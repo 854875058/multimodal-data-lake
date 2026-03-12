@@ -1681,6 +1681,68 @@ pre {
   width: 100%;
 }
 
+.workspace-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.workspace-switcher-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.workspace-segmented {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px;
+  border-radius: 16px;
+  background: rgba(0, 102, 255, 0.05);
+  border: 1px solid rgba(0, 102, 255, 0.08);
+}
+
+.workspace-segment {
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  text-align: left;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.workspace-segment:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(0, 102, 255, 0.12);
+}
+
+.workspace-segment.is-active {
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.14), rgba(14, 165, 233, 0.08));
+  border-color: rgba(0, 102, 255, 0.22);
+  color: var(--ink-strong);
+  box-shadow: 0 12px 24px rgba(0, 80, 190, 0.08);
+}
+
+.workspace-segment-label {
+  font-weight: 700;
+  color: inherit;
+}
+
+.workspace-segment-hint {
+  font-size: 0.76rem;
+  line-height: 1.36;
+  color: inherit;
+  opacity: 0.82;
+}
+
 .workbench-form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

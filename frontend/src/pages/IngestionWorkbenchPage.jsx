@@ -403,6 +403,7 @@ export default function IngestionWorkbenchPage() {
   const [scanResult, setScanResult] = useState(emptyScan)
   const [indexStatus, setIndexStatus] = useState(emptyIndexStatus)
   const [platformSettings, setPlatformSettings] = useState(null)
+  const [activeWorkspaceSection, setActiveWorkspaceSection] = useState('overview')
   const [jobs, setJobs] = useState([])
   const [selectedJobId, setSelectedJobId] = useState('')
   const [jobDetail, setJobDetail] = useState(null)
@@ -574,6 +575,13 @@ export default function IngestionWorkbenchPage() {
       title: '执行治理',
       copy: '优先展示任务状态、索引结果和日志闭环，保证工作台更像商业平台控制面，而不是单次操作面板。'
     }
+  ]
+  const workspaceSections = [
+    { id: 'overview', label: '总控', hint: '平台视角' },
+    { id: 'source', label: '来源配置', hint: '接入与扫描' },
+    { id: 'workflow', label: '工作流', hint: 'Daft / Ray' },
+    { id: 'operations', label: '任务治理', hint: '执行与日志' },
+    { id: 'index', label: '索引资产', hint: '索引与容量' }
   ]
 
   const loadSettings = async () => {
@@ -944,123 +952,153 @@ export default function IngestionWorkbenchPage() {
       {banner.message ? <div className={`${banner.type}-banner`}>{banner.message}</div> : null}
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <div className="workbench-strategy-grid">
-        <section className="glass-card workbench-platform-card">
-          <div className="card-header">
-            <div>
-              <h2>平台依赖矩阵</h2>
-              <p>用平台服务视角描述当前工作台，而不是只看表单字段和按钮。</p>
-            </div>
-            <span className="badge">Control Plane</span>
+      <div className="workspace-switcher glass-card">
+        <div className="workspace-switcher-head">
+          <div>
+            <div className="section-title">工作区视图</div>
+            <div className="workbench-help">用分段工作区代替长滚动页面，降低信息堆叠感。</div>
           </div>
+        </div>
+        <div className="workspace-segmented">
+          {workspaceSections.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              className={`workspace-segment${activeWorkspaceSection === section.id ? ' is-active' : ''}`}
+              onClick={() => setActiveWorkspaceSection(section.id)}
+            >
+              <span className="workspace-segment-label">{section.label}</span>
+              <span className="workspace-segment-hint">{section.hint}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
-          <div className="platform-service-grid compact-grid">
-            {platformServiceCards.map((item) => (
-              <div className="platform-service-card compact-card" key={item.title}>
-                <div className="platform-service-head">
-                  <div className="platform-service-title">{item.title}</div>
+      {activeWorkspaceSection === 'overview' ? (
+        <>
+          <div className="workbench-strategy-grid">
+            <section className="glass-card workbench-platform-card">
+              <div className="card-header">
+                <div>
+                  <h2>平台依赖矩阵</h2>
+                  <p>用平台服务视角描述当前工作台，而不是只看表单字段和按钮。</p>
                 </div>
-                <div className="platform-service-meta mono">{item.value}</div>
-                <div className="platform-service-note">{item.note}</div>
+                <span className="badge">Control Plane</span>
               </div>
-            ))}
-          </div>
-        </section>
 
-        <section className="glass-card workbench-playbook-card">
-          <div className="card-header">
-            <div>
-              <h2>执行准则</h2>
-              <p>让工作台更像商业平台控制台，而不是临时操作页。</p>
-            </div>
-          </div>
-
-          <div className="platform-roadmap-list">
-            {governanceCards.map((item) => (
-              <div className="platform-roadmap-item" key={item.title}>
-                <div className="platform-roadmap-title">{item.title}</div>
-                <div className="platform-roadmap-copy">{item.copy}</div>
+              <div className="platform-service-grid compact-grid">
+                {platformServiceCards.map((item) => (
+                  <div className="platform-service-card compact-card" key={item.title}>
+                    <div className="platform-service-head">
+                      <div className="platform-service-title">{item.title}</div>
+                    </div>
+                    <div className="platform-service-meta mono">{item.value}</div>
+                    <div className="platform-service-note">{item.note}</div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
-      </div>
+            </section>
 
-      <div className="workbench-command-deck">
-        <section className="glass-card workbench-command-card">
-          <div className="card-header">
-            <div>
-              <h2>执行概览</h2>
-              <p>先确认来源、连接和扫描状态，再进入批量导入、索引构建和任务追踪。</p>
-            </div>
-            <span className="badge">{readinessBadge}</span>
-          </div>
-
-          <div className="workflow-strip">
-            <div className="workflow-step is-active">
-              <span className="workflow-step-index">01</span>
-              <div>
-                <div className="workflow-step-title">配置来源</div>
-                <div className="workflow-step-copy">{form.source_type === 's3' ? 'SeaweedFS / S3 兼容对象存储' : '远程 SFTP 目录'}</div>
+            <section className="glass-card workbench-playbook-card">
+              <div className="card-header">
+                <div>
+                  <h2>执行准则</h2>
+                  <p>让工作台更像商业平台控制台，而不是临时操作页。</p>
+                </div>
               </div>
-            </div>
-            <div className={`workflow-step ${connectionData ? 'is-active' : ''}`}>
-              <span className="workflow-step-index">02</span>
-              <div>
-                <div className="workflow-step-title">验证连接</div>
-                <div className="workflow-step-copy">{connectionData ? '已拿到样本结果' : '建议先做连通性测试'}</div>
+
+              <div className="platform-roadmap-list">
+                {governanceCards.map((item) => (
+                  <div className="platform-roadmap-item" key={item.title}>
+                    <div className="platform-roadmap-title">{item.title}</div>
+                    <div className="platform-roadmap-copy">{item.copy}</div>
+                  </div>
+                ))}
               </div>
-            </div>
-            <div className={`workflow-step ${scanResult.objects.length ? 'is-active' : ''}`}>
-              <span className="workflow-step-index">03</span>
-              <div>
-                <div className="workflow-step-title">扫描筛选</div>
-                <div className="workflow-step-copy">{scanResult.objects.length ? `已返回 ${formatNumber(scanResult.returned_count)} 个对象` : '还未生成预览清单'}</div>
-              </div>
-            </div>
-            <div className={`workflow-step ${activeJobs ? 'is-active' : ''}`}>
-              <span className="workflow-step-index">04</span>
-              <div>
-                <div className="workflow-step-title">任务执行</div>
-                <div className="workflow-step-copy">{activeJobs ? `${formatNumber(activeJobs)} 个任务执行中` : '等待启动导入任务'}</div>
-              </div>
-            </div>
+            </section>
           </div>
 
-          <div className="workbench-brief-copy">
-            <p>{orchestrationHint}</p>
-            <p>{taskPressureText}</p>
+          <div className="workbench-command-deck">
+            <section className="glass-card workbench-command-card">
+              <div className="card-header">
+                <div>
+                  <h2>执行概览</h2>
+                  <p>先确认来源、连接和扫描状态，再进入批量导入、索引构建和任务追踪。</p>
+                </div>
+                <span className="badge">{readinessBadge}</span>
+              </div>
+
+              <div className="workflow-strip">
+                <div className="workflow-step is-active">
+                  <span className="workflow-step-index">01</span>
+                  <div>
+                    <div className="workflow-step-title">配置来源</div>
+                    <div className="workflow-step-copy">{form.source_type === 's3' ? 'SeaweedFS / S3 兼容对象存储' : '远程 SFTP 目录'}</div>
+                  </div>
+                </div>
+                <div className={`workflow-step ${connectionData ? 'is-active' : ''}`}>
+                  <span className="workflow-step-index">02</span>
+                  <div>
+                    <div className="workflow-step-title">验证连接</div>
+                    <div className="workflow-step-copy">{connectionData ? '已拿到样本结果' : '建议先做连通性测试'}</div>
+                  </div>
+                </div>
+                <div className={`workflow-step ${scanResult.objects.length ? 'is-active' : ''}`}>
+                  <span className="workflow-step-index">03</span>
+                  <div>
+                    <div className="workflow-step-title">扫描筛选</div>
+                    <div className="workflow-step-copy">{scanResult.objects.length ? `已返回 ${formatNumber(scanResult.returned_count)} 个对象` : '还未生成预览清单'}</div>
+                  </div>
+                </div>
+                <div className={`workflow-step ${activeJobs ? 'is-active' : ''}`}>
+                  <span className="workflow-step-index">04</span>
+                  <div>
+                    <div className="workflow-step-title">任务执行</div>
+                    <div className="workflow-step-copy">{activeJobs ? `${formatNumber(activeJobs)} 个任务执行中` : '等待启动导入任务'}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="workbench-brief-copy">
+                <p>{orchestrationHint}</p>
+                <p>{taskPressureText}</p>
+              </div>
+            </section>
+
+            <section className="glass-card workbench-source-brief">
+              <div className="kpi-label">当前来源</div>
+              <div className="workbench-source-brief-title">{sourceSummaryTitle}</div>
+              <div className="workbench-source-brief-path mono">{sourceSummaryPath}</div>
+              <div className="workbench-source-brief-meta">{sourceSummaryMeta}</div>
+
+              <div className="workbench-brief-stats">
+                <div className="workbench-brief-stat">
+                  <div className="kpi-label">活动任务</div>
+                  <div className="workbench-brief-value">{formatNumber(activeJobs)}</div>
+                </div>
+                <div className="workbench-brief-stat">
+                  <div className="kpi-label">扫描对象</div>
+                  <div className="workbench-brief-value">{formatNumber(scanResult.returned_count)}</div>
+                </div>
+                <div className="workbench-brief-stat">
+                  <div className="kpi-label">已勾选</div>
+                  <div className="workbench-brief-value">{formatNumber(selectedScanKeys.length)}</div>
+                </div>
+              </div>
+            </section>
           </div>
-        </section>
+        </>
+      ) : null}
 
-        <section className="glass-card workbench-source-brief">
-          <div className="kpi-label">当前来源</div>
-          <div className="workbench-source-brief-title">{sourceSummaryTitle}</div>
-          <div className="workbench-source-brief-path mono">{sourceSummaryPath}</div>
-          <div className="workbench-source-brief-meta">{sourceSummaryMeta}</div>
+      {activeWorkspaceSection === 'workflow' ? (
+        <WorkflowStudio
+          sourceHint={sourceSummaryPath}
+          onBanner={(type, message) => showBanner(type, message)}
+        />
+      ) : null}
 
-          <div className="workbench-brief-stats">
-            <div className="workbench-brief-stat">
-              <div className="kpi-label">活动任务</div>
-              <div className="workbench-brief-value">{formatNumber(activeJobs)}</div>
-            </div>
-            <div className="workbench-brief-stat">
-              <div className="kpi-label">扫描对象</div>
-              <div className="workbench-brief-value">{formatNumber(scanResult.returned_count)}</div>
-            </div>
-            <div className="workbench-brief-stat">
-              <div className="kpi-label">已勾选</div>
-              <div className="workbench-brief-value">{formatNumber(selectedScanKeys.length)}</div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <WorkflowStudio
-        sourceHint={sourceSummaryPath}
-        onBanner={(type, message) => showBanner(type, message)}
-      />
-
+      {activeWorkspaceSection === 'source' ? (
+        <>
       <section className="glass-card workbench-config-card">
           <div className="card-header">
             <div>
@@ -1222,8 +1260,11 @@ export default function IngestionWorkbenchPage() {
           </div>
         </div>
       </section>
+      </>
+      ) : null}
 
-      <div className="section-title">执行态势</div>
+      {activeWorkspaceSection === 'overview' || activeWorkspaceSection === 'index' ? <div className="section-title">执行态势</div> : null}
+      {activeWorkspaceSection === 'overview' || activeWorkspaceSection === 'index' ? (
       <div className="mini-kpi-grid">
         <div className="glass-card mini-kpi-card">
           <div className="kpi-label">扫描返回对象</div>
@@ -1246,7 +1287,9 @@ export default function IngestionWorkbenchPage() {
           <div className="kpi-sub">本次准备定向导入的扫描对象</div>
         </div>
       </div>
+      ) : null}
 
+      {activeWorkspaceSection === 'source' ? (
       <div className="workbench-grid">
         <section className="glass-card">
           <div className="card-header">
@@ -1396,7 +1439,11 @@ export default function IngestionWorkbenchPage() {
             </div>
           ) : null}
         </section>
+      </div>
+      ) : null}
 
+      {activeWorkspaceSection === 'index' ? (
+      <div className="workbench-grid">
         <section className="glass-card">
           <div className="card-header">
             <div>
@@ -1425,7 +1472,9 @@ export default function IngestionWorkbenchPage() {
           </div>
         </section>
       </div>
+      ) : null}
 
+      {activeWorkspaceSection === 'operations' ? (
       <div className="workbench-grid workbench-grid-wide">
         <section className="glass-card">
           <div className="card-header">
@@ -1613,6 +1662,7 @@ export default function IngestionWorkbenchPage() {
           )}
         </section>
       </div>
+      ) : null}
 
 
       {jobModalOpen && jobDetail ? (
