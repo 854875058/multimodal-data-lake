@@ -1743,6 +1743,20 @@ pre {
   opacity: 0.82;
 }
 
+.governance-summary-grid,
+.governance-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.governance-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.governance-shell {
+  grid-template-columns: minmax(0, 1.12fr) minmax(360px, 0.88fr);
+}
+
 .workbench-form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2098,6 +2112,7 @@ pre {
 
   .shell-header,
   .platform-overview-grid,
+  .governance-shell,
   .dashboard-lead-grid,
   .catalog-shell,
   .query-top-grid,
@@ -2119,6 +2134,7 @@ pre {
   .shell-stat-grid,
   .platform-service-grid,
   .platform-capability-grid,
+  .governance-summary-grid,
   .dashboard-pulse-row,
   .catalog-selectors,
   .query-settings-grid,

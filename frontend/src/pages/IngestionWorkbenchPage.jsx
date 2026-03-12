@@ -580,7 +580,6 @@ export default function IngestionWorkbenchPage() {
     { id: 'overview', label: '总控', hint: '平台视角' },
     { id: 'source', label: '来源配置', hint: '接入与扫描' },
     { id: 'workflow', label: '工作流', hint: 'Daft / Ray' },
-    { id: 'operations', label: '任务治理', hint: '执行与日志' },
     { id: 'index', label: '索引资产', hint: '索引与容量' }
   ]
 
@@ -647,6 +646,37 @@ export default function IngestionWorkbenchPage() {
   useEffect(() => {
     refreshAll(false)
   }, [])
+
+  useEffect(() => {
+    if (loading) {
+      return
+    }
+
+    const payloadText = typeof window !== 'undefined' ? window.sessionStorage.getItem('workbench_reuse_payload') : ''
+    if (!payloadText) {
+      return
+    }
+
+    try {
+      const payload = JSON.parse(payloadText)
+      const nextForm = normalizeForm(payload)
+      setForm(nextForm)
+      setConnectionData(null)
+      setScanResult({ ...emptyScan, source_type: nextForm.source_type })
+      setSelectedScanKeys([])
+      setScanPage(1)
+      setActiveWorkspaceSection('source')
+      const sourceJobId = window.sessionStorage.getItem('workbench_reuse_job_id')
+      showBanner('success', sourceJobId ? `已从任务 ${sourceJobId} 回填配置。` : '已回填任务配置。')
+      window.sessionStorage.removeItem('workbench_reuse_payload')
+      window.sessionStorage.removeItem('workbench_reuse_job_id')
+    } catch {
+      if (typeof window !== 'undefined') {
+        window.sessionStorage.removeItem('workbench_reuse_payload')
+        window.sessionStorage.removeItem('workbench_reuse_job_id')
+      }
+    }
+  }, [loading])
 
   useEffect(() => {
     if (selectedJobId) {
@@ -1472,264 +1502,6 @@ export default function IngestionWorkbenchPage() {
           </div>
         </section>
       </div>
-      ) : null}
-
-      {activeWorkspaceSection === 'operations' ? (
-      <div className="workbench-grid workbench-grid-wide">
-        <section className="glass-card">
-          <div className="card-header">
-            <div>
-              <h2>任务列表</h2>
-              <p>展示最近批量接入任务，可查看实时进度与状态。</p>
-            </div>
-          </div>
-
-          <div className="toolbar workbench-table-toolbar">
-            <div className="toolbar-group">
-              <div className="field compact-field">
-                <label htmlFor="job_status_filter">任务状态</label>
-                <select
-                  id="job_status_filter"
-                  className="select"
-                  value={jobStatusFilter}
-                  onChange={(event) => setJobStatusFilter(event.target.value)}
-                >
-                  {jobStatusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field compact-field">
-                <label htmlFor="job_sort">排序方式</label>
-                <select
-                  id="job_sort"
-                  className="select"
-                  value={jobSort}
-                  onChange={(event) => setJobSort(event.target.value)}
-                >
-                  {jobSortOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field grow-field">
-                <label htmlFor="job_keyword">任务搜索</label>
-                <input
-                  id="job_keyword"
-                  className="input"
-                  value={jobKeyword}
-                  onChange={(event) => setJobKeyword(event.target.value)}
-                  placeholder="搜索任务 ID、状态、说明、Bucket、Prefix、Host 或 Path"
-                />
-              </div>
-            </div>
-            <div className="workbench-help">共 {formatNumber(jobs.length)} 条任务，当前显示 {formatNumber(filteredJobs.length)} 条。</div>
-          </div>
-
-          {filteredJobs.length ? (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>任务 ID</th>
-                    <th>状态</th>
-                    <th>进度</th>
-                    <th>说明</th>
-                    <th>更新时间</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredJobs.map((job) => {
-                    const progress = getJobProgress(job)
-                    return (
-                      <tr key={job.job_id} className={selectedJobId === job.job_id ? 'table-row-active' : ''}>
-                        <td className="mono">{job.job_id}</td>
-                        <td>
-                          <span className={`badge ${getJobBadgeClass(job.status)}`}>
-                            {getJobStatusText(job.status)}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="job-progress-row">
-                            <div className="job-progress-track">
-                              <div className="job-progress-value" style={{ width: `${progress}%` }} />
-                            </div>
-                            <span>{progress}%</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="table-secondary">{job.message || '--'}</div>
-                          <div className="table-secondary">{getJobCompactStats(job)}</div>
-                        </td>
-                        <td>{formatDateTime(job.updated_at)}</td>
-                        <td>
-                          <div className="table-actions">
-                            <button type="button" className="button button-small button-secondary" onClick={() => handleViewJobDetail(job.job_id)}>
-                              查看详情
-                            </button>
-                            <button type="button" className="button button-small button-ghost" onClick={() => handleReuseJobConfig(job)}>
-                              复用配置
-                            </button>
-                            {['pending', 'running', 'cancelling'].includes(job.status) ? (
-                              <button
-                                type="button"
-                                className="button button-small button-danger"
-                                onClick={() => handleCancelJob(job.job_id)}
-                                disabled={job.status === 'cancelling'}
-                              >
-                                {job.status === 'cancelling' ? '取消中...' : '停止任务'}
-                              </button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="empty-state small">{jobs.length ? '当前筛选下暂无任务。' : '还没有批量导入任务，启动一次任务后这里会自动刷新。'}</div>
-          )}
-        </section>
-
-        <section className="glass-card">
-          <div className="card-header">
-            <div>
-              <h2>任务详情</h2>
-              <p>查看当前任务结果摘要、任务参数和完整处理日志。</p>
-            </div>
-          </div>
-
-          {jobDetail ? (
-            <>
-              <div className="detail-grid">
-                <div className="detail-item">
-                  <div className="kpi-label">任务状态</div>
-                  <div className="detail-value">
-                    <span className={`badge ${getJobBadgeClass(jobDetail.status)}`}>{getJobStatusText(jobDetail.status)}</span>
-                  </div>
-                </div>
-                <div className="detail-item">
-                  <div className="kpi-label">结果摘要</div>
-                  <div className="detail-value">{getJobResultSummary(jobDetail)}</div>
-                </div>
-                <div className="detail-item">
-                  <div className="kpi-label">来源类型</div>
-                  <div className="detail-value">{getSourceTypeText(jobDetail.payload?.source_type)}</div>
-                </div>
-                <div className="detail-item">
-                  <div className="kpi-label">{getSourcePrimaryLabel(jobDetail.payload?.source_type)}</div>
-                  <div className="detail-value mono">{getSourcePrimaryValue(jobDetail.payload)}</div>
-                </div>
-                <div className="detail-item">
-                  <div className="kpi-label">{getSourceSecondaryLabel(jobDetail.payload?.source_type)}</div>
-                  <div className="detail-value mono">{getSourceSecondaryValue(jobDetail.payload)}</div>
-                </div>
-                <div className="detail-item">
-                  <div className="kpi-label">勾选导入</div>
-                  <div className="detail-value">{Number(jobDetail.result?.selected_requested || 0) > 0 ? `${Number(jobDetail.result?.selected_matched || 0)} / ${Number(jobDetail.result?.selected_requested || 0)} 个对象命中` : '未启用'}</div>
-                </div>
-              </div>
-
-              <div className="toolbar workbench-table-toolbar">
-                <div className="toolbar-group">
-                  <button type="button" className="button button-small button-ghost" onClick={() => handleCopyLogs(jobDetail.logs)}>
-                    复制日志
-                  </button>
-                  <button type="button" className="button button-small button-secondary" onClick={() => handleExportLogs(jobDetail)}>
-                    导出日志
-                  </button>
-                  <button type="button" className="button button-small button-ghost" onClick={() => handleReuseJobConfig(jobDetail)}>
-                    复用配置
-                  </button>
-                  {['pending', 'running', 'cancelling'].includes(jobDetail.status) ? (
-                    <button type="button" className="button button-small button-danger" onClick={() => handleCancelJob(jobDetail.job_id)} disabled={jobDetail.status === 'cancelling'}>
-                      {jobDetail.status === 'cancelling' ? '取消中...' : '停止任务'}
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-              <div className="log-viewer">{jobDetail.logs || '暂无任务日志。'}</div>
-            </>
-          ) : (
-            <div className="empty-state small">请选择一条任务查看详情。</div>
-          )}
-        </section>
-      </div>
-      ) : null}
-
-
-      {jobModalOpen && jobDetail ? (
-        <div className="modal-overlay" onClick={closeJobModal}>
-          <div className="modal-panel glass-card" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-header">
-              <div>
-                <div className="modal-title">任务详情</div>
-                <div className="modal-subtitle">
-                  <span className="badge">{jobDetail.job_id}</span>
-                  <span className={`badge ${getJobBadgeClass(jobDetail.status)}`}>{getJobStatusText(jobDetail.status)}</span>
-                  <span>{formatDateTime(jobDetail.updated_at)}</span>
-                </div>
-              </div>
-              <div className="toolbar-group">
-                <button type="button" className="button button-small button-ghost" onClick={() => handleCopyLogs(jobDetail.logs)}>
-                  复制日志
-                </button>
-                <button type="button" className="button button-small button-secondary" onClick={() => handleExportLogs(jobDetail)}>
-                  导出日志
-                </button>
-                <button type="button" className="button button-small button-ghost" onClick={() => handleReuseJobConfig(jobDetail)}>
-                  复用配置
-                </button>
-                {['pending', 'running', 'cancelling'].includes(jobDetail.status) ? (
-                  <button type="button" className="button button-small button-danger" onClick={() => handleCancelJob(jobDetail.job_id)} disabled={jobDetail.status === 'cancelling'}>
-                    {jobDetail.status === 'cancelling' ? '取消中...' : '停止任务'}
-                  </button>
-                ) : null}
-                <button type="button" className="button button-small button-secondary" onClick={closeJobModal}>
-                  关闭
-                </button>
-              </div>
-            </div>
-
-            <div className="modal-body">
-              <div className="detail-grid">
-                <div className="detail-item">
-                  <div className="kpi-label">结果摘要</div>
-                  <div className="detail-value">{getJobResultSummary(jobDetail)}</div>
-                </div>
-                <div className="detail-item">
-                  <div className="kpi-label">执行进度</div>
-                  <div className="detail-value">{getJobProgress(jobDetail)}%</div>
-                </div>
-                <div className="detail-item">
-                  <div className="kpi-label">来源类型</div>
-                  <div className="detail-value">{getSourceTypeText(jobDetail.payload?.source_type)}</div>
-                </div>
-                <div className="detail-item">
-                  <div className="kpi-label">{getSourcePrimaryLabel(jobDetail.payload?.source_type)}</div>
-                  <div className="detail-value mono">{getSourcePrimaryValue(jobDetail.payload)}</div>
-                </div>
-                <div className="detail-item">
-                  <div className="kpi-label">{getSourceSecondaryLabel(jobDetail.payload?.source_type)}</div>
-                  <div className="detail-value mono">{getSourceSecondaryValue(jobDetail.payload)}</div>
-                </div>
-                <div className="detail-item">
-                  <div className="kpi-label">勾选导入</div>
-                  <div className="detail-value">{Number(jobDetail.result?.selected_requested || 0) > 0 ? `${Number(jobDetail.result?.selected_matched || 0)} / ${Number(jobDetail.result?.selected_requested || 0)} 个对象命中` : '未启用'}</div>
-                </div>
-              </div>
-
-              <div className="log-viewer">{jobDetail.logs || '暂无任务日志。'}</div>
-            </div>
-          </div>
-        </div>
       ) : null}
 
     </div>
