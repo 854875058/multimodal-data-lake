@@ -1,99 +1,223 @@
-import axios from 'axios'
+﻿import axios from 'axios'
 
-const api = axios.create({
+export const apiClient = axios.create({
   baseURL: '/api',
   timeout: 60000
 })
 
-// 请求拦截器
-api.interceptors.request.use(
-  config => {
-    return config
-  },
-  error => {
+function normalizeErrorPayload(value) {
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => {
+        if (typeof item === 'string') {
+          return item
+        }
+        if (item && typeof item === 'object') {
+          return item.msg || item.message || JSON.stringify(item)
+        }
+        return ''
+      })
+      .filter(Boolean)
+    return parts.join('；') || '请求失败'
+  }
+
+  if (value && typeof value === 'object') {
+    return value.msg || value.message || JSON.stringify(value)
+  }
+
+  return String(value || '').trim()
+}
+
+apiClient.interceptors.response.use(
+  (response) => response.data,
+  (error) => {
+    const detail = error?.response?.data?.detail
+    const rawMessage = error?.response?.data?.message || detail || error.message || '请求失败'
+    error.message = normalizeErrorPayload(rawMessage) || '请求失败'
     return Promise.reject(error)
   }
 )
 
-// 响应拦截器
-api.interceptors.response.use(
-  response => {
-    return response.data
-  },
-  error => {
-    console.error('API Error:', error)
-    return Promise.reject(error)
+function buildFileParams(page = 1, pageSize = 20, docType = 'all') {
+  const params = {
+    page,
+    page_size: pageSize
   }
-)
 
-export default {
-  // 文件上传
+  if (docType && docType !== 'all') {
+    params.doc_type = docType
+  }
+
+  return params
+}
+
+const api = {
   uploadFiles(files) {
     const formData = new FormData()
-    files.forEach(file => {
+    files.forEach((file) => {
       formData.append('files', file)
     })
-    return api.post('/upload/batch', formData, {
+    return apiClient.post('/upload/batch', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
 
-  // 搜索
   search(query, mode = 'text', limit = 10) {
-    return api.post('/search/', { query, mode, limit })
+    return apiClient.post('/search/', { query, mode, limit })
   },
 
-  // 文件列表
-  getFiles(page = 1, pageSize = 20, docType = null) {
-    return api.get('/files/list', {
-      params: { page, page_size: pageSize, doc_type: docType }
+  getFiles(page = 1, pageSize = 20, docType = 'all') {
+    return apiClient.get('/files/list', {
+      params: buildFileParams(page, pageSize, docType)
     })
   },
 
-  // 文件预览
   previewFile(fileHash) {
-    return api.get(`/files/preview/${fileHash}`)
+    return apiClient.get(`/files/preview/${encodeURIComponent(fileHash)}`)
   },
 
-  // 删除文件
+  getFileContentUrl(fileHash) {
+    return `/api/files/content/${encodeURIComponent(fileHash)}`
+  },
+
   deleteFile(fileHash) {
-    return api.delete(`/files/${fileHash}`)
+    return apiClient.delete(`/files/${encodeURIComponent(fileHash)}`)
   },
 
-  // 仪表盘统计
   getDashboardStats() {
-    return api.get('/dashboard/stats')
+    return apiClient.get('/dashboard/stats')
   },
 
-  // 趋势数据
   getTrend(days = 7) {
-    return api.get('/dashboard/trend', { params: { days } })
+    return apiClient.get('/dashboard/trend', { params: { days } })
   },
 
-  // 文件类型分布
   getFileTypes() {
-    return api.get('/dashboard/file-types')
+    return apiClient.get('/dashboard/file-types')
   },
 
-  // 实体数据
   getEntities(fileHash = null) {
-    return api.get('/dashboard/entities', {
+    return apiClient.get('/dashboard/entities', {
       params: fileHash ? { file_hash: fileHash } : {}
     })
   },
 
-  // 系统资源
+  getKnowledgeGraph() {
+    return apiClient.get('/dashboard/knowledge-graph')
+  },
+
   getSystemResources() {
-    return api.get('/system/resources')
+    return apiClient.get('/system/resources')
   },
 
-  // 系统状态
   getSystemStatus() {
-    return api.get('/system/status')
+    return apiClient.get('/system/status')
   },
 
-  // 日志
   getLogs(lines = 500) {
-    return api.get('/system/logs', { params: { lines } })
+    return apiClient.get('/system/logs', { params: { lines } })
+  },
+
+  getWorkbenchSettings() {
+    return apiClient.get('/workbench/settings')
+  },
+
+  saveWorkbenchSettings(payload) {
+    return apiClient.post('/workbench/settings', payload)
+  },
+
+  testWorkbenchConnection(payload) {
+    return apiClient.post('/workbench/test-connection', payload)
+  },
+
+  scanWorkbenchSource(payload) {
+    return apiClient.post('/workbench/scan', payload)
+  },
+
+  startWorkbenchJob(payload) {
+    return apiClient.post('/workbench/jobs', payload)
+  },
+
+  getWorkbenchJobs(limit = 20) {
+    return apiClient.get('/workbench/jobs', { params: { limit } })
+  },
+
+  getWorkbenchJob(jobId) {
+    return apiClient.get(`/workbench/jobs/${encodeURIComponent(jobId)}`)
+  },
+
+  cancelWorkbenchJob(jobId) {
+    return apiClient.post(`/workbench/jobs/${encodeURIComponent(jobId)}/cancel`)
+  },
+
+  getWorkbenchIndexStatus() {
+    return apiClient.get('/workbench/index-status')
+  },
+
+  buildWorkbenchIndex(payload) {
+    return apiClient.post('/workbench/build-index', payload)
+  },
+
+  getPlatformSettings() {
+    return apiClient.get('/platform/settings')
+  },
+
+  savePlatformSettings(payload) {
+    return apiClient.post('/platform/settings', payload)
+  },
+
+  getAssetCatalogs() {
+    return apiClient.get('/platform/assets/catalogs')
+  },
+
+  getAssetSchemas(catalog) {
+    return apiClient.get('/platform/assets/schemas', { params: { catalog } })
+  },
+
+  getAssetTables(catalog, schema) {
+    return apiClient.get('/platform/assets/tables', { params: { catalog, schema } })
+  },
+
+  getAssetDetail(catalog, schema, table, limit = 8) {
+    return apiClient.get('/platform/assets/detail', { params: { catalog, schema, table, limit } })
+  },
+
+  getExternalTables() {
+    return apiClient.get('/platform/doris/external-tables')
+  },
+
+  testDorisConnection(payload) {
+    return apiClient.post('/platform/doris/test-connection', payload)
+  },
+
+  createExternalTable(payload) {
+    return apiClient.post('/platform/doris/external-tables', payload)
+  },
+
+  executeDorisSql(payload) {
+    return apiClient.post('/platform/doris/sql', payload)
+  },
+
+  convertNlToSql(payload) {
+    return apiClient.post('/platform/doris/nl2sql', payload)
+  },
+
+  convertNlToVector(payload) {
+    return apiClient.post('/platform/doris/nl2vector', payload)
+  },
+
+  getWorkflowPresets() {
+    return apiClient.get('/platform/workflow/presets')
+  },
+
+  buildWorkflowJob(payload) {
+    return apiClient.post('/platform/workflow/build-job', payload)
   }
 }
+
+export function getErrorMessage(error, fallback = '请求失败') {
+  const message = normalizeErrorPayload(error?.message)
+  return message || fallback
+}
+
+export default api

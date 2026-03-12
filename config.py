@@ -3,6 +3,25 @@
 
 import os
 
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    """读取布尔环境变量。"""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int) -> int:
+    """读取整型环境变量，失败时回退默认值。"""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
 # --- 路径 ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # LanceDB 存储位置：
@@ -13,6 +32,33 @@ TEMP_DIR = os.path.join(BASE_DIR, "temp_uploads")
 EXTRACT_DIR = os.path.join(BASE_DIR, "temp_extracted")
 DB_PATH = os.path.join(BASE_DIR, "user_data.db")
 LOG_PATH = os.path.join(BASE_DIR, "app.log")
+
+# --- Web 服务 ---
+CORS_ALLOW_ORIGINS = [
+    item.strip()
+    for item in os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
+    if item.strip()
+]
+CORS_ALLOW_CREDENTIALS = _env_bool("CORS_ALLOW_CREDENTIALS", True)
+BACKEND_RELOAD = _env_bool("BACKEND_RELOAD", False)
+
+DEFAULT_AWS_REGION = (
+    os.getenv("S3_REGION")
+    or os.getenv("AWS_REGION")
+    or os.getenv("AWS_DEFAULT_REGION")
+    or "us-east-1"
+)
+os.environ.setdefault("AWS_REGION", DEFAULT_AWS_REGION)
+os.environ.setdefault("AWS_DEFAULT_REGION", DEFAULT_AWS_REGION)
+os.environ.setdefault("AWS_EC2_METADATA_DISABLED", "true")
+
+# --- 系统接口 ---
+SYSTEM_API_LOCAL_ONLY = _env_bool("SYSTEM_API_LOCAL_ONLY", True)
+MAX_LOG_LINES = max(100, _env_int("MAX_LOG_LINES", 2000))
+FILE_DELETE_LOCAL_ONLY = _env_bool("FILE_DELETE_LOCAL_ONLY", True)
 
 # --- S3 ---
 # 兼容两种写法：
@@ -29,6 +75,7 @@ S3_CONFIG = {
     # "raw_bucket": "demo-raw",
     # "lance_bucket": "demo-lance",
     "lance_prefix": os.getenv("S3_LANCE_PREFIX", "lance_lake"),
+    "region": os.getenv("S3_REGION", DEFAULT_AWS_REGION),
 }
 
 # --- 归一化（保证其它模块都用统一字段）---

@@ -2,10 +2,13 @@
 """系统监控 API"""
 
 import logging
+from collections import deque
 import psutil
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
+
+from config import MAX_LOG_LINES, SYSTEM_API_LOCAL_ONLY
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -31,6 +34,23 @@ class SystemStatus(BaseModel):
     models: ModelStatus
     lancedb: LanceDBStatus
 
+
+def _get_client_host(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    if forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+    if request.client:
+        return request.client.host
+    return ""
+
+
+def _ensure_local_access(request: Request):
+    if not SYSTEM_API_LOCAL_ONLY:
+        return
+    client_host = _get_client_host(request)
+    if client_host not in {"127.0.0.1", "::1", "localhost"}:
+        raise HTTPException(status_code=403, detail="该接口仅允许本机访问")
+
 @router.get("/resources", response_model=SystemResources)
 async def get_resources():
     """获取系统资源使用情况"""
@@ -47,7 +67,7 @@ async def get_resources():
 
     except Exception as e:
         logger.error(f"获取系统资源失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取系统资源失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="获取系统资源失败")
 
 @router.get("/status", response_model=SystemStatus)
 async def get_status():
@@ -102,23 +122,24 @@ async def get_status():
 
     except Exception as e:
         logger.error(f"获取系统状态失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取系统状态失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="获取系统状态失败")
 
 @router.get("/logs")
-async def get_logs(lines: int = 500):
+async def get_logs(request: Request, lines: int = 500):
     """获取应用日志"""
     try:
+        _ensure_local_access(request)
         log_file = Path(__file__).parent.parent.parent / "app.log"
+        safe_lines = max(1, min(lines, MAX_LOG_LINES))
 
         if not log_file.exists():
             return {"logs": "日志文件不存在"}
 
         with open(log_file, "r", encoding="utf-8", errors="ignore") as f:
-            all_lines = f.readlines()
-            recent_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+            recent_lines = deque(f, maxlen=safe_lines)
 
         return {"logs": "".join(recent_lines)}
 
     except Exception as e:
         logger.error(f"读取日志失败: {e}")
-        raise HTTPException(status_code=500, detail=f"读取日志失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="读取日志失败")

@@ -1,0 +1,3 @@
+﻿北京大学人工智能实验室与阿里云合作开发 DataLakeX 平台。
+DataLakeX 平台部署在上海张江数据中心，并依赖 LanceDB 和 DeepSeek 服务。
+张三负责 DataLakeX 平台，李四管理上海张江数据中心。

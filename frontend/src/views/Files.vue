@@ -58,24 +58,24 @@
     </div>
 
     <!-- 预览对话框 -->
-    <el-dialog v-model="previewVisible" :title="previewTitle" width="70%" :close-on-click-modal="false">
+    <el-dialog v-model="previewVisible" :title="previewTitle" width="70%" :close-on-click-modal="false" @closed="onPreviewClosed">
       <div v-loading="previewLoading">
         <!-- 图片预览 -->
         <div v-if="previewType === 'image'" style="text-align: center;">
-          <img :src="`data:image/${previewExt};base64,${previewContent}`" style="max-width: 100%; max-height: 600px;" />
+          <img :src="previewMediaUrl" style="max-width: 100%; max-height: 600px;" />
         </div>
 
         <!-- 音频预览 -->
         <div v-else-if="previewType === 'audio'" style="text-align: center;">
           <audio controls style="width: 100%;">
-            <source :src="`data:audio/${previewExt};base64,${previewContent}`" />
+            <source :src="previewMediaUrl" />
           </audio>
         </div>
 
         <!-- 视频预览 -->
         <div v-else-if="previewType === 'video'" style="text-align: center;">
           <video controls style="max-width: 100%; max-height: 600px;">
-            <source :src="`data:video/${previewExt};base64,${previewContent}`" />
+            <source :src="previewMediaUrl" />
           </video>
         </div>
 
@@ -112,8 +112,15 @@ const previewLoading = ref(false)
 const previewTitle = ref('')
 const previewType = ref('')
 const previewExt = ref('')
-const previewContent = ref('')
+const previewMediaUrl = ref('')
 const previewTextFull = ref('')
+
+const onPreviewClosed = () => {
+  previewType.value = ''
+  previewExt.value = ''
+  previewMediaUrl.value = ''
+  previewTextFull.value = ''
+}
 
 const loadFiles = async () => {
   loading.value = true
@@ -140,6 +147,10 @@ const previewFile = async (file) => {
   previewVisible.value = true
   previewLoading.value = true
   previewTitle.value = file.doc_name
+  previewType.value = ''
+  previewExt.value = ''
+  previewMediaUrl.value = ''
+  previewTextFull.value = ''
 
   try {
     const response = await api.previewFile(file.file_hash)
@@ -151,7 +162,7 @@ const previewFile = async (file) => {
       if (response.content_type === 'text') {
         previewTextFull.value = response.text_full || '无文本内容'
       } else {
-        previewContent.value = response.content
+        previewMediaUrl.value = response.content_url || api.getFileContentUrl(file.file_hash)
       }
     } else {
       ElMessage.error('预览失败')

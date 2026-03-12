@@ -113,6 +113,26 @@ def build_frontend():
         print(f"前端构建失败: {e}")
         return False
 
+
+def start_backend_process(reload=False):
+    """启动后端进程，并通过环境变量控制是否热重载。"""
+    env = os.environ.copy()
+    env["BACKEND_RELOAD"] = "1" if reload else "0"
+
+    if sys.platform == "win32":
+        return subprocess.Popen(
+            [sys.executable, "main.py"],
+            cwd=str(BACKEND_DIR),
+            env=env,
+        )
+
+    return subprocess.Popen(
+        [sys.executable, "main.py"],
+        cwd=str(BACKEND_DIR),
+        env=env,
+        preexec_fn=os.setsid,
+    )
+
 def start_backend():
     """启动后端服务"""
     print("\n" + "="*50)
@@ -125,18 +145,8 @@ def start_backend():
     print("API 文档: http://localhost:8090/docs")
     print("\n按 Ctrl+C 停止服务\n")
 
-    # 启动后端
-    if sys.platform == "win32":
-        proc = subprocess.Popen(
-            [sys.executable, "main.py"],
-            cwd=str(BACKEND_DIR)
-        )
-    else:
-        proc = subprocess.Popen(
-            [sys.executable, "main.py"],
-            cwd=str(BACKEND_DIR),
-            preexec_fn=os.setsid
-        )
+    # 启动后端（开发模式默认开启热重载）
+    proc = start_backend_process(reload=True)
 
     processes.append(proc)
 
@@ -201,19 +211,9 @@ def start_both():
     print("前端地址: http://localhost:3000")
     print("\n按 Ctrl+C 停止所有服务\n")
 
-    # 启动后端
+    # 启动后端（开发模式默认开启热重载）
     print("[1/2] 启动后端...")
-    if sys.platform == "win32":
-        backend_proc = subprocess.Popen(
-            [sys.executable, "main.py"],
-            cwd=str(BACKEND_DIR)
-        )
-    else:
-        backend_proc = subprocess.Popen(
-            [sys.executable, "main.py"],
-            cwd=str(BACKEND_DIR),
-            preexec_fn=os.setsid
-        )
+    backend_proc = start_backend_process(reload=True)
     processes.append(backend_proc)
 
     # 等待后端启动
@@ -272,17 +272,7 @@ def start_production():
     print("\n前端已构建并集成到后端")
     print("按 Ctrl+C 停止服务\n")
 
-    if sys.platform == "win32":
-        proc = subprocess.Popen(
-            [sys.executable, "main.py"],
-            cwd=str(BACKEND_DIR)
-        )
-    else:
-        proc = subprocess.Popen(
-            [sys.executable, "main.py"],
-            cwd=str(BACKEND_DIR),
-            preexec_fn=os.setsid
-        )
+    proc = start_backend_process(reload=False)
 
     processes.append(proc)
 

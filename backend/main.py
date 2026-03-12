@@ -1,99 +1,111 @@
-# -*- coding: utf-8 -*-
-"""FastAPI 后端主入口"""
-
-import sys
-import os
-from pathlib import Path
-
-# 添加项目根目录到 Python 路径
-ROOT_DIR = Path(__file__).parent.parent
-sys.path.insert(0, str(ROOT_DIR))
+﻿# -*- coding: utf-8 -*-
+"""FastAPI 后端主入口。"""
 
 import logging
+import sys
+import threading
+from contextlib import asynccontextmanager
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from api import upload, search, files, dashboard, system
+ROOT_DIR = Path(__file__).parent.parent
+sys.path.insert(0, str(ROOT_DIR))
 
-# 配置日志
+from backend.api import dashboard, files, platform, search, system, upload, workbench
+from config import BACKEND_RELOAD, CORS_ALLOW_CREDENTIALS, CORS_ALLOW_ORIGINS
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler(ROOT_DIR / 'app.log', encoding='utf-8'),
-        logging.StreamHandler()
-    ]
+        logging.StreamHandler(),
+    ],
 )
 logger = logging.getLogger(__name__)
 
-# 创建 FastAPI 应用
+def _load_background_resources():
+    try:
+        from models_loader import get_lancedb_tables, load_models_cached
+
+        models = load_models_cached()
+        logger.info('AI 模型加载完成: %s', list(models.keys()))
+
+        tbl_text, tbl_image, tbl_files = get_lancedb_tables()
+        logger.info(
+            'LanceDB 连接成功: text=%s, image=%s, files=%s',
+            tbl_text.count_rows(),
+            tbl_image.count_rows(),
+            tbl_files.count_rows(),
+        )
+    except Exception as error:
+        logger.error('资源加载失败: %s', error)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info('=' * 60)
+    logger.info('DataVerse Pro API 服务启动')
+    logger.info('=' * 60)
+
+    from database import init_db
+
+    init_db()
+    logger.info('SQLite 数据库初始化完成')
+
+    threading.Thread(target=_load_background_resources, daemon=True).start()
+    yield
+
+
 app = FastAPI(
-    title="DataVerse Pro API",
-    description="多模态数据湖 API 服务",
-    version="2.0.0"
+    title='DataVerse Pro API',
+    description='多模态数据湖仓 API 服务',
+    version='2.1.0',
+    lifespan=lifespan,
 )
 
-# CORS 配置
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 生产环境应限制具体域名
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ALLOW_ORIGINS,
+    allow_credentials=CORS_ALLOW_CREDENTIALS,
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
-# 注册路由
-app.include_router(upload.router, prefix="/api/upload", tags=["文件上传"])
-app.include_router(search.router, prefix="/api/search", tags=["向量搜索"])
-app.include_router(files.router, prefix="/api/files", tags=["文件管理"])
-app.include_router(dashboard.router, prefix="/api/dashboard", tags=["仪表盘"])
-app.include_router(system.router, prefix="/api/system", tags=["系统监控"])
+app.include_router(upload.router, prefix='/api/upload', tags=['文件上传'])
+app.include_router(search.router, prefix='/api/search', tags=['向量检索'])
+app.include_router(files.router, prefix='/api/files', tags=['文件管理'])
+app.include_router(dashboard.router, prefix='/api/dashboard', tags=['仪表盘'])
+app.include_router(system.router, prefix='/api/system', tags=['系统监控'])
+app.include_router(workbench.router, prefix='/api/workbench', tags=['接入工作台'])
+app.include_router(platform.router, prefix='/api/platform', tags=['平台能力'])
 
-@app.get("/api/health")
+
+@app.get('/api/health')
 async def health_check():
-    """健康检查接口"""
-    return {"status": "ok", "service": "DataVerse Pro API"}
+    """健康检查接口。"""
+    return {'status': 'ok', 'service': 'DataVerse Pro API'}
 
-# 静态文件服务（前端构建产物）- 必须在所有 API 路由之后
-frontend_dist = ROOT_DIR / "frontend" / "dist"
+
+frontend_dist = ROOT_DIR / 'frontend' / 'dist'
 if frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
-    logger.info(f"前端静态文件服务已启用: {frontend_dist}")
+    app.mount('/', StaticFiles(directory=str(frontend_dist), html=True), name='frontend')
+    logger.info('前端静态文件服务已启用: %s', frontend_dist)
 
-@app.on_event("startup")
-async def startup_event():
-    """应用启动时初始化"""
-    logger.info("=" * 60)
-    logger.info("DataVerse Pro API 服务启动")
-    logger.info("=" * 60)
 
-    # 初始化数据库
-    from database import init_db
-    init_db()
-    logger.info("✓ SQLite 数据库初始化完成")
 
-    # 预加载 AI 模型和 LanceDB 连接（后台线程）
-    import threading
-    def load_resources():
-        try:
-            from models_loader import load_models_cached, get_lancedb_tables
-            models = load_models_cached()
-            logger.info(f"✓ AI 模型加载完成: {list(models.keys())}")
 
-            tbl_text, tbl_image, tbl_files = get_lancedb_tables()
-            logger.info(f"✓ LanceDB 连接成功: text={tbl_text.count_rows()}, image={tbl_image.count_rows()}, files={tbl_files.count_rows()}")
-        except Exception as e:
-            logger.error(f"✗ 资源加载失败: {e}")
-
-    threading.Thread(target=load_resources, daemon=True).start()
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     import uvicorn
+
+    app_target = 'main:app' if BACKEND_RELOAD else app
     uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
+        app_target,
+        host='0.0.0.0',
         port=8090,
-        reload=True,
-        log_level="info"
+        reload=BACKEND_RELOAD,
+        log_level='info',
     )

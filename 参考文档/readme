@@ -1,0 +1,118 @@
+BONC 多模态数据湖统一管理平台
+================================
+基于 Gradio + Apache Gravitino + Ray + SeaweedFS + Lance + Doris 的数据湖控制台。
+
+────────────────────────────────
+一、功能模块
+────────────────────────────────
+1. 资产浏览器
+   - Gravitino 三级数据目录（Catalog → Schema → Table）
+   - 多模态预览：数据表格 / Schema / 图像 / 文档（PDF）
+   - SeaweedFS 文件上传（支持图片、PDF）
+   - Lance 格式一键转换（图片→CLIP向量 / PDF→BERT向量）
+
+2. AI 工作台
+   - Ray 集群资源监控（CPU / GPU / 内存 / 节点）
+   - 可视化工作流节点编排（Daft ETL 流程）
+   - Ray Job 提交（支持 CPU/GPU 细粒度资源配置）
+   - 自动向量化封装（Daft ETL → 分布式向量化 Ray Job）
+   - 任务列表监控 + 详情日志查询
+
+3. Doris 联邦查询
+   - Doris FE 连接配置与测试
+   - SeaweedFS 外表（Lance/Parquet/JSON 格式）可视化创建
+   - SQL 编辑器（语法高亮、执行、结果 JSON 展示）
+   - 向量检索（语义查询 → Top K 相似结果）
+   - 自然语言工具：NL → Doris SQL / NL → 向量检索指令（MCP Server）
+
+4. 系统配置
+   - Gravitino / Ray / SeaweedFS / Doris 连接地址统一管理
+
+────────────────────────────────
+二、环境依赖安装
+────────────────────────────────
+
+# 必装（核心运行依赖）
+pip install gradio requests pandas numpy pillow
+
+# 可选（完整功能需要）
+pip install lance pyarrow               # Lance 向量格式读写
+pip install pymupdf                     # PDF 解析（fitz）
+pip install pymysql                     # Doris 连接
+pip install transformers torch          # CLIP/BERT 向量化模型
+pip install ray[default]                # Ray 分布式计算
+pip install daft                        # Daft ETL 框架
+
+一键安装所有依赖：
+pip install gradio requests pandas numpy pillow lance pyarrow pymupdf pymysql transformers torch ray[default] daft
+
+注意：transformers/torch 体积较大（约 2-5 GB），未安装时 Lance 转换模块
+      自动使用随机向量替代，不影响界面运行。
+
+────────────────────────────────
+三、运行命令
+────────────────────────────────
+
+cd d:\software\env\gradio
+python 20260224/gravitino_lake_console.py
+
+启动后访问：http://127.0.0.1:7860
+
+────────────────────────────────
+四、Mock 演示模式
+────────────────────────────────
+所有后端服务（Gravitino / Ray / SeaweedFS / Doris）均支持离线 Mock 模式：
+- 未连接服务时，自动使用内置 Mock 数据演示全部功能
+- 状态栏显示"连接失败 — 使用 Mock 数据"提示
+- 无需部署任何后端服务即可体验完整 UI 流程
+
+────────────────────────────────
+五、真实集群接入
+────────────────────────────────
+在对应模块填写真实地址即可切换生产模式：
+
+  Gravitino    : http://<host>:8090   默认 Metalake: demo_lake
+  Ray          : http://<host>:8265   Ray Dashboard 地址
+  SeaweedFS    : http://<host>:9333   Master 节点地址
+  Doris FE     : <host>:9030          MySQL 协议端口
+
+────────────────────────────────
+六、系统架构
+────────────────────────────────
+
+  BONC 多模态数据湖统一管理平台 (Gradio UI)
+    │
+    ├── GravitinoClient     → REST /api/metalakes/... 元数据管理
+    ├── SeaweedFSClient     → REST /dir/assign,lookup 文件存储
+    ├── LanceConverter      → CLIP/BERT 向量化 + lance.write_dataset
+    ├── RayClient           → Ray Dashboard REST API 任务调度
+    ├── DorisClient         → MySQL 协议 联邦查询 + 向量检索
+    └── VectorizedJobWrapper → Daft ETL → Ray 分布式向量化封装
+
+  数据流：
+  图片/PDF → SeaweedFS 存储 → LanceConverter → Lance 向量
+      ↓
+  Gravitino 元数据注册 → 资产浏览器展示
+      ↓
+  Doris 外表映射 → 联邦 SQL 查询 / 向量检索
+      ↓
+  Ray Job 分布式 ETL → 向量写回 SeaweedFS
+
+────────────────────────────────
+七、常见问题
+────────────────────────────────
+Q: 启动报 ModuleNotFoundError?
+A: 只需安装核心依赖即可启动：pip install gradio requests pandas numpy pillow
+   其余可选依赖未安装时自动降级为 Mock 模式。
+
+Q: Lance 转换输出"Mock模式"?
+A: 需安装 lance + pyarrow（+ transformers/torch 以获取真实向量）。
+
+Q: Doris 连接失败?
+A: 确认 pymysql 已安装，Doris FE 端口（默认 9030）已开放。
+
+Q: 如何替换为自定义 LLM（NL2SQL）?
+A: 修改 DorisClient.nl2sql() 方法，将 Mock 映射替换为 LLM API 调用即可。
+
+Q: Error 3003 Connect Timeout?
+A: 这是 IDE 自身的网络超时错误，与本项目无关，检查 IDE 网络代理设置即可。

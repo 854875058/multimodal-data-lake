@@ -8,12 +8,14 @@ from typing import List
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks
 from pydantic import BaseModel
 
-from config import TEMP_DIR
+from config import TEMP_DIR, MAX_UPLOAD_SIZE_MB
 from etl import batch_process_local_files
 from models_loader import load_models_cached, get_lancedb_tables
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+UPLOAD_CHUNK_SIZE = 1024 * 1024
 
 class UploadResponse(BaseModel):
     success: bool
@@ -47,13 +49,24 @@ async def upload_files(
     # 保存上传的文件到临时目录
     os.makedirs(TEMP_DIR, exist_ok=True)
     temp_files = []
+    total_size = 0
+    max_upload_size_bytes = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
     try:
         for file in files:
             temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4().hex[:8]}_{file.filename}")
-            content = await file.read()
+
             with open(temp_path, "wb") as f:
-                f.write(content)
+                while True:
+                    chunk = await file.read(UPLOAD_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    total_size += len(chunk)
+                    if total_size > max_upload_size_bytes:
+                        raise ValueError(f"单次上传总大小不能超过 {MAX_UPLOAD_SIZE_MB}MB")
+                    f.write(chunk)
+
+            await file.close()
             temp_files.append((temp_path, file.filename))
             logger.info(f"文件已保存: {file.filename} -> {temp_path}")
 
@@ -74,8 +87,13 @@ async def upload_files(
         for temp_path, _ in temp_files:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+        for file in files:
+            try:
+                await file.close()
+            except Exception:
+                pass
         return UploadResponse(
             success=False,
-            message=f"上传失败: {str(e)}",
+            message=str(e) if isinstance(e, ValueError) else "上传失败，请稍后重试",
             file_count=0
         )

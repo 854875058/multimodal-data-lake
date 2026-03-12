@@ -1,0 +1,156 @@
+核心目标
+基于提供的 gravitino_lake_console.py 代码，完成界面重构、存储层扩展、AI 工作台增强、联邦查询模块新增四大类优化，最终实现 “多模态数据湖统一管理平台” 的功能升级与体验美化。
+一、界面品牌与视觉美化优化
+品牌与标题替换
+将界面顶部 Header 中的 Logo 替换为 “BONC”（可优先使用文本形式，如大号字体 + 品牌色；若需图标可补充 BONC 品牌图标资源）；
+将平台名称从 “Data Lake Console” 改为 “多模态数据湖统一管理平台”，副标题调整为 “BONC・Apache Gravitino・Ray AI Platform・多模态资产管理”；
+移除原 Gravitino/Ray/Gradio 版本徽章，替换为 BONC 品牌相关标识（如 “BONC 数据湖解决方案” 徽章）。
+视觉风格重构（参考字节跳动数据湖管理页面）
+背景色：摒弃黑色系，主背景使用浅白色（#f5f7fa），模块背景使用浅灰色（#fafbfc），卡片背景为纯白色（#ffffff）；
+主色调：采用字节系蓝（#0066ff）作为主色，辅助色为浅蓝（#e8f3ff）、浅绿（#e8f8e8），强调色为橙色（#ff7d00）；
+布局优化：
+卡片模块增加圆角（8px）、轻微阴影（0 2px 8px rgba (0,0,0,0.06)），提升层次感；
+导航栏、下拉框、按钮等控件统一视觉风格，按钮 hover 态增加浅色系背景过渡；
+表格样式优化：表头背景为 #f5f7fa，行 hover 态为 #e8f3ff，文字色统一为 #333333（主文本）、#666666（辅助文本）；
+字体：优先使用 “PingFang SC”“Microsoft YaHei”，标题字体加粗，字号层级清晰（标题 18px、子标题 16px、正文 14px、辅助文本 12px）。
+二、底层存储层扩展（SeaweedFS + Lance 格式）
+新增 SeaweedFS 客户端类
+封装 SeaweedFS REST API，实现以下核心方法：
+python
+运行
+class SeaweedFSClient:
+    def __init__(self, master_url: str = "http://localhost:9333"):
+        self.base_url = master_url.rstrip("/")
+    
+    # 获取文件存储位置
+    def lookup_volume(self, file_id: str):
+        # 实现 SeaweedFS lookup API 调用
+    
+    # 上传文件（支持图片/PDF等非结构化数据）
+    def upload_file(self, file_path: str, collection: str = "default"):
+        # 实现文件上传，并返回存储ID
+    
+    # 下载文件
+    def download_file(self, file_id: str):
+        # 实现文件下载
+    
+    # 删除文件
+    def delete_file(self, file_id: str):
+Lance 格式转换与读取能力
+新增 LanceConverter 类，实现非结构化数据（图片 / PDF）转 Lance 格式：
+python
+运行
+import lance
+import pyarrow as pa
+from PIL import Image
+import fitz  # PyMuPDF
+
+class LanceConverter:
+    # 图片转 Lance 向量（提取视觉特征，如CLIP模型）
+    def image_to_lance(self, image_path: str, output_path: str):
+        # 1. 读取图片并提取特征向量
+        # 2. 构建 pyarrow 表
+        # 3. 写入 Lance 格式文件
+    
+    # PDF 转 Lance 向量（提取文本特征，如BERT模型）
+    def pdf_to_lance(self, pdf_path: str, output_path: str):
+        # 1. 解析PDF文本
+        # 2. 文本向量化
+        # 3. 写入 Lance 格式文件
+扩展 RayClient 类，实现 Ray 零拷贝读取 SeaweedFS 中 Lance 数据：
+python
+运行
+def read_lance_from_seaweedfs(self, file_id: str, seaweed_client: SeaweedFSClient):
+    # 基于 SeaweedFS 文件ID获取文件路径
+    # 使用 Ray 分布式读取 Lance 数据（零拷贝，基于mmap）
+    # 返回 LanceDataset 对象
+资产浏览器适配
+在 “资产浏览器” 中新增 “非结构化资产” 分类（图片 / PDF），支持选择文件后：
+预览原始文件（图片直接展示、PDF 展示文本内容）；
+一键转换为 Lance 格式并存储到 SeaweedFS；
+查看 Lance 向量数据的元信息（向量维度、存储路径、生成时间等）。
+三、AI 工作台增强（工作流管理 + Ray + Daft ETL）
+新增工作流管理模块
+在 “AI 工作台” Tab 下新增 “工作流管理” 子模块，核心功能：
+可视化配置 Daft ETL 流程（数据源选择→转换算子→输出目标）；
+支持拖拽式编排任务节点（如 “读取 Lance 数据”“向量化处理”“GPU 推理”“写入 Doris”）；
+工作流保存 / 加载、手动触发 / 定时触发。
+异构资源细粒度调度
+扩展 RayClient 的 submit_job 方法，支持 CPU/GPU 细粒度资源指定：
+python
+运行
+def submit_job(self, entrypoint: str, runtime_env: dict, job_id: str = "", resources: dict = None):
+    # resources 示例: {"CPU": 2, "GPU": 1, "memory": "16GB"}
+    # 封装 Ray Job 提交时的资源约束
+在任务提交界面新增资源配置项：CPU 核数、GPU 卡数、内存大小、是否使用异构节点（如 GPU 节点）。
+自动化向量化 Ray Job 封装
+新增 VectorizedJobWrapper 类，自动将普通 ETL 任务封装为向量化 Ray Job：
+python
+运行
+class VectorizedJobWrapper:
+    def wrap_etl_job(self, daft_etl_script: str, vector_config: dict):
+        # 1. 解析 Daft ETL 脚本
+        # 2. 插入向量化处理逻辑（如Lance向量生成、批量计算）
+        # 3. 封装为 Ray 分布式任务
+        # 4. 返回封装后的 entrypoint 命令
+在界面中新增 “自动向量化” 开关，开启后自动为任务添加向量化逻辑。
+Daft ETL 流程支持
+集成 Daft 库，在代码中新增 Daft ETL 示例脚本；
+在 AI 工作台中新增 “Daft ETL 模板”，支持选择模板快速生成任务脚本；
+支持查看 Daft ETL 任务的执行日志、进度、结果预览。
+四、新增 Doris 联邦查询模块
+模块入口
+在主 Tab 中新增 “📊 Doris 联邦查询”Tab，作为独立功能模块。
+核心功能实现
+Doris 客户端类封装：
+python
+运行
+class DorisClient:
+    def __init__(self, host: str = "localhost", port: int = 9030, user: str = "root", password: str = "", db: str = "default"):
+        self.conn = None
+        self.host = host
+        self.port = port
+        self.user = user
+        self.password = password
+        self.db = db
+    
+    # 建立连接
+    def connect(self):
+        import pymysql
+        self.conn = pymysql.connect(
+            host=self.host, port=self.port, user=self.user, password=self.password, db=self.db
+        )
+    
+    # 执行SQL
+    def execute_sql(self, sql: str):
+        # 执行SQL并返回结果
+    
+    # 创建 SeaweedFS 外表
+    def create_seaweedfs_external_table(self, table_name: str, seaweedfs_path: str, file_format: str = "lance"):
+        # 生成并执行创建Doris外表的SQL（关联SeaweedFS）
+功能 1：Doris 读取 SeaweedFS 外表
+界面支持配置 Doris 连接信息（主机、端口、账号、密码）；
+支持可视化创建 SeaweedFS 外表（指定表名、SeaweedFS 路径、文件格式）；
+支持执行查询 SQL，预览查询结果。
+功能 2：向量检索
+新增 “向量检索” 子模块，支持：
+输入语义描述（如 “红色背景的用户头像图片”）；
+调用 Lance 向量检索器，转换语义描述为向量；
+通过 Doris 联邦查询关联 SeaweedFS 中的 Lance 数据，返回相似结果。
+功能 3：MCP Server 中间件集成
+封装 MCP Server API，实现 Doris 与 SeaweedFS 之间的交互；
+确保向量检索、联邦查询的请求通过 MCP Server 转发，提升安全性与可管控性。
+功能 4：自然语言转 SQL / 向量检索
+SQL Tool：集成大语言模型（如 ChatGLM、GPT），支持输入自然语言（如 “查询 2024 年 1 月的用户订单数据”），自动转换为 Doris SQL 并执行；
+Vector Tool：输入语义描述（如 “提取所有 PDF 文档中关于用户行为的内容”），自动转换为 Lance 向量检索指令并执行，返回检索结果。
+界面适配
+Doris 连接配置区：输入框 + 测试连接按钮；
+SQL 编辑器：支持语法高亮、执行 / 清空按钮；
+自然语言输入区：文本框 +“转换并执行” 按钮；
+结果展示区：表格展示 SQL 结果，卡片展示向量检索结果（图片 / PDF 预览 + 相似度评分）。
+五、通用要求
+代码结构：保持原有 GravitinoClient、RayClient 等类的兼容性，新增类与方法需注释清晰；
+错误处理：所有新增 API 调用需增加异常捕获，返回友好的错误提示；
+Mock 数据：新增模块需补充 Mock 数据（如 Doris 查询结果、SeaweedFS 文件列表、向量检索结果），确保无真实环境时可演示；
+界面交互：所有新增功能需绑定 Gradio 事件（如按钮点击、下拉框选择），保证操作流程闭环；
+注释与文档：关键方法、类需添加中文注释，核心功能模块需补充使用说明。
