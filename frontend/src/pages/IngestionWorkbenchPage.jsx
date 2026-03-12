@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import api, { getErrorMessage } from '@/api'
-import WorkflowStudio from '@/components/WorkflowStudio.jsx'
+import { useNavigate } from 'react-router-dom'
 import { formatBytes, formatDateTime, formatNumber } from '@/utils/format'
 
 const defaultForm = {
@@ -399,6 +399,7 @@ function getJobCompactStats(job) {
 }
 
 export default function IngestionWorkbenchPage() {
+  const navigate = useNavigate()
   const [form, setForm] = useState(defaultForm)
   const [scanResult, setScanResult] = useState(emptyScan)
   const [indexStatus, setIndexStatus] = useState(emptyIndexStatus)
@@ -579,7 +580,6 @@ export default function IngestionWorkbenchPage() {
   const workspaceSections = [
     { id: 'overview', label: '总控', hint: '平台视角' },
     { id: 'source', label: '来源配置', hint: '接入与扫描' },
-    { id: 'workflow', label: '工作流', hint: 'Daft / Ray' },
     { id: 'index', label: '索引资产', hint: '索引与容量' }
   ]
 
@@ -1120,11 +1120,40 @@ export default function IngestionWorkbenchPage() {
         </>
       ) : null}
 
-      {activeWorkspaceSection === 'workflow' ? (
-        <WorkflowStudio
-          sourceHint={sourceSummaryPath}
-          onBanner={(type, message) => showBanner(type, message)}
-        />
+      {activeWorkspaceSection === 'overview' ? (
+        <section className="glass-card">
+          <div className="card-header">
+            <div>
+              <h2>编排入口</h2>
+              <p>Daft ETL 工作流和 Ray Job 资源控制已经独立到编排中心，让 AI 工作台保持控制面属性。</p>
+            </div>
+            <span className="badge">Workflow</span>
+          </div>
+
+          <div className="platform-capability-grid">
+            <div className="platform-capability-card">
+              <div className="platform-capability-title">模板化编排</div>
+              <div className="platform-capability-copy">使用预设模板与节点库组合 Daft ETL 工作流，避免把复杂流程塞回工作台首页。</div>
+            </div>
+            <div className="platform-capability-card">
+              <div className="platform-capability-title">资源控制</div>
+              <div className="platform-capability-copy">在编排中心统一设置 CPU、GPU 和内存，使来源配置和执行模板解耦。</div>
+            </div>
+            <div className="platform-capability-card">
+              <div className="platform-capability-title">运行治理分离</div>
+              <div className="platform-capability-copy">任务列表、日志与取消动作已迁到任务治理中心，避免工作台承担运行明细页角色。</div>
+            </div>
+            <div className="platform-capability-card">
+              <div className="platform-capability-title">进入编排中心</div>
+              <div className="platform-capability-copy">对复杂 Ray Job、Daft ETL 模板和执行摘要做独立编排，而不是继续依赖单页切换。</div>
+              <div className="toolbar-group" style={{ marginTop: 10 }}>
+                <button type="button" className="button button-small button-primary" onClick={() => navigate('/workflow')}>
+                  打开编排中心
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
       ) : null}
 
       {activeWorkspaceSection === 'source' ? (

@@ -7,15 +7,17 @@ import LogsPage from './pages/LogsPage.jsx'
 import SearchPage from './pages/SearchPage.jsx'
 import TaskGovernancePage from './pages/TaskGovernancePage.jsx'
 import UploadPage from './pages/UploadPage.jsx'
+import WorkflowCenterPage from './pages/WorkflowCenterPage.jsx'
 
 const navItems = [
   { path: '/dashboard', code: '01', label: '平台总览', tag: 'Overview', description: '平台规模、资源态势与知识图谱总览' },
-  { path: '/workbench', code: '02', label: 'AI 工作台', tag: 'Ray', description: 'SeaweedFS / Lance / Ray 工作流与任务编排' },
-  { path: '/governance', code: '03', label: '任务治理中心', tag: 'Ops', description: '批量任务、执行日志与配置回填控制面' },
-  { path: '/upload', code: '04', label: '数据接入', tag: 'Ingress', description: '手动上传、多模态入湖与接入起点' },
-  { path: '/search', code: '05', label: 'Doris 查询台', tag: 'SQL', description: '外表创建、SQL 编辑器、NL2SQL 与向量查询' },
-  { path: '/files', code: '06', label: '资产浏览器', tag: 'Catalog', description: 'Gravitino 三级目录资产浏览与预览治理' },
-  { path: '/logs', code: '07', label: '系统日志', tag: 'Logs', description: '服务日志、排障线索与运行状态追踪' }
+  { path: '/workbench', code: '02', label: 'AI 工作台', tag: 'Control', description: '来源接入、索引资产与平台控制总台' },
+  { path: '/workflow', code: '03', label: '编排中心', tag: 'Workflow', description: 'Daft ETL、Ray Job 与执行模板编排中心' },
+  { path: '/governance', code: '04', label: '任务治理中心', tag: 'Ops', description: '批量任务、执行日志与配置回填控制面' },
+  { path: '/upload', code: '05', label: '数据接入', tag: 'Ingress', description: '手动上传、多模态入湖与接入起点' },
+  { path: '/search', code: '06', label: 'Doris 查询台', tag: 'SQL', description: '外表创建、SQL 编辑器、NL2SQL 与向量查询' },
+  { path: '/files', code: '07', label: '资产浏览器', tag: 'Catalog', description: 'Gravitino 三级目录资产浏览与预览治理' },
+  { path: '/logs', code: '08', label: '系统日志', tag: 'Logs', description: '服务日志、排障线索与运行状态追踪' }
 ]
 
 function AppShell() {
@@ -75,7 +77,7 @@ function AppShell() {
             <span className="sidebar-pill">React</span>
           </div>
           <div className="sidebar-note">
-            当前已经把 AI 工作台和任务治理中心拆成两个控制面，避免平台感被超长单页拉垮。
+            当前已经把控制台拆成总览、工作台、编排中心和任务治理中心四层，逐步摆脱 POC 式单页堆叠。
           </div>
         </div>
       </aside>
@@ -115,6 +117,7 @@ function AppShell() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/workbench" element={<ErrorBoundary pageName="AI 工作台"><IngestionWorkbenchPage /></ErrorBoundary>} />
+            <Route path="/workflow" element={<WorkflowCenterPage />} />
             <Route path="/governance" element={<TaskGovernancePage />} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/search" element={<SearchPage />} />
