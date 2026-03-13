@@ -1,5 +1,6 @@
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import DashboardPage from './pages/DashboardPage.jsx'
+import ConfigCenterPage from './pages/ConfigCenterPage.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import FilesPage from './pages/FilesPage.jsx'
 import IngestionWorkbenchPage from './pages/IngestionWorkbenchPage.jsx'
@@ -14,10 +15,11 @@ const navItems = [
   { path: '/workbench', code: '02', label: 'AI 工作台', tag: 'Control', description: '来源接入、索引资产与平台控制总台' },
   { path: '/workflow', code: '03', label: '编排中心', tag: 'Workflow', description: 'Daft ETL、Ray Job 与执行模板编排中心' },
   { path: '/governance', code: '04', label: '任务治理中心', tag: 'Ops', description: '批量任务、执行日志与配置回填控制面' },
-  { path: '/upload', code: '05', label: '数据接入', tag: 'Ingress', description: '手动上传、多模态入湖与接入起点' },
-  { path: '/search', code: '06', label: 'Doris 查询台', tag: 'SQL', description: '外表创建、SQL 编辑器、NL2SQL 与向量查询' },
-  { path: '/files', code: '07', label: '资产浏览器', tag: 'Catalog', description: 'Gravitino 三级目录资产浏览与预览治理' },
-  { path: '/logs', code: '08', label: '系统日志', tag: 'Logs', description: '服务日志、排障线索与运行状态追踪' }
+  { path: '/settings', code: '05', label: '配置中心', tag: 'Config', description: '统一管理平台连接配置与默认接入模板' },
+  { path: '/upload', code: '06', label: '数据接入', tag: 'Ingress', description: '手动上传、多模态入湖与接入起点' },
+  { path: '/search', code: '07', label: 'Doris 查询台', tag: 'SQL', description: '外表创建、SQL 编辑器、NL2SQL 与向量查询' },
+  { path: '/files', code: '08', label: '资产浏览器', tag: 'Catalog', description: 'Gravitino 三级目录资产浏览与预览治理' },
+  { path: '/logs', code: '09', label: '系统日志', tag: 'Logs', description: '服务日志、排障线索与运行状态追踪' }
 ]
 
 function AppShell() {
@@ -119,6 +121,7 @@ function AppShell() {
             <Route path="/workbench" element={<ErrorBoundary pageName="AI 工作台"><IngestionWorkbenchPage /></ErrorBoundary>} />
             <Route path="/workflow" element={<WorkflowCenterPage />} />
             <Route path="/governance" element={<TaskGovernancePage />} />
+            <Route path="/settings" element={<ConfigCenterPage />} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/files" element={<FilesPage />} />
