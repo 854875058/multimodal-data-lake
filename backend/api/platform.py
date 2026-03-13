@@ -30,6 +30,7 @@ COMPONENT_ACTION_ROUTES = {
 
 PLATFORM_SETTINGS_KEY = 'platform_service_settings'
 PLATFORM_EXTERNAL_TABLES_KEY = 'platform_external_tables'
+PLATFORM_COMPONENT_HISTORY_KEY = 'platform_component_history'
 
 DEFAULT_PLATFORM_SETTINGS = {
     'gravitino_url': 'http://192.168.11.17:8090',
@@ -436,6 +437,52 @@ def _save_external_tables(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return items
 
 
+def _load_component_history() -> Dict[str, List[Dict[str, Any]]]:
+    saved = get_app_setting(PLATFORM_COMPONENT_HISTORY_KEY, {})
+    return saved if isinstance(saved, dict) else {}
+
+
+def _save_component_history(history: Dict[str, List[Dict[str, Any]]]) -> Dict[str, List[Dict[str, Any]]]:
+    save_app_setting(PLATFORM_COMPONENT_HISTORY_KEY, history)
+    return history
+
+
+def _summarize_component_history(item: Dict[str, Any], history_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    recent = history_rows[-12:]
+    success_rows = [row for row in history_rows if row.get('online')]
+    failure_rows = [row for row in history_rows if not row.get('online')]
+    success_rate = int(round((sum(1 for row in recent if row.get('online')) / len(recent)) * 100)) if recent else 0
+
+    enriched = dict(item)
+    enriched['history_points'] = [1 if row.get('online') else 0 for row in recent]
+    enriched['history_count'] = len(history_rows)
+    enriched['success_rate_recent'] = success_rate
+    enriched['last_success_at'] = success_rows[-1]['probed_at'] if success_rows else ''
+    enriched['last_failure_at'] = failure_rows[-1]['probed_at'] if failure_rows else ''
+    enriched['failure_reason'] = failure_rows[-1]['note'] if failure_rows else ''
+    return enriched
+
+
+def _append_component_history(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    history = _load_component_history()
+    enriched_items = []
+
+    for item in items:
+      rows = history.get(item['id'], [])
+      rows.append({
+          'probed_at': item.get('probed_at', ''),
+          'online': bool(item.get('online')),
+          'latency_ms': item.get('latency_ms'),
+          'note': item.get('note', ''),
+      })
+      rows = rows[-24:]
+      history[item['id']] = rows
+      enriched_items.append(_summarize_component_history(item, rows))
+
+    _save_component_history(history)
+    return enriched_items
+
+
 def _probe_http_component(component_id: str, title: str, base_url: str, paths: Optional[List[str]] = None, note: str = '') -> Dict[str, Any]:
     normalized_url = str(base_url or '').strip()
     probed_at = datetime.now().isoformat(timespec='seconds')
@@ -648,6 +695,7 @@ def _build_component_status(component_id: str = '') -> List[Dict[str, Any]]:
         _probe_lancedb_component(),
         _probe_model_component(),
     ]
+    items = _append_component_history(items)
     if component_id:
         return [item for item in items if item.get('id') == component_id]
     return items

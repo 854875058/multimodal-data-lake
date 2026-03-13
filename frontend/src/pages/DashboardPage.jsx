@@ -149,8 +149,10 @@ export default function DashboardPage() {
   const [status, setStatus] = useState(emptyStatus)
   const [platformSettings, setPlatformSettings] = useState(null)
   const [componentStatus, setComponentStatus] = useState([])
+  const [componentSummary, setComponentSummary] = useState({ total: 0, online: 0, offline: 0 })
   const [activePanel, setActivePanel] = useState('kpi')
   const [componentRefreshingId, setComponentRefreshingId] = useState('')
+  const [serviceFilter, setServiceFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
@@ -176,6 +178,7 @@ export default function DashboardPage() {
       setGraph(graphData || emptyGraph)
       setStatus(statusData || emptyStatus)
       setPlatformSettings(platformResponse?.data || null)
+      setComponentSummary(responseSummary(componentResponse?.summary))
       setComponentStatus(Array.isArray(componentResponse?.items) ? componentResponse.items : [])
     } catch (requestError) {
       setError(getErrorMessage(requestError, '加载平台总览失败。'))
@@ -204,10 +207,21 @@ export default function DashboardPage() {
           : [...current, nextItem]
         return nextItems
       })
+      if (response?.summary) {
+        setComponentSummary(responseSummary(response.summary))
+      }
     } catch (requestError) {
       setError(getErrorMessage(requestError, '刷新组件状态失败。'))
     } finally {
       setComponentRefreshingId('')
+    }
+  }
+
+  function responseSummary(summary) {
+    return {
+      total: Number(summary?.total || 0),
+      online: Number(summary?.online || 0),
+      offline: Number(summary?.offline || 0)
     }
   }
 
@@ -226,12 +240,24 @@ export default function DashboardPage() {
 
   const serviceCards = useMemo(() => {
     if (componentStatus.length) {
-      return componentStatus.map((item) => ({
-        title: item.title,
-        status: item.status,
-        meta: item.endpoint || '--',
-        note: item.latency_ms ? `${item.note} · ${item.latency_ms} ms` : item.note
-      }))
+      const filtered = componentStatus.filter((item) => {
+        if (serviceFilter === 'online') {
+          return item.online
+        }
+        if (serviceFilter === 'offline') {
+          return !item.online
+        }
+        return true
+      })
+
+      return filtered
+        .slice()
+        .sort((left, right) => Number(left.online) - Number(right.online) || String(left.title).localeCompare(String(right.title)))
+        .map((item) => ({
+          ...item,
+          meta: item.endpoint || '--',
+          note: item.latency_ms ? `${item.note} · ${item.latency_ms} ms` : item.note
+        }))
     }
 
     return [
@@ -248,7 +274,7 @@ export default function DashboardPage() {
         note: '对象存储 / S3 Gateway'
       }
     ]
-  }, [componentStatus, platformSettings])
+  }, [componentStatus, platformSettings, serviceFilter])
 
   const coreKpis = [
     { label: '资产总数', value: formatNumber(stats.total_files), sub: '当前已入湖文件与多模态资产数量' },
@@ -527,6 +553,28 @@ export default function DashboardPage() {
               <h2>平台服务状态</h2>
               <p>集中展示核心基础设施与连接状态，不和图表抢高度。</p>
             </div>
+            <div className="toolbar-group">
+              <span className="badge is-muted">在线 {formatNumber(componentSummary.online)}</span>
+              <span className="badge is-warning">离线 {formatNumber(componentSummary.offline)}</span>
+            </div>
+          </div>
+
+          <div className="workspace-segmented dashboard-filter-bar">
+            {[
+              { id: 'all', label: '全部组件', hint: `${formatNumber(componentSummary.total)} total` },
+              { id: 'offline', label: '仅看离线', hint: `${formatNumber(componentSummary.offline)} offline` },
+              { id: 'online', label: '仅看在线', hint: `${formatNumber(componentSummary.online)} online` }
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`workspace-segment${serviceFilter === item.id ? ' is-active' : ''}`}
+                onClick={() => setServiceFilter(item.id)}
+              >
+                <span className="workspace-segment-label">{item.label}</span>
+                <span className="workspace-segment-hint">{item.hint}</span>
+              </button>
+            ))}
           </div>
 
           <div className="platform-service-grid dashboard-service-grid">
@@ -538,6 +586,8 @@ export default function DashboardPage() {
                 </div>
                 <div className="platform-service-meta mono">{item.meta}</div>
                 <div className="platform-service-note">{item.note}</div>
+                {item.last_success_at ? <div className="platform-service-probe">最近成功：{formatDateTime(item.last_success_at)}</div> : null}
+                {!item.online && item.failure_reason ? <div className="platform-service-probe">失败原因：{item.failure_reason}</div> : null}
                 <div className="platform-service-foot">
                   <span className="platform-service-probe">最后探测：{item.probed_at ? formatDateTime(item.probed_at) : '--'}</span>
                   <div className="toolbar-group">
@@ -558,6 +608,12 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 </div>
+                <div className="component-sparkline" aria-hidden="true">
+                  {(item.history_points || []).map((point, index) => (
+                    <span key={`${item.id}-${index}`} className={`component-sparkline-bar${point ? ' is-up' : ' is-down'}`} />
+                  ))}
+                </div>
+                <div className="platform-service-probe">最近样本稳定度：{item.success_rate_recent ?? 0}%</div>
               </div>
             ))}
           </div>

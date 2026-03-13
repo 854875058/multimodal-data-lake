@@ -756,6 +756,32 @@ pre {
   color: var(--text-muted);
 }
 
+.dashboard-filter-bar {
+  margin-bottom: 12px;
+}
+
+.component-sparkline {
+  margin-top: 10px;
+  display: flex;
+  gap: 4px;
+  align-items: end;
+}
+
+.component-sparkline-bar {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(95, 114, 136, 0.24);
+}
+
+.component-sparkline-bar.is-up {
+  background: rgba(23, 121, 95, 0.72);
+}
+
+.component-sparkline-bar.is-down {
+  background: rgba(209, 59, 93, 0.6);
+}
+
 .platform-capability-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
