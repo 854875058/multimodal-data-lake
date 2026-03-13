@@ -146,6 +146,7 @@ export default function DashboardPage() {
   const [graph, setGraph] = useState(emptyGraph)
   const [status, setStatus] = useState(emptyStatus)
   const [platformSettings, setPlatformSettings] = useState(null)
+  const [componentStatus, setComponentStatus] = useState([])
   const [activePanel, setActivePanel] = useState('kpi')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -156,13 +157,14 @@ export default function DashboardPage() {
     setError('')
 
     try {
-      const [statsData, trendData, typeData, graphData, statusData, platformResponse] = await Promise.all([
+      const [statsData, trendData, typeData, graphData, statusData, platformResponse, componentResponse] = await Promise.all([
         api.getDashboardStats(),
         api.getTrend(7),
         api.getFileTypes(),
         api.getKnowledgeGraph(),
         api.getSystemStatus(),
-        api.getPlatformSettings()
+        api.getPlatformSettings(),
+        api.getPlatformComponentStatus()
       ])
 
       setStats(statsData || emptyStats)
@@ -171,6 +173,7 @@ export default function DashboardPage() {
       setGraph(graphData || emptyGraph)
       setStatus(statusData || emptyStatus)
       setPlatformSettings(platformResponse?.data || null)
+      setComponentStatus(Array.isArray(componentResponse?.items) ? componentResponse.items : [])
     } catch (requestError) {
       setError(getErrorMessage(requestError, '加载平台总览失败。'))
     } finally {
@@ -196,38 +199,31 @@ export default function DashboardPage() {
     return '当前平台还不具备稳定商业演示状态。应优先处理工作台失败任务、资源瓶颈和接入链路不稳定问题。'
   }, [stats.week_success_rate, stats.week_tasks_total])
 
-  const serviceCards = useMemo(() => [
-    {
-      title: 'Gravitino',
-      status: platformSettings?.gravitino_url ? '在线' : '待配置',
-      meta: platformSettings?.gravitino_url || '--',
-      note: platformSettings?.metalake ? `Metalake: ${platformSettings.metalake}` : '目录治理入口'
-    },
-    {
-      title: 'SeaweedFS',
-      status: platformSettings?.seaweedfs_s3_url ? '在线' : '待配置',
-      meta: platformSettings?.seaweedfs_s3_url || '--',
-      note: '对象存储 / S3 Gateway'
-    },
-    {
-      title: 'Ray 编排',
-      status: platformSettings?.ray_dashboard_url ? '在线' : '待配置',
-      meta: platformSettings?.ray_dashboard_url || '--',
-      note: `${formatNumber(stats.week_tasks_total)} 个近 7 天任务`
-    },
-    {
-      title: 'LanceDB',
-      status: status.lancedb.connected ? '已连接' : '待检查',
-      meta: `${formatNumber(status.lancedb.files_count)} assets`,
-      note: `text=${formatNumber(status.lancedb.text_rows)} / image=${formatNumber(status.lancedb.image_rows)}`
-    },
-    {
-      title: 'Doris',
-      status: platformSettings?.doris_mysql_host ? '待验证' : '待配置',
-      meta: platformSettings?.doris_mysql_host ? `${platformSettings.doris_mysql_host}:${platformSettings.doris_mysql_port}` : '--',
-      note: '联邦查询与外表映射'
+  const serviceCards = useMemo(() => {
+    if (componentStatus.length) {
+      return componentStatus.map((item) => ({
+        title: item.title,
+        status: item.status,
+        meta: item.endpoint || '--',
+        note: item.latency_ms ? `${item.note} · ${item.latency_ms} ms` : item.note
+      }))
     }
-  ], [platformSettings, stats.week_tasks_total, status.lancedb])
+
+    return [
+      {
+        title: 'Gravitino',
+        status: platformSettings?.gravitino_url ? '待检查' : '待配置',
+        meta: platformSettings?.gravitino_url || '--',
+        note: platformSettings?.metalake ? `Metalake: ${platformSettings.metalake}` : '目录治理入口'
+      },
+      {
+        title: 'SeaweedFS',
+        status: platformSettings?.seaweedfs_s3_url ? '待检查' : '待配置',
+        meta: platformSettings?.seaweedfs_s3_url || '--',
+        note: '对象存储 / S3 Gateway'
+      }
+    ]
+  }, [componentStatus, platformSettings])
 
   const coreKpis = [
     { label: '资产总数', value: formatNumber(stats.total_files), sub: '当前已入湖文件与多模态资产数量' },
@@ -242,34 +238,41 @@ export default function DashboardPage() {
     }
   ]
 
-  const statusKpis = [
-    { label: 'CPU 负载', value: formatPercent(status.resources.cpu_percent), sub: '实时系统资源' },
-    {
-      label: '内存负载',
-      value: formatPercent(status.resources.memory_percent),
-      sub: `${status.resources.memory_used_gb} / ${status.resources.memory_total_gb} GB`
-    },
-    {
-      label: '平均耗时',
-      value: `${Number(stats.week_avg_time_sec || 0).toFixed(2)} 秒`,
-      sub: '近 7 天任务平均时长'
-    },
-    {
-      label: '模型状态',
-      value: status.models.loaded ? '已加载' : '未加载',
-      sub: formatList(status.models.models)
-    },
-    {
-      label: '图谱模式',
-      value: getGraphModeLabel(graph.mode),
-      sub: getGraphMessage(graph)
-    },
-    {
-      label: 'Mock 策略',
-      value: platformSettings?.use_mock ? '已启用' : '关闭',
-      sub: '真实集群不可达时保留平台演示路径'
-    }
-  ]
+  const statusKpis = useMemo(() => {
+    const componentMap = new Map(componentStatus.map((item) => [item.id, item]))
+    return [
+      {
+        label: 'Ray Dashboard',
+        value: componentMap.get('ray')?.status || '待检查',
+        sub: componentMap.get('ray')?.note || (platformSettings?.ray_dashboard_url || '--')
+      },
+      {
+        label: 'SeaweedFS Master',
+        value: componentMap.get('seaweedfs_master')?.status || '待检查',
+        sub: componentMap.get('seaweedfs_master')?.note || (platformSettings?.seaweedfs_master_url || '--')
+      },
+      {
+        label: 'Doris',
+        value: componentMap.get('doris')?.status || '待检查',
+        sub: componentMap.get('doris')?.note || (platformSettings?.doris_mysql_host ? `${platformSettings.doris_mysql_host}:${platformSettings.doris_mysql_port}` : '--')
+      },
+      {
+        label: 'LanceDB',
+        value: componentMap.get('lancedb')?.status || '待检查',
+        sub: componentMap.get('lancedb')?.note || `files=${formatNumber(status.lancedb.files_count)}`
+      },
+      {
+        label: '模型状态',
+        value: componentMap.get('models')?.status || (status.models.loaded ? '已加载' : '未加载'),
+        sub: componentMap.get('models')?.note || formatList(status.models.models)
+      },
+      {
+        label: '主机资源',
+        value: formatPercent(status.resources.cpu_percent),
+        sub: `${status.resources.memory_used_gb} / ${status.resources.memory_total_gb} GB`
+      }
+    ]
+  }, [componentStatus, platformSettings, status])
 
   const trendOption = useMemo(() => ({
     tooltip: { trigger: 'axis' },

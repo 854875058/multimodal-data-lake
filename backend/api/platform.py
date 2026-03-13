@@ -4,6 +4,7 @@
 import logging
 import re
 from datetime import datetime
+from time import perf_counter
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -425,6 +426,196 @@ def _save_external_tables(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return items
 
 
+def _probe_http_component(component_id: str, title: str, base_url: str, paths: Optional[List[str]] = None, note: str = '') -> Dict[str, Any]:
+    normalized_url = str(base_url or '').strip()
+    if not normalized_url:
+        return {
+            'id': component_id,
+            'title': title,
+            'status': '待配置',
+            'online': False,
+            'endpoint': '--',
+            'latency_ms': None,
+            'note': note or '尚未配置地址',
+        }
+
+    probe_paths = paths or ['']
+    last_error = ''
+    for path in probe_paths:
+        target = f"{normalized_url.rstrip('/')}{path}"
+        started = perf_counter()
+        try:
+            response = requests.get(target, timeout=3)
+            latency_ms = int((perf_counter() - started) * 1000)
+            if response.status_code < 500:
+                return {
+                    'id': component_id,
+                    'title': title,
+                    'status': '在线',
+                    'online': True,
+                    'endpoint': normalized_url,
+                    'latency_ms': latency_ms,
+                    'note': note or f'HTTP {response.status_code}',
+                }
+            last_error = f'HTTP {response.status_code}'
+        except Exception as error:
+            last_error = str(error)
+
+    return {
+        'id': component_id,
+        'title': title,
+        'status': '离线',
+        'online': False,
+        'endpoint': normalized_url,
+        'latency_ms': None,
+        'note': last_error or note or '连接失败',
+    }
+
+
+def _probe_doris_component(settings: Dict[str, Any]) -> Dict[str, Any]:
+    host = str(settings.get('doris_mysql_host', '') or '').strip()
+    port = int(settings.get('doris_mysql_port') or 9030)
+    endpoint = f'{host}:{port}' if host else '--'
+    if not host:
+        return {
+            'id': 'doris',
+            'title': 'Doris',
+            'status': '待配置',
+            'online': False,
+            'endpoint': endpoint,
+            'latency_ms': None,
+            'note': '尚未配置 Doris MySQL 地址',
+        }
+
+    try:
+        import pymysql
+
+        started = perf_counter()
+        conn = pymysql.connect(
+            host=host,
+            port=port,
+            user=settings.get('doris_user', ''),
+            password=settings.get('doris_password', ''),
+            database=settings.get('doris_database') or None,
+            connect_timeout=3,
+            read_timeout=3,
+            write_timeout=3,
+        )
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute('SELECT VERSION()')
+                version = cursor.fetchone()
+        finally:
+            conn.close()
+
+        return {
+            'id': 'doris',
+            'title': 'Doris',
+            'status': '在线',
+            'online': True,
+            'endpoint': endpoint,
+            'latency_ms': int((perf_counter() - started) * 1000),
+            'note': f"版本 {version[0] if version else 'unknown'}",
+        }
+    except Exception as error:
+        return {
+            'id': 'doris',
+            'title': 'Doris',
+            'status': '离线',
+            'online': False,
+            'endpoint': endpoint,
+            'latency_ms': None,
+            'note': str(error),
+        }
+
+
+def _probe_lancedb_component() -> Dict[str, Any]:
+    try:
+        tbl_text, tbl_image, tbl_files = get_lancedb_tables()
+        return {
+            'id': 'lancedb',
+            'title': 'LanceDB',
+            'status': '已连接',
+            'online': True,
+            'endpoint': 'internal',
+            'latency_ms': None,
+            'note': f"text={tbl_text.count_rows()} / image={tbl_image.count_rows()} / files={tbl_files.count_rows()}",
+        }
+    except Exception as error:
+        return {
+            'id': 'lancedb',
+            'title': 'LanceDB',
+            'status': '异常',
+            'online': False,
+            'endpoint': 'internal',
+            'latency_ms': None,
+            'note': str(error),
+        }
+
+
+def _probe_model_component() -> Dict[str, Any]:
+    try:
+        from models_loader import load_models_cached
+
+        models = load_models_cached()
+        return {
+            'id': 'models',
+            'title': 'Embedding Models',
+            'status': '已加载',
+            'online': True,
+            'endpoint': 'internal',
+            'latency_ms': None,
+            'note': ', '.join(list(models.keys())),
+        }
+    except Exception as error:
+        return {
+            'id': 'models',
+            'title': 'Embedding Models',
+            'status': '异常',
+            'online': False,
+            'endpoint': 'internal',
+            'latency_ms': None,
+            'note': str(error),
+        }
+
+
+def _build_component_status() -> List[Dict[str, Any]]:
+    settings = _get_platform_settings()
+    return [
+        _probe_http_component(
+            'gravitino',
+            'Gravitino',
+            settings.get('gravitino_url', ''),
+            paths=['/api/version', ''],
+            note=f"Metalake: {settings.get('metalake', 'demo_lake')}",
+        ),
+        _probe_http_component(
+            'ray',
+            'Ray Dashboard',
+            settings.get('ray_dashboard_url', ''),
+            paths=['/api/cluster_status', '/'],
+            note='工作流编排与任务调度入口',
+        ),
+        _probe_http_component(
+            'seaweedfs_master',
+            'SeaweedFS Master',
+            settings.get('seaweedfs_master_url', ''),
+            paths=['/cluster/status', '/dir/status', '/'],
+            note='对象存储主控入口',
+        ),
+        _probe_http_component(
+            'seaweedfs_s3',
+            'SeaweedFS S3',
+            settings.get('seaweedfs_s3_url', ''),
+            paths=['/'],
+            note='S3 Gateway',
+        ),
+        _probe_doris_component(settings),
+        _probe_lancedb_component(),
+        _probe_model_component(),
+    ]
+
+
 def _trim_text(value: Any, max_length: int = 120) -> str:
     text = str(value or '').strip().replace('\n', ' ')
     if len(text) <= max_length:
@@ -677,6 +868,21 @@ async def get_platform_settings():
                 'focus': ['Gravitino 目录管理', 'SeaweedFS + Lance 存储', 'Ray 编排', 'Doris 联邦查询'],
             },
         },
+    }
+
+
+@router.get('/component-status')
+async def get_platform_component_status():
+    items = _build_component_status()
+    online_count = sum(1 for item in items if item.get('online'))
+    return {
+        'success': True,
+        'summary': {
+            'total': len(items),
+            'online': online_count,
+            'offline': len(items) - online_count,
+        },
+        'items': items,
     }
 
 

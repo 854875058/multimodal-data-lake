@@ -162,6 +162,10 @@ const api = {
     return apiClient.get('/platform/settings')
   },
 
+  getPlatformComponentStatus() {
+    return apiClient.get('/platform/component-status')
+  },
+
   savePlatformSettings(payload) {
     return apiClient.post('/platform/settings', payload)
   },
