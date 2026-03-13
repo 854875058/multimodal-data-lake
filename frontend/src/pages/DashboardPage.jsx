@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api, { getErrorMessage } from '@/api'
 import ChartPanel from '@/components/ChartPanel.jsx'
-import { formatList, formatNumber, formatPercent } from '@/utils/format'
+import { formatDateTime, formatList, formatNumber, formatPercent } from '@/utils/format'
 
 const emptyStats = {
   total_files: 0,
@@ -140,6 +141,7 @@ function getServiceStatusClass(status) {
 }
 
 export default function DashboardPage() {
+  const navigate = useNavigate()
   const [stats, setStats] = useState(emptyStats)
   const [trend, setTrend] = useState([])
   const [fileTypes, setFileTypes] = useState([])
@@ -148,6 +150,7 @@ export default function DashboardPage() {
   const [platformSettings, setPlatformSettings] = useState(null)
   const [componentStatus, setComponentStatus] = useState([])
   const [activePanel, setActivePanel] = useState('kpi')
+  const [componentRefreshingId, setComponentRefreshingId] = useState('')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
@@ -185,6 +188,28 @@ export default function DashboardPage() {
   useEffect(() => {
     loadData()
   }, [])
+
+  const handleRefreshComponent = async (componentId) => {
+    setComponentRefreshingId(componentId)
+    try {
+      const response = await api.getPlatformComponentStatus(componentId)
+      const nextItem = Array.isArray(response?.items) ? response.items[0] : null
+      if (!nextItem) {
+        return
+      }
+      setComponentStatus((current) => {
+        const hasItem = current.some((item) => item.id === componentId)
+        const nextItems = hasItem
+          ? current.map((item) => (item.id === componentId ? nextItem : item))
+          : [...current, nextItem]
+        return nextItems
+      })
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, '刷新组件状态失败。'))
+    } finally {
+      setComponentRefreshingId('')
+    }
+  }
 
   const executiveSummary = useMemo(() => {
     if (!stats.week_tasks_total) {
@@ -452,25 +477,6 @@ export default function DashboardPage() {
 
       {activePanel === 'kpi' ? (
         <>
-          <section className="glass-card">
-            <div className="card-header">
-              <div>
-                <h2>平台能力层</h2>
-                <p>把当前应用从 POC 页面提升为平台控制台，核心在于能力分层和服务语义要完整。</p>
-              </div>
-            </div>
-
-            <div className="platform-capability-grid">
-              {capabilityBlueprint.map((item) => (
-                <div className="platform-capability-card" key={item.title}>
-                  <span className="badge">{item.tag}</span>
-                  <div className="platform-capability-title">{item.title}</div>
-                  <div className="platform-capability-copy">{item.copy}</div>
-                </div>
-              ))}
-            </div>
-          </section>
-
           <div className="section-title">核心指标</div>
           <div className="stats-grid">
             {coreKpis.map((item) => (
@@ -492,6 +498,25 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
+
+          <section className="glass-card">
+            <div className="card-header">
+              <div>
+                <h2>平台能力层</h2>
+                <p>把当前应用从 POC 页面提升为平台控制台，核心在于能力分层和服务语义要完整。</p>
+              </div>
+            </div>
+
+            <div className="platform-capability-grid">
+              {capabilityBlueprint.map((item) => (
+                <div className="platform-capability-card" key={item.title}>
+                  <span className="badge">{item.tag}</span>
+                  <div className="platform-capability-title">{item.title}</div>
+                  <div className="platform-capability-copy">{item.copy}</div>
+                </div>
+              ))}
+            </div>
+          </section>
         </>
       ) : null}
 
@@ -513,6 +538,26 @@ export default function DashboardPage() {
                 </div>
                 <div className="platform-service-meta mono">{item.meta}</div>
                 <div className="platform-service-note">{item.note}</div>
+                <div className="platform-service-foot">
+                  <span className="platform-service-probe">最后探测：{item.probed_at ? formatDateTime(item.probed_at) : '--'}</span>
+                  <div className="toolbar-group">
+                    <button
+                      type="button"
+                      className="button button-small button-secondary"
+                      onClick={() => handleRefreshComponent(item.id)}
+                      disabled={componentRefreshingId === item.id}
+                    >
+                      {componentRefreshingId === item.id ? '刷新中...' : '刷新'}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-small button-ghost"
+                      onClick={() => navigate(item.action_route || '/dashboard')}
+                    >
+                      去处理
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

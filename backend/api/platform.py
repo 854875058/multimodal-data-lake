@@ -18,6 +18,16 @@ from text_codec import decode_text_from_storage
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+COMPONENT_ACTION_ROUTES = {
+    'gravitino': '/files',
+    'ray': '/workflow',
+    'seaweedfs_master': '/workbench',
+    'seaweedfs_s3': '/workbench',
+    'doris': '/search',
+    'lancedb': '/workbench',
+    'models': '/dashboard',
+}
+
 PLATFORM_SETTINGS_KEY = 'platform_service_settings'
 PLATFORM_EXTERNAL_TABLES_KEY = 'platform_external_tables'
 
@@ -428,6 +438,7 @@ def _save_external_tables(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def _probe_http_component(component_id: str, title: str, base_url: str, paths: Optional[List[str]] = None, note: str = '') -> Dict[str, Any]:
     normalized_url = str(base_url or '').strip()
+    probed_at = datetime.now().isoformat(timespec='seconds')
     if not normalized_url:
         return {
             'id': component_id,
@@ -437,6 +448,8 @@ def _probe_http_component(component_id: str, title: str, base_url: str, paths: O
             'endpoint': '--',
             'latency_ms': None,
             'note': note or '尚未配置地址',
+            'probed_at': probed_at,
+            'action_route': COMPONENT_ACTION_ROUTES.get(component_id, '/dashboard'),
         }
 
     probe_paths = paths or ['']
@@ -456,6 +469,8 @@ def _probe_http_component(component_id: str, title: str, base_url: str, paths: O
                     'endpoint': normalized_url,
                     'latency_ms': latency_ms,
                     'note': note or f'HTTP {response.status_code}',
+                    'probed_at': probed_at,
+                    'action_route': COMPONENT_ACTION_ROUTES.get(component_id, '/dashboard'),
                 }
             last_error = f'HTTP {response.status_code}'
         except Exception as error:
@@ -469,6 +484,8 @@ def _probe_http_component(component_id: str, title: str, base_url: str, paths: O
         'endpoint': normalized_url,
         'latency_ms': None,
         'note': last_error or note or '连接失败',
+        'probed_at': probed_at,
+        'action_route': COMPONENT_ACTION_ROUTES.get(component_id, '/dashboard'),
     }
 
 
@@ -476,6 +493,7 @@ def _probe_doris_component(settings: Dict[str, Any]) -> Dict[str, Any]:
     host = str(settings.get('doris_mysql_host', '') or '').strip()
     port = int(settings.get('doris_mysql_port') or 9030)
     endpoint = f'{host}:{port}' if host else '--'
+    probed_at = datetime.now().isoformat(timespec='seconds')
     if not host:
         return {
             'id': 'doris',
@@ -485,6 +503,8 @@ def _probe_doris_component(settings: Dict[str, Any]) -> Dict[str, Any]:
             'endpoint': endpoint,
             'latency_ms': None,
             'note': '尚未配置 Doris MySQL 地址',
+            'probed_at': probed_at,
+            'action_route': COMPONENT_ACTION_ROUTES['doris'],
         }
 
     try:
@@ -516,6 +536,8 @@ def _probe_doris_component(settings: Dict[str, Any]) -> Dict[str, Any]:
             'endpoint': endpoint,
             'latency_ms': int((perf_counter() - started) * 1000),
             'note': f"版本 {version[0] if version else 'unknown'}",
+            'probed_at': probed_at,
+            'action_route': COMPONENT_ACTION_ROUTES['doris'],
         }
     except Exception as error:
         return {
@@ -526,10 +548,13 @@ def _probe_doris_component(settings: Dict[str, Any]) -> Dict[str, Any]:
             'endpoint': endpoint,
             'latency_ms': None,
             'note': str(error),
+            'probed_at': probed_at,
+            'action_route': COMPONENT_ACTION_ROUTES['doris'],
         }
 
 
 def _probe_lancedb_component() -> Dict[str, Any]:
+    probed_at = datetime.now().isoformat(timespec='seconds')
     try:
         tbl_text, tbl_image, tbl_files = get_lancedb_tables()
         return {
@@ -540,6 +565,8 @@ def _probe_lancedb_component() -> Dict[str, Any]:
             'endpoint': 'internal',
             'latency_ms': None,
             'note': f"text={tbl_text.count_rows()} / image={tbl_image.count_rows()} / files={tbl_files.count_rows()}",
+            'probed_at': probed_at,
+            'action_route': COMPONENT_ACTION_ROUTES['lancedb'],
         }
     except Exception as error:
         return {
@@ -550,10 +577,13 @@ def _probe_lancedb_component() -> Dict[str, Any]:
             'endpoint': 'internal',
             'latency_ms': None,
             'note': str(error),
+            'probed_at': probed_at,
+            'action_route': COMPONENT_ACTION_ROUTES['lancedb'],
         }
 
 
 def _probe_model_component() -> Dict[str, Any]:
+    probed_at = datetime.now().isoformat(timespec='seconds')
     try:
         from models_loader import load_models_cached
 
@@ -566,6 +596,8 @@ def _probe_model_component() -> Dict[str, Any]:
             'endpoint': 'internal',
             'latency_ms': None,
             'note': ', '.join(list(models.keys())),
+            'probed_at': probed_at,
+            'action_route': COMPONENT_ACTION_ROUTES['models'],
         }
     except Exception as error:
         return {
@@ -576,12 +608,14 @@ def _probe_model_component() -> Dict[str, Any]:
             'endpoint': 'internal',
             'latency_ms': None,
             'note': str(error),
+            'probed_at': probed_at,
+            'action_route': COMPONENT_ACTION_ROUTES['models'],
         }
 
 
-def _build_component_status() -> List[Dict[str, Any]]:
+def _build_component_status(component_id: str = '') -> List[Dict[str, Any]]:
     settings = _get_platform_settings()
-    return [
+    items = [
         _probe_http_component(
             'gravitino',
             'Gravitino',
@@ -614,6 +648,9 @@ def _build_component_status() -> List[Dict[str, Any]]:
         _probe_lancedb_component(),
         _probe_model_component(),
     ]
+    if component_id:
+        return [item for item in items if item.get('id') == component_id]
+    return items
 
 
 def _trim_text(value: Any, max_length: int = 120) -> str:
@@ -872,8 +909,8 @@ async def get_platform_settings():
 
 
 @router.get('/component-status')
-async def get_platform_component_status():
-    items = _build_component_status()
+async def get_platform_component_status(component_id: str = ''):
+    items = _build_component_status(component_id.strip())
     online_count = sum(1 for item in items if item.get('online'))
     return {
         'success': True,

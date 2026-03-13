@@ -742,6 +742,20 @@ pre {
   color: var(--text-secondary);
 }
 
+.platform-service-foot {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.platform-service-probe {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
 .platform-capability-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
