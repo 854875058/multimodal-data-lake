@@ -98,6 +98,13 @@ const roadmapSnapshot = [
   }
 ]
 
+const overviewPanels = [
+  { id: 'kpi', label: '指标总览', hint: '规模与产能' },
+  { id: 'services', label: '平台服务', hint: '依赖与状态' },
+  { id: 'trend', label: '趋势分析', hint: '增长与结构' },
+  { id: 'graph', label: '知识图谱', hint: '图谱与关系' }
+]
+
 function getGraphModeLabel(mode) {
   switch (mode) {
     case 'relation':
@@ -139,6 +146,7 @@ export default function DashboardPage() {
   const [graph, setGraph] = useState(emptyGraph)
   const [status, setStatus] = useState(emptyStatus)
   const [platformSettings, setPlatformSettings] = useState(null)
+  const [activePanel, setActivePanel] = useState('kpi')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
@@ -269,7 +277,7 @@ export default function DashboardPage() {
       data: ['接入文件', '成功任务'],
       textStyle: { color: chartPalette.text }
     },
-    grid: { left: 24, right: 18, top: 34, bottom: 18, containLabel: true },
+    grid: { left: 24, right: 18, top: 30, bottom: 16, containLabel: true },
     xAxis: {
       type: 'category',
       boundaryGap: false,
@@ -290,7 +298,7 @@ export default function DashboardPage() {
         smooth: true,
         data: trend.map((item) => item.file_count),
         areaStyle: { color: chartPalette.accentSoft },
-        lineStyle: { width: 2.5, color: chartPalette.accent },
+        lineStyle: { width: 2.4, color: chartPalette.accent },
         itemStyle: { color: chartPalette.accent }
       },
       {
@@ -298,7 +306,7 @@ export default function DashboardPage() {
         type: 'line',
         smooth: true,
         data: trend.map((item) => item.success_count),
-        lineStyle: { width: 2.5, color: chartPalette.cool },
+        lineStyle: { width: 2.4, color: chartPalette.cool },
         itemStyle: { color: chartPalette.cool }
       }
     ]
@@ -315,7 +323,7 @@ export default function DashboardPage() {
       {
         name: '文件类型',
         type: 'pie',
-        radius: ['44%', '72%'],
+        radius: ['42%', '68%'],
         avoidLabelOverlap: true,
         label: { formatter: '{b}: {d}%', color: chartPalette.text },
         data: fileTypes.map((item) => ({
@@ -348,7 +356,7 @@ export default function DashboardPage() {
         },
         lineStyle: {
           color: 'source',
-          opacity: 0.52,
+          opacity: 0.5,
           curveness: 0.1
         },
         edgeLabel: {
@@ -359,7 +367,7 @@ export default function DashboardPage() {
         },
         force: {
           repulsion: 300,
-          edgeLength: [64, 126],
+          edgeLength: [60, 120],
           gravity: 0.08
         },
         emphasis: {
@@ -375,7 +383,7 @@ export default function DashboardPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">平台总览</h1>
-          <p className="page-subtitle">从商业化平台视角查看目录、存储、编排、查询和智能能力的整体就绪度，而不是只看单页 demo 指标。</p>
+          <p className="page-subtitle">总览页现在优先呈现一屏决策信息，深度内容通过分段视图切换，尽量避免持续向下滚动。</p>
         </div>
         <div className="page-actions">
           <button type="button" className="button button-primary" onClick={loadData} disabled={refreshing}>
@@ -394,19 +402,6 @@ export default function DashboardPage() {
           </div>
           <div className="platform-hero-title">当前平台资产总量 {formatNumber(stats.total_files)}，近 7 天接入成功率 {formatPercent(stats.week_success_rate)}。</div>
           <p className="platform-hero-copy">{executiveSummary}</p>
-
-          <div className="platform-service-grid">
-            {serviceCards.map((item) => (
-              <div className="platform-service-card" key={item.title}>
-                <div className="platform-service-head">
-                  <div className="platform-service-title">{item.title}</div>
-                  <span className={`badge ${getServiceStatusClass(item.status)}`}>{item.status}</span>
-                </div>
-                <div className="platform-service-meta mono">{item.meta}</div>
-                <div className="platform-service-note">{item.note}</div>
-              </div>
-            ))}
-          </div>
         </section>
 
         <section className="glass-card platform-roadmap-card">
@@ -430,95 +425,151 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      <section className="glass-card">
-        <div className="card-header">
+      <div className="workspace-switcher glass-card">
+        <div className="workspace-switcher-head">
           <div>
-            <h2>平台能力层</h2>
-            <p>把当前应用从 POC 页面提升为平台控制台，核心在于能力分层和服务语义要完整。</p>
+            <div className="section-title">总览视图</div>
+            <div className="workbench-help">把核心信息拆成分段视图，避免趋势、服务、图谱同时堆在一页里。</div>
           </div>
         </div>
-
-        <div className="platform-capability-grid">
-          {capabilityBlueprint.map((item) => (
-            <div className="platform-capability-card" key={item.title}>
-              <span className="badge">{item.tag}</span>
-              <div className="platform-capability-title">{item.title}</div>
-              <div className="platform-capability-copy">{item.copy}</div>
-            </div>
+        <div className="workspace-segmented">
+          {overviewPanels.map((panel) => (
+            <button
+              key={panel.id}
+              type="button"
+              className={`workspace-segment${activePanel === panel.id ? ' is-active' : ''}`}
+              onClick={() => setActivePanel(panel.id)}
+            >
+              <span className="workspace-segment-label">{panel.label}</span>
+              <span className="workspace-segment-hint">{panel.hint}</span>
+            </button>
           ))}
         </div>
-      </section>
-
-      <div className="section-title">核心指标</div>
-      <div className="stats-grid">
-        {coreKpis.map((item) => (
-          <div className="kpi-card glass-card" key={item.label}>
-            <div className="kpi-label">{item.label}</div>
-            <div className="kpi-value">{item.value}</div>
-            <div className="kpi-sub">{item.sub}</div>
-          </div>
-        ))}
       </div>
 
-      <div className="section-title">系统状态</div>
-      <div className="status-grid">
-        {statusKpis.map((item) => (
-          <div className="kpi-card glass-card" key={item.label}>
-            <div className="kpi-label">{item.label}</div>
-            <div className="kpi-value">{item.value}</div>
-            <div className="kpi-sub">{item.sub}</div>
-          </div>
-        ))}
-      </div>
+      {activePanel === 'kpi' ? (
+        <>
+          <section className="glass-card">
+            <div className="card-header">
+              <div>
+                <h2>平台能力层</h2>
+                <p>把当前应用从 POC 页面提升为平台控制台，核心在于能力分层和服务语义要完整。</p>
+              </div>
+            </div>
 
-      <div className="chart-grid">
+            <div className="platform-capability-grid">
+              {capabilityBlueprint.map((item) => (
+                <div className="platform-capability-card" key={item.title}>
+                  <span className="badge">{item.tag}</span>
+                  <div className="platform-capability-title">{item.title}</div>
+                  <div className="platform-capability-copy">{item.copy}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <div className="section-title">核心指标</div>
+          <div className="stats-grid">
+            {coreKpis.map((item) => (
+              <div className="kpi-card glass-card" key={item.label}>
+                <div className="kpi-label">{item.label}</div>
+                <div className="kpi-value">{item.value}</div>
+                <div className="kpi-sub">{item.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="section-title">系统状态</div>
+          <div className="status-grid">
+            {statusKpis.map((item) => (
+              <div className="kpi-card glass-card" key={item.label}>
+                <div className="kpi-label">{item.label}</div>
+                <div className="kpi-value">{item.value}</div>
+                <div className="kpi-sub">{item.sub}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {activePanel === 'services' ? (
+        <section className="glass-card">
+          <div className="card-header">
+            <div>
+              <h2>平台服务状态</h2>
+              <p>集中展示核心基础设施与连接状态，不和图表抢高度。</p>
+            </div>
+          </div>
+
+          <div className="platform-service-grid dashboard-service-grid">
+            {serviceCards.map((item) => (
+              <div className="platform-service-card" key={item.title}>
+                <div className="platform-service-head">
+                  <div className="platform-service-title">{item.title}</div>
+                  <span className={`badge ${getServiceStatusClass(item.status)}`}>{item.status}</span>
+                </div>
+                <div className="platform-service-meta mono">{item.meta}</div>
+                <div className="platform-service-note">{item.note}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {activePanel === 'trend' ? (
+        <div className="chart-grid">
+          <div className="glass-card chart-card">
+            <div className="card-header">
+              <div>
+                <h2>近 7 天接入趋势</h2>
+                <p>同时看接入文件数和成功任务数，判断平台运行稳定性。</p>
+              </div>
+            </div>
+            <ChartPanel
+              option={trendOption}
+              height={300}
+              loading={loading && trend.length === 0}
+              empty={!loading && trend.length === 0}
+              emptyText="暂无趋势数据"
+            />
+          </div>
+
+          <div className="glass-card chart-card">
+            <div className="card-header">
+              <div>
+                <h2>文件类型分布</h2>
+                <p>当前平台已接入资产的格式结构。</p>
+              </div>
+            </div>
+            <ChartPanel
+              option={fileTypeOption}
+              height={300}
+              loading={loading && fileTypes.length === 0}
+              empty={!loading && fileTypes.length === 0}
+              emptyText="暂无文件类型统计"
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {activePanel === 'graph' ? (
         <div className="glass-card chart-card">
           <div className="card-header">
             <div>
-              <h2>近 7 天接入趋势</h2>
-              <p>同时看接入文件数和成功任务数，判断平台运行稳定性。</p>
+              <h2>知识图谱</h2>
+              <p>{getGraphMessage(graph)}</p>
             </div>
+            <span className="badge">{getGraphModeLabel(graph.mode)}</span>
           </div>
           <ChartPanel
-            option={trendOption}
-            loading={loading && trend.length === 0}
-            empty={!loading && trend.length === 0}
-            emptyText="暂无趋势数据"
+            option={graphOption}
+            height={360}
+            loading={loading && (!graph.nodes || graph.nodes.length === 0)}
+            empty={!loading && (!graph.nodes || graph.nodes.length === 0)}
+            emptyText={getGraphMessage(graph)}
           />
         </div>
-
-        <div className="glass-card chart-card">
-          <div className="card-header">
-            <div>
-              <h2>文件类型分布</h2>
-              <p>当前平台已接入资产的格式结构。</p>
-            </div>
-          </div>
-          <ChartPanel
-            option={fileTypeOption}
-            loading={loading && fileTypes.length === 0}
-            empty={!loading && fileTypes.length === 0}
-            emptyText="暂无文件类型统计"
-          />
-        </div>
-      </div>
-
-      <div className="glass-card chart-card">
-        <div className="card-header">
-          <div>
-            <h2>知识图谱</h2>
-            <p>{getGraphMessage(graph)}</p>
-          </div>
-          <span className="badge">{getGraphModeLabel(graph.mode)}</span>
-        </div>
-        <ChartPanel
-          option={graphOption}
-          height={380}
-          loading={loading && (!graph.nodes || graph.nodes.length === 0)}
-          empty={!loading && (!graph.nodes || graph.nodes.length === 0)}
-          emptyText={getGraphMessage(graph)}
-        />
-      </div>
+      ) : null}
     </div>
   )
 }
