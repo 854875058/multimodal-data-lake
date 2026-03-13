@@ -22,6 +22,8 @@ const jobSortOptions = [
   { value: 'progress_desc', label: '按进度倒序' }
 ]
 
+const pageSizeOptions = [10, 20, 50]
+
 function normalizeJob(job) {
   const source = job && typeof job === 'object' ? job : {}
   return {
@@ -184,6 +186,8 @@ export default function TaskGovernancePage() {
   const [jobStatusFilter, setJobStatusFilter] = useState('all')
   const [jobKeyword, setJobKeyword] = useState('')
   const [jobSort, setJobSort] = useState('updated_desc')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [banner, setBanner] = useState({ type: '', message: '' })
   const [error, setError] = useState('')
 
@@ -219,6 +223,17 @@ export default function TaskGovernancePage() {
 
     return sortJobs(keywordMatched, jobSort)
   }, [jobKeyword, jobSort, jobStatusFilter, jobs])
+
+  const pageCount = useMemo(
+    () => Math.max(1, Math.ceil(filteredJobs.length / Math.max(1, pageSize))),
+    [filteredJobs.length, pageSize]
+  )
+
+  const pagedJobs = useMemo(() => {
+    const safePage = Math.min(Math.max(1, page), pageCount)
+    const startIndex = (safePage - 1) * pageSize
+    return filteredJobs.slice(startIndex, startIndex + pageSize)
+  }, [filteredJobs, page, pageCount, pageSize])
 
   const completedCount = useMemo(
     () => jobs.filter((job) => job.status === 'completed').length,
@@ -306,6 +321,14 @@ export default function TaskGovernancePage() {
 
     return () => window.clearInterval(timer)
   }, [activeJobs, jobDetail?.status, selectedJobId])
+
+  useEffect(() => {
+    setPage((current) => Math.min(Math.max(1, current), pageCount))
+  }, [pageCount])
+
+  useEffect(() => {
+    setPage(1)
+  }, [jobStatusFilter, jobKeyword, jobSort, pageSize])
 
   const handleCancelJob = async (jobId) => {
     if (!jobId) {
@@ -453,6 +476,21 @@ export default function TaskGovernancePage() {
                   ))}
                 </select>
               </div>
+              <div className="field compact-field">
+                <label htmlFor="job_page_size">每页条数</label>
+                <select
+                  id="job_page_size"
+                  className="select"
+                  value={pageSize}
+                  onChange={(event) => setPageSize(Number(event.target.value))}
+                >
+                  {pageSizeOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="field grow-field">
                 <label htmlFor="job_keyword">任务搜索</label>
                 <input
@@ -468,66 +506,80 @@ export default function TaskGovernancePage() {
           </div>
 
           {filteredJobs.length ? (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>任务 ID</th>
-                    <th>状态</th>
-                    <th>进度</th>
-                    <th>说明</th>
-                    <th>更新时间</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredJobs.map((job) => {
-                    const progress = getJobProgress(job)
-                    return (
-                      <tr key={job.job_id} className={selectedJobId === job.job_id ? 'table-row-active' : ''}>
-                        <td className="mono">{job.job_id}</td>
-                        <td>
-                          <span className={`badge ${getJobBadgeClass(job.status)}`}>{getJobStatusText(job.status)}</span>
-                        </td>
-                        <td>
-                          <div className="job-progress-row">
-                            <div className="job-progress-track">
-                              <div className="job-progress-value" style={{ width: `${progress}%` }} />
+            <>
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>任务 ID</th>
+                      <th>状态</th>
+                      <th>进度</th>
+                      <th>说明</th>
+                      <th>更新时间</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedJobs.map((job) => {
+                      const progress = getJobProgress(job)
+                      return (
+                        <tr key={job.job_id} className={selectedJobId === job.job_id ? 'table-row-active' : ''}>
+                          <td className="mono">{job.job_id}</td>
+                          <td>
+                            <span className={`badge ${getJobBadgeClass(job.status)}`}>{getJobStatusText(job.status)}</span>
+                          </td>
+                          <td>
+                            <div className="job-progress-row">
+                              <div className="job-progress-track">
+                                <div className="job-progress-value" style={{ width: `${progress}%` }} />
+                              </div>
+                              <span>{progress}%</span>
                             </div>
-                            <span>{progress}%</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="table-secondary">{job.message || '--'}</div>
-                          <div className="table-secondary">{getJobCompactStats(job)}</div>
-                        </td>
-                        <td>{formatDateTime(job.updated_at)}</td>
-                        <td>
-                          <div className="table-actions">
-                            <button type="button" className="button button-small button-secondary" onClick={() => setSelectedJobId(job.job_id)}>
-                              查看详情
-                            </button>
-                            <button type="button" className="button button-small button-ghost" onClick={() => handleReuseJobConfig(job)}>
-                              回填到工作台
-                            </button>
-                            {['pending', 'running', 'cancelling'].includes(job.status) ? (
-                              <button
-                                type="button"
-                                className="button button-small button-danger"
-                                onClick={() => handleCancelJob(job.job_id)}
-                                disabled={job.status === 'cancelling'}
-                              >
-                                {job.status === 'cancelling' ? '取消中...' : '停止任务'}
+                          </td>
+                          <td>
+                            <div className="table-secondary">{job.message || '--'}</div>
+                            <div className="table-secondary">{getJobCompactStats(job)}</div>
+                          </td>
+                          <td>{formatDateTime(job.updated_at)}</td>
+                          <td>
+                            <div className="table-actions">
+                              <button type="button" className="button button-small button-secondary" onClick={() => setSelectedJobId(job.job_id)}>
+                                查看详情
                               </button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                              <button type="button" className="button button-small button-ghost" onClick={() => handleReuseJobConfig(job)}>
+                                回填到工作台
+                              </button>
+                              {['pending', 'running', 'cancelling'].includes(job.status) ? (
+                                <button
+                                  type="button"
+                                  className="button button-small button-danger"
+                                  onClick={() => handleCancelJob(job.job_id)}
+                                  disabled={job.status === 'cancelling'}
+                                >
+                                  {job.status === 'cancelling' ? '取消中...' : '停止任务'}
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="pagination">
+                <span className="pagination-meta">第 {formatNumber(page)} / {formatNumber(pageCount)} 页，共 {formatNumber(filteredJobs.length)} 条</span>
+                <div className="toolbar-group">
+                  <button type="button" className="button button-small button-secondary" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>
+                    上一页
+                  </button>
+                  <button type="button" className="button button-small button-secondary" onClick={() => setPage((current) => Math.min(pageCount, current + 1))} disabled={page >= pageCount}>
+                    下一页
+                  </button>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="empty-state small">当前筛选下暂无任务。</div>
           )}
