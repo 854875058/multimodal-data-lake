@@ -40,3 +40,8 @@ psutil>=5.9.0
 
 # --- 数值计算 ---
 numpy>=1.24.0
+
+# --- 用户认证 ---
+passlib[bcrypt]>=1.7.4
+python-jose[cryptography]>=3.3.0
+pydantic[email]>=2.4.0

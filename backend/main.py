@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from backend.api import dashboard, files, platform, search, system, upload, workbench
+from backend.api import dashboard, files, platform, search, system, upload, workbench, users, users
 from config import BACKEND_RELOAD, CORS_ALLOW_CREDENTIALS, CORS_ALLOW_ORIGINS
 
 logging.basicConfig(
@@ -53,9 +53,13 @@ async def lifespan(app: FastAPI):
     logger.info('=' * 60)
 
     from database import init_db
+    from backend.api.users import init_users_table
 
     init_db()
     logger.info('SQLite 数据库初始化完成')
+
+    init_users_table()
+    logger.info('用户表初始化完成')
 
     threading.Thread(target=_load_background_resources, daemon=True).start()
     yield
@@ -83,6 +87,7 @@ app.include_router(dashboard.router, prefix='/api/dashboard', tags=['仪表盘']
 app.include_router(system.router, prefix='/api/system', tags=['系统监控'])
 app.include_router(workbench.router, prefix='/api/workbench', tags=['接入工作台'])
 app.include_router(platform.router, prefix='/api/platform', tags=['平台能力'])
+app.include_router(users.router, prefix='/api/users', tags=['用户管理'])
 
 
 @app.get('/api/health')
