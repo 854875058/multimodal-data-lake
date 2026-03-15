@@ -1,4 +1,4 @@
-# local-file-to-lance Agent Notes
+# multimodal-data-lake Agent Notes
 
 This file stores project-level rules that should be read first in new sessions.
 
