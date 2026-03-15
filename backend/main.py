@@ -48,7 +48,7 @@ def _load_background_resources():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info('=' * 60)
-    logger.info('DataVerse Pro API 服务启动')
+    logger.info('多模态数据湖 API 服务启动')
     logger.info('=' * 60)
 
     from database import init_db
@@ -61,8 +61,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title='DataVerse Pro API',
-    description='多模态数据湖仓 API 服务',
+    title='多模态数据湖 API',
+    description='多模态数据湖统一管理平台 API 服务',
     version='2.1.0',
     lifespan=lifespan,
 )
@@ -87,7 +87,7 @@ app.include_router(platform.router, prefix='/api/platform', tags=['平台能力'
 @app.get('/api/health')
 async def health_check():
     """健康检查接口。"""
-    return {'status': 'ok', 'service': 'DataVerse Pro API'}
+    return {'status': 'ok', 'service': '多模态数据湖 API'}
 
 
 frontend_dist = ROOT_DIR / 'frontend' / 'dist'

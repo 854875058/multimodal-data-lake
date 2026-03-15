@@ -234,8 +234,8 @@ export default function ConfigCenterPage() {
     <div className="content-wrap">
       <div className="page-header">
         <div>
-          <h1 className="page-title">配置中心</h1>
-          <p className="page-subtitle">把平台连接配置和默认接入模板收口到一个地方，其他页面只消费配置，不再各自承担配置入口。</p>
+          <h1 className="page-title">接入配置</h1>
+          <p className="page-subtitle">把平台连接配置和默认接入模板收口到系统配置下的接入配置模块，其他页面只消费配置，不再各自承担配置入口。</p>
         </div>
         <div className="page-actions">
           <button type="button" className="button button-secondary" onClick={loadData}>
