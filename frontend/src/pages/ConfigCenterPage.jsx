@@ -91,6 +91,14 @@ function getIndexModeValue(form) {
   return form.index_type || 'EMPTY'
 }
 
+function showPartitionField(indexModeValue) {
+  return indexModeValue !== 'none' && indexModeValue !== 'EMPTY'
+}
+
+function showSubVectorField(indexModeValue) {
+  return ['IVF_PQ', 'IVF_HNSW_PQ'].includes(indexModeValue)
+}
+
 function mapIndexModeToForm(modeValue, currentForm) {
   if (modeValue === 'auto') {
     return { ...currentForm, index_strategy: 'auto' }
