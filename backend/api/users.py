@@ -10,7 +10,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 
-from database import get_db_connection
+from database import _get_connection as get_db_connection
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
