@@ -7,8 +7,9 @@ import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 ROOT_DIR = Path(__file__).parent.parent
@@ -91,9 +92,42 @@ async def health_check():
 
 
 frontend_dist = ROOT_DIR / 'frontend' / 'dist'
+frontend_assets = frontend_dist / 'assets'
+frontend_index = frontend_dist / 'index.html'
 if frontend_dist.exists():
-    app.mount('/', StaticFiles(directory=str(frontend_dist), html=True), name='frontend')
+    if frontend_assets.exists():
+        app.mount('/assets', StaticFiles(directory=str(frontend_assets)), name='frontend-assets')
     logger.info('前端静态文件服务已启用: %s', frontend_dist)
+
+
+@app.get('/', include_in_schema=False)
+async def serve_frontend_root():
+    if frontend_index.exists():
+        return FileResponse(frontend_index)
+    raise HTTPException(status_code=404, detail='前端构建产物不存在')
+
+
+@app.get('/{full_path:path}', include_in_schema=False)
+async def serve_frontend_app(full_path: str):
+    if not frontend_dist.exists():
+        raise HTTPException(status_code=404, detail='前端构建产物不存在')
+
+    if full_path.startswith('api/'):
+        raise HTTPException(status_code=404, detail='接口不存在')
+
+    requested = (frontend_dist / full_path).resolve()
+    try:
+        requested.relative_to(frontend_dist.resolve())
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail='非法路径') from error
+
+    if requested.exists() and requested.is_file():
+        return FileResponse(requested)
+
+    if frontend_index.exists():
+        return FileResponse(frontend_index)
+
+    raise HTTPException(status_code=404, detail='前端入口不存在')
 
 
 
