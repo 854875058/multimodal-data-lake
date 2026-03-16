@@ -66,7 +66,7 @@
 
 | 层级 | 技术 |
 |------|------|
-| 前端 | React 18, Vite, ECharts, Vue Router |
+| 前端 | React 18, Vite, React Router, ECharts |
 | 后端 | FastAPI, Uvicorn, Pydantic v2 |
 | 向量存储 | LanceDB >= 0.4, PyArrow |
 | 对象存储 | SeaweedFS (S3 兼容), boto3 |
@@ -124,7 +124,7 @@ multimodal-data-lake/
 pip install -r requirements.txt
 
 # 前端依赖
-cd frontend && npm install
+cd frontend && npm install && cd ..
 ```
 
 ### 2. 配置环境变量
@@ -142,15 +142,19 @@ export DEEPSEEK_API_KEY=sk-xxxxxxxx
 ### 3. 启动服务
 
 ```bash
-# 方式一：一键启动（后端 + 前端）
-python start.py
+# 方式一：开发模式一键启动（后端 + 前端）
+python start.py --dev
 
-# 方式二：分别启动
-uvicorn backend.main:app --host 0.0.0.0 --port 8000
+# 方式二：按项目约定分别启动
+python backend/main.py
 cd frontend && npm run dev
+
+# 方式三：生产模式（前端构建后由后端直接提供）
+cd frontend && npm run build && cd ..
+python backend/main.py
 ```
 
-访问 http://localhost:3000 打开控制台。
+开发模式访问 `http://localhost:3000`，生产模式访问 `http://127.0.0.1:8090`。
 
 ---
 
@@ -165,12 +169,18 @@ cd frontend && npm run dev
 | GET | `/api/dashboard/stats` | 统计看板数据 |
 | GET | `/api/system/logs` | 实时日志 |
 | GET | `/api/system/status` | 系统状态 |
-| POST | `/api/workbench/ingest` | 工作台批量接入 |
+| GET | `/api/workbench/settings` | 获取工作台接入配置 |
+| POST | `/api/workbench/settings` | 保存工作台接入配置 |
+| POST | `/api/workbench/test-connection` | 测试 S3 / SFTP 来源连接 |
+| POST | `/api/workbench/scan` | 扫描来源对象或目录 |
+| POST | `/api/workbench/jobs` | 创建批量接入任务 |
+| GET | `/api/workbench/jobs` | 获取工作台任务列表 |
+| POST | `/api/workbench/build-index` | 构建向量索引 |
 | POST | `/api/users/login` | 用户登录（JWT） |
 | GET | `/api/users/me` | 当前用户信息 |
 | GET | `/api/platform/info` | 平台信息 |
 
-完整 Swagger 文档：http://localhost:8000/docs
+完整 Swagger 文档：http://localhost:8090/docs
 
 ---
 
@@ -220,4 +230,3 @@ python agents/start_agents.py
 ---
 
 *Built with FastAPI + React + LanceDB | Last updated: 2026-03-15*
-

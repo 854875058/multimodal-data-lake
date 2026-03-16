@@ -21,8 +21,8 @@ DataVerse Pro 是一个**多模态数据湖平台**，支持将本地文件（�
 
 ```
                     +------------------+
-                    |   浏览器 (Vue3)   |
-                    |   Element Plus   |
+                    | 浏览器 (React 18) |
+                    | React Router     |
                     |   ECharts        |
                     +--------+---------+
                              |
@@ -53,16 +53,18 @@ DataVerse Pro 是一个**多模态数据湖平台**，支持将本地文件（�
       files.py           #   文件管理 API (列表/预览/删除)
       dashboard.py       #   仪表盘统计 API
       system.py          #   系统监控 API (CPU/内存/日志)
-  frontend/              # 前端 (Vue 3 + Vite)
+  frontend/              # 前端 (React + Vite)
     src/
-      views/
-        Dashboard.vue    #   领导看板
-        Upload.vue       #   文件上传
-        Search.vue       #   向量搜索
-        Files.vue        #   文件管理
-        Logs.vue         #   应用日志
+      pages/
+        DashboardPage.jsx         #   平台总览
+        IngestionWorkbenchPage.jsx #  接入工作台
+        UploadPage.jsx            #   文件上传
+        SearchPage.jsx            #   向量搜索
+        FilesPage.jsx             #   文件管理
+        LogsPage.jsx              #   应用日志
       api/index.js       #   API 封装 (axios)
-      router/index.js    #   路由配置
+      App.jsx            #   控制台壳层
+      main.jsx           #   前端入口
     dist/                #   构建产物（生产模式由后端提供）
   config.py              # 全局配置（路径、S3、LLM、分块参数）
   database.py            # SQLite 操作（文件注册、任务统计、实体存储）
@@ -143,6 +145,9 @@ cd ..
 python start.py --production    # 生产模式
 python start.py --dev           # 开发模式（前后端分离）
 python start.py --backend       # 仅后端
+
+# 或按项目约定从仓库根直接启动后端
+python backend/main.py
 ```
 
 ### 4.3 配置说明
@@ -248,6 +253,11 @@ rm -rf temp_extracted/*
 | `/api/system/resources` | GET | CPU/内存使用 |
 | `/api/system/status` | GET | 系统整体状态（模型+LanceDB+资源） |
 | `/api/system/logs` | GET | 应用日志内容 |
+| `/api/workbench/settings` | GET/POST | 工作台配置读取与保存 |
+| `/api/workbench/test-connection` | POST | 测试来源连接 |
+| `/api/workbench/scan` | POST | 扫描来源对象或目录 |
+| `/api/workbench/jobs` | GET/POST | 工作台任务列表与任务创建 |
+| `/api/workbench/build-index` | POST | 构建向量索引 |
 
 ## 7. 故障排查
 

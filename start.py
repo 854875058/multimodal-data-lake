@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent.absolute()
 BACKEND_DIR = ROOT_DIR / "backend"
 FRONTEND_DIR = ROOT_DIR / "frontend"
+BACKEND_ENTRY = Path("backend") / "main.py"
 
 # 进程列表（用于清理）
 processes = []
@@ -115,20 +116,20 @@ def build_frontend():
 
 
 def start_backend_process(reload=False):
-    """启动后端进程，并通过环境变量控制是否热重载。"""
+    """从仓库根目录启动后端进程，并通过环境变量控制是否热重载。"""
     env = os.environ.copy()
     env["BACKEND_RELOAD"] = "1" if reload else "0"
 
     if sys.platform == "win32":
         return subprocess.Popen(
-            [sys.executable, "main.py"],
-            cwd=str(BACKEND_DIR),
+            [sys.executable, str(BACKEND_ENTRY)],
+            cwd=str(ROOT_DIR),
             env=env,
         )
 
     return subprocess.Popen(
-        [sys.executable, "main.py"],
-        cwd=str(BACKEND_DIR),
+        [sys.executable, str(BACKEND_ENTRY)],
+        cwd=str(ROOT_DIR),
         env=env,
         preexec_fn=os.setsid,
     )

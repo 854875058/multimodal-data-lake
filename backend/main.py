@@ -148,7 +148,7 @@ if __name__ == '__main__':
     import uvicorn
 
     port = int(os.getenv('BACKEND_PORT', '8090'))
-    app_target = 'main:app' if BACKEND_RELOAD else app
+    app_target = 'backend.main:app' if BACKEND_RELOAD else app
     uvicorn.run(
         app_target,
         host='0.0.0.0',
