@@ -24,6 +24,10 @@ class CodeAgent(BaseAgent):
         self.client = Anthropic(api_key=api_key) if api_key and Anthropic else None
         self.current_task = None
 
+    def is_ready_for_autonomous_execution(self) -> bool:
+        """当前实现是否具备可信的自动执行能力。"""
+        return False
+
     def receive_task(self, task: Dict[str, Any]) -> bool:
         """接收任务"""
         self.current_task = task

@@ -67,6 +67,12 @@ function AppShell() {
     day: '2-digit',
     weekday: 'short'
   }).format(new Date())
+  const absoluteDate = new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date())
+  const highlightedModules = currentGroup.items.slice(0, 4)
 
   return (
     <div className="app-shell">
@@ -107,8 +113,29 @@ function AppShell() {
           ))}
         </nav>
 
+        <div className="sidebar-runtime-card">
+          <div className="sidebar-section-label">Control Room</div>
+          <div className="sidebar-runtime-grid">
+            <div className="runtime-metric">
+              <div className="runtime-metric-label">当前模块</div>
+              <div className="runtime-metric-value">{currentNav.code}</div>
+              <div className="runtime-metric-note">{currentNav.label}</div>
+            </div>
+            <div className="runtime-metric">
+              <div className="runtime-metric-label">模块总数</div>
+              <div className="runtime-metric-value">{String(navItems.length).padStart(2, '0')}</div>
+              <div className="runtime-metric-note">控制台导航矩阵</div>
+            </div>
+            <div className="runtime-metric is-wide">
+              <div className="runtime-metric-label">当前路径</div>
+              <div className="runtime-metric-path">{currentNav.path}</div>
+              <div className="runtime-metric-note">Lake control routing</div>
+            </div>
+          </div>
+        </div>
+
         <div className="sidebar-foot">
-          <div className="sidebar-section-label">Platform Stack</div>
+          <div className="sidebar-section-label">Platform Fabric</div>
           <div className="sidebar-pill-row">
             <span className="sidebar-pill">Gravitino</span>
             <span className="sidebar-pill">SeaweedFS</span>
@@ -127,14 +154,52 @@ function AppShell() {
       </aside>
 
       <main className="app-main">
+        <section className="shell-toolbar shell-panel">
+          <div className="shell-toolbar-main">
+            <div className="shell-toolbar-kicker">Arco-aligned Enterprise Console</div>
+            <div className="shell-toolbar-title">Lake Operations Control Surface</div>
+            <div className="shell-toolbar-meta">
+              <span className="toolbar-token is-primary">{currentGroup.title}</span>
+              <span className="toolbar-token">Module {currentNav.code}</span>
+              <span className="toolbar-token">{currentNav.path}</span>
+            </div>
+          </div>
+          <div className="shell-toolbar-rail">
+            <div className="toolbar-pulse-card">
+              <div className="toolbar-pulse-label">Control Plane</div>
+              <div className="toolbar-pulse-value">{String(navItems.length).padStart(2, '0')}</div>
+              <div className="toolbar-pulse-note">功能模块已编排</div>
+            </div>
+            <div className="toolbar-pulse-card">
+              <div className="toolbar-pulse-label">Current Group</div>
+              <div className="toolbar-pulse-value">{currentGroup.title}</div>
+              <div className="toolbar-pulse-note">企业控制台主分区</div>
+            </div>
+            <div className="toolbar-pulse-card">
+              <div className="toolbar-pulse-label">Checked</div>
+              <div className="toolbar-pulse-value">{absoluteDate}</div>
+              <div className="toolbar-pulse-note">控制面巡检日期</div>
+            </div>
+          </div>
+        </section>
+
         <section className="shell-header">
-          <div>
+          <div className="shell-header-main">
             <div className="shell-eyebrow">{currentGroup.title}</div>
             <div className="shell-title-row">
               <h1 className="shell-title">{currentNav.label}</h1>
               <span className="shell-badge">{currentNav.tag}</span>
             </div>
             <p className="shell-subtitle">{currentNav.description}</p>
+
+            <div className="shell-command-row">
+              {highlightedModules.map((item) => (
+                <div key={item.path} className={`command-pill${item.path === currentNav.path ? ' is-active' : ''}`}>
+                  <span className="command-pill-code">{item.code}</span>
+                  <span className="command-pill-label">{item.label}</span>
+                </div>
+              ))}
+            </div>
 
             <div className="shell-subnav">
               {currentGroup.items.map((item) => (
@@ -149,21 +214,40 @@ function AppShell() {
             </div>
           </div>
 
-          <div className="shell-stat-grid">
-            <div className="shell-stat-card">
-              <div className="shell-stat-label">当前分组</div>
-              <div className="shell-stat-value">{currentGroup.title}</div>
-              <div className="shell-stat-note">{currentGroup.note}</div>
+          <div className="shell-side-panel">
+            <div className="shell-brief-card">
+              <div className="shell-stat-label">Console Brief</div>
+              <div className="shell-brief-title">统一接入、编排、治理与权限控制</div>
+              <div className="shell-brief-copy">
+                以更接近 Arco Design 的企业控制台语言重排主壳层：强化层级、收敛色彩、突出状态与路径感。
+              </div>
+              <div className="shell-brief-metrics">
+                <div className="shell-brief-metric">
+                  <div className="shell-brief-metric-label">Active Route</div>
+                  <div className="shell-brief-metric-value">{currentNav.path}</div>
+                </div>
+                <div className="shell-brief-metric">
+                  <div className="shell-brief-metric-label">巡检时间</div>
+                  <div className="shell-brief-metric-value">{checkedDate}</div>
+                </div>
+              </div>
             </div>
-            <div className="shell-stat-card">
-              <div className="shell-stat-label">二级模块</div>
-              <div className="shell-stat-value">{String(currentGroup.items.length).padStart(2, '0')}</div>
-              <div className="shell-stat-note">当前分组下可切换的功能模块</div>
-            </div>
-            <div className="shell-stat-card">
-              <div className="shell-stat-label">巡检时间</div>
-              <div className="shell-stat-value">{checkedDate}</div>
-              <div className="shell-stat-note">Gravitino / SeaweedFS / Lance / Ray / Doris</div>
+            <div className="shell-stat-grid">
+              <div className="shell-stat-card">
+                <div className="shell-stat-label">当前分组</div>
+                <div className="shell-stat-value">{currentGroup.title}</div>
+                <div className="shell-stat-note">{currentGroup.note}</div>
+              </div>
+              <div className="shell-stat-card">
+                <div className="shell-stat-label">二级模块</div>
+                <div className="shell-stat-value">{String(currentGroup.items.length).padStart(2, '0')}</div>
+                <div className="shell-stat-note">当前分组下可切换的功能模块</div>
+              </div>
+              <div className="shell-stat-card">
+                <div className="shell-stat-label">核心栈</div>
+                <div className="shell-stat-value">R / F</div>
+                <div className="shell-stat-note">React / FastAPI / Gravitino / Lance</div>
+              </div>
             </div>
           </div>
         </section>

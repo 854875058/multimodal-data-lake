@@ -50,7 +50,15 @@ class BrainAgent(BaseAgent):
             'missing_features': [],
             'incomplete_modules': [],
             'optimization_opportunities': [],
+            'architecture_tasks': [],
         }
+
+        def add_architecture_task(title: str, description: str, priority: int = 3):
+            analysis['architecture_tasks'].append({
+                'title': title,
+                'description': description,
+                'priority': priority,
+            })
 
         # 读取项目文档
         readme_path = project_root / "README.md"
@@ -62,9 +70,114 @@ class BrainAgent(BaseAgent):
                     analysis['missing_features'].append("用户管理系统")
                 if "权限管理" in readme_content and not (project_root / "backend" / "api" / "permissions.py").exists():
                     analysis['missing_features'].append("权限管理系统")
+                if "Vue Router" in readme_content or "/api/workbench/ingest" in readme_content or "localhost:8000" in readme_content:
+                    add_architecture_task(
+                        "修正文档与当前 React/FastAPI 实现不一致",
+                        "README 仍包含 Vue Router、旧 workbench 接口或 8000 端口等过时描述，需要与当前 React + FastAPI + 8090 的实现对齐。",
+                        priority=5,
+                    )
+
+        frontend_main = project_root / "frontend" / "src" / "main.jsx"
+        legacy_vue_main = project_root / "frontend" / "src" / "main.js"
+        legacy_vue_app = project_root / "frontend" / "src" / "App.vue"
+        legacy_vue_views = project_root / "frontend" / "src" / "views"
+        if frontend_main.exists() and (legacy_vue_main.exists() or legacy_vue_app.exists() or legacy_vue_views.exists()):
+            add_architecture_task(
+                "清理遗留 Vue 前端入口和页面文件",
+                "当前前端已切到 main.jsx / App.jsx，但仓库仍保留 main.js、App.vue、views 等旧 Vue 入口与页面，需要决定保留或清理策略。",
+                priority=5,
+            )
+
+        if (project_root / "README_VUE.md").exists() or (project_root / "架构图.md").exists() or (project_root / "app_nicegui.py").exists():
+            add_architecture_task(
+                "统一多代前端和架构文档口径",
+                "仓库同时保留 React、Vue、Streamlit/NiceGUI 多代资料与实现痕迹，需要整理当前有效架构、历史遗留和废弃路径。",
+                priority=4,
+            )
+
+        backend_main = project_root / "backend" / "main.py"
+        start_script = project_root / "start.py"
+        agents_doc = project_root / "AGENTS.md"
+        backend_main_content = backend_main.read_text(encoding='utf-8') if backend_main.exists() else ''
+        start_script_content = start_script.read_text(encoding='utf-8') if start_script.exists() else ''
+        agents_doc_content = agents_doc.read_text(encoding='utf-8') if agents_doc.exists() else ''
+
+        if "BACKEND_PORT', '8091'" in backend_main_content and "8090" in agents_doc_content:
+            add_architecture_task(
+                "统一后端默认端口与启动约定",
+                "backend/main.py 默认端口仍是 8091，但项目规则、部署脚本和验收口径都以 8090 为准，需要统一。",
+                priority=5,
+            )
+
+        if 'cwd=str(BACKEND_DIR)' in start_script_content and 'python backend/main.py' in agents_doc_content:
+            add_architecture_task(
+                "统一启动脚本与仓库根启动方式",
+                "AGENTS 要求从仓库根执行 python backend/main.py，但 start.py 仍切到 backend 目录运行 main.py，需要收敛为同一启动方式。",
+                priority=4,
+            )
+
+        if "api_key = None" in (project_root / "agents" / "start_agents.py").read_text(encoding='utf-8'):
+            add_architecture_task(
+                "补齐 Agent Team 的环境配置读取",
+                "start_agents.py 仍把 api_key 写死为 None，缺少从环境变量读取配置、区分执行模式和可观测状态的能力。",
+                priority=4,
+            )
+
+        code_agent_path = project_root / "agents" / "code_agent.py"
+        test_agent_path = project_root / "agents" / "test_agent.py"
+        code_agent_content = code_agent_path.read_text(encoding='utf-8') if code_agent_path.exists() else ''
+        test_agent_content = test_agent_path.read_text(encoding='utf-8') if test_agent_path.exists() else ''
+        if "占位实现" in code_agent_content or "占位实现" in test_agent_content:
+            add_architecture_task(
+                "补齐 Agent Team 的真实执行能力",
+                "CodeAgent / TestAgent 仍是占位实现，当前只能规划任务，无法可信地自动改码和验收。",
+                priority=5,
+            )
+            analysis['optimization_opportunities'].append("Agent Team 仍处于规划骨架阶段，优先适合作为 backlog 生成器。")
+
+        if "AgentCoordinator" not in backend_main_content:
+            add_architecture_task(
+                "明确 Agent Team 的系统集成位置",
+                "Agent Team 目前是独立启动脚本，尚未接入后端生命周期、管理界面或状态 API，需要明确最终集成方案。",
+                priority=3,
+            )
 
         self.log_action("analyze_project", analysis)
         return analysis
+
+    def ensure_task(self, title: str, description: str, priority: int = 1) -> Dict[str, Any]:
+        """按标题去重创建任务。"""
+        for task in self.task_queue:
+            if task['title'] == title:
+                return task
+        return self.create_task(title, description, priority)
+
+    def bootstrap_tasks_from_analysis(self, analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """根据项目分析结果生成初始 backlog。"""
+        created_tasks = []
+
+        for feature in analysis.get('missing_features', []):
+            created_tasks.append(self.ensure_task(
+                title=f"实现{feature}",
+                description=f"完整实现{feature}功能，包括后端 API 和前端界面",
+                priority=3,
+            ))
+
+        for module in analysis.get('incomplete_modules', []):
+            created_tasks.append(self.ensure_task(
+                title=f"补齐{module}",
+                description=f"完善 {module} 的缺失实现并补充验证。",
+                priority=3,
+            ))
+
+        for item in analysis.get('architecture_tasks', []):
+            created_tasks.append(self.ensure_task(
+                title=item['title'],
+                description=item['description'],
+                priority=item.get('priority', 3),
+            ))
+
+        return created_tasks
 
     def create_task(self, title: str, description: str, priority: int = 1) -> Dict[str, Any]:
         """创建新任务"""

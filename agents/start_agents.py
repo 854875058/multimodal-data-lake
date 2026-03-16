@@ -2,6 +2,7 @@
 """Agent Team 启动脚本"""
 
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -26,12 +27,14 @@ logger = logging.getLogger(__name__)
 def main():
     """主函数"""
     workspace_dir = ROOT_DIR / 'agents' / 'workspace'
-    api_key = None  # 从环境变量读取或配置文件
+    api_key = os.getenv('ANTHROPIC_API_KEY')
 
     coordinator = AgentCoordinator(workspace_dir, api_key)
 
     try:
         logger.info("启动 Agent Team...")
+        logger.info("Anthropic API 已配置: %s", bool(api_key))
+        logger.info("工作空间目录: %s", workspace_dir)
         coordinator.start(ROOT_DIR)
     except KeyboardInterrupt:
         logger.info("收到停止信号")

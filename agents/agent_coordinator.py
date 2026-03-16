@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Agent Coordinator - Agent 协调器"""
 
+import json
 import logging
 import time
 from pathlib import Path
@@ -19,6 +20,7 @@ class AgentCoordinator:
     def __init__(self, workspace_dir: Path, api_key: Optional[str] = None):
         self.workspace_dir = workspace_dir
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
+        self.status_file = self.workspace_dir / 'agent_team_status.json'
 
         self.brain = BrainAgent(workspace_dir, api_key)
         self.code = CodeAgent(workspace_dir, api_key)
@@ -26,28 +28,57 @@ class AgentCoordinator:
 
         self.running = False
         self.max_retry = 3
+        self.mode = 'planning_only'
+        self.mode_reason = 'CodeAgent/TestAgent 仍是占位实现，暂不进入自动改码流程。'
+        self.analysis_interval_seconds = 60
+        self.project_root: Optional[Path] = None
+        self._last_analysis_at = 0.0
+
+    def _refresh_mode(self):
+        """根据 Agent 能力选择运行模式。"""
+        if self.code.is_ready_for_autonomous_execution() and self.test.is_ready_for_autonomous_execution():
+            self.mode = 'execution'
+            self.mode_reason = '执行 Agent 已具备真实改码和测试能力。'
+        else:
+            self.mode = 'planning_only'
+            self.mode_reason = 'CodeAgent/TestAgent 仍是占位实现，暂不进入自动改码流程。'
+
+    def _write_status_snapshot(self):
+        """将当前状态写入工作空间，便于外部查看。"""
+        try:
+            with open(self.status_file, 'w', encoding='utf-8') as f:
+                json.dump(self.get_status(), f, ensure_ascii=False, indent=2)
+        except Exception as error:
+            logger.warning("写入 Agent 状态快照失败: %s", error)
+
+    def _refresh_backlog(self):
+        """重新扫描项目并同步 backlog。"""
+        if not self.project_root:
+            return
+        analysis = self.brain.analyze_project(self.project_root)
+        created_tasks = self.brain.bootstrap_tasks_from_analysis(analysis)
+        self._last_analysis_at = time.time()
+        logger.info("Agent backlog 刷新完成，当前任务总数: %s", len(self.brain.task_queue))
+        if created_tasks:
+            logger.info("本次分析覆盖任务数: %s", len(created_tasks))
 
     def start(self, project_root: Path):
         """启动协调器，持续运行"""
         self.running = True
+        self.project_root = project_root
+        self._refresh_mode()
         logger.info("Agent Team 启动")
+        logger.info("运行模式: %s", self.mode)
+        logger.info("模式说明: %s", self.mode_reason)
 
-        # 1. Brain Agent 分析项目
-        analysis = self.brain.analyze_project(project_root)
-        logger.info(f"项目分析完成: {analysis}")
-
-        # 2. 创建初始任务
-        for feature in analysis.get('missing_features', []):
-            self.brain.create_task(
-                title=f"实现{feature}",
-                description=f"完整实现{feature}功能，包括后端 API 和前端界面",
-                priority=3
-            )
+        self._refresh_backlog()
+        self._write_status_snapshot()
 
         # 3. 主循环
         while self.running:
             try:
                 self._process_one_cycle()
+                self._write_status_snapshot()
                 time.sleep(5)  # 每 5 秒检查一次
             except KeyboardInterrupt:
                 logger.info("收到停止信号")
@@ -58,6 +89,11 @@ class AgentCoordinator:
 
     def _process_one_cycle(self):
         """处理一个工作循环"""
+        if self.mode == 'planning_only':
+            if time.time() - self._last_analysis_at >= self.analysis_interval_seconds:
+                self._refresh_backlog()
+            return
+
         # 获取下一个任务
         task = self.brain.get_next_task()
         if not task:
@@ -139,12 +175,15 @@ class AgentCoordinator:
     def stop(self):
         """停止协调器"""
         self.running = False
+        self._write_status_snapshot()
         logger.info("Agent Team 停止")
 
     def get_status(self) -> Dict[str, Any]:
         """获取整体状态"""
         return {
             'running': self.running,
+            'mode': self.mode,
+            'mode_reason': self.mode_reason,
             'brain': self.brain.get_status(),
             'code': self.code.get_status(),
             'test': self.test.get_status(),

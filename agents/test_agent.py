@@ -24,6 +24,10 @@ class TestAgent(BaseAgent):
         self.client = Anthropic(api_key=api_key) if api_key and Anthropic else None
         self.test_results = []
 
+    def is_ready_for_autonomous_execution(self) -> bool:
+        """当前实现是否具备可信的自动验收能力。"""
+        return False
+
     def receive_code(self, code_info: Dict[str, Any]) -> bool:
         """接收代码"""
         self.log_action("receive_code", {
