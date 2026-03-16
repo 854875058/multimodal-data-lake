@@ -23,6 +23,14 @@ const jobSortOptions = [
 ]
 
 const pageSizeOptions = [10, 20, 50]
+const agentTaskStatusOptions = [
+  { value: 'all', label: '全部状态' },
+  { value: 'pending', label: '待规划' },
+  { value: 'in_progress', label: '规划中' },
+  { value: 'ready', label: '待执行' },
+  { value: 'completed', label: '已完成' },
+  { value: 'failed', label: '失败' }
+]
 
 function normalizeJob(job) {
   const source = job && typeof job === 'object' ? job : {}
@@ -146,6 +154,65 @@ function getJobBadgeClass(status) {
   }
 }
 
+function normalizeAgentTask(task) {
+  const source = task && typeof task === 'object' ? task : {}
+  const planPayload = source.plan?.plan && typeof source.plan.plan === 'object'
+    ? source.plan.plan
+    : (source.plan && typeof source.plan === 'object' ? source.plan : {})
+  return {
+    ...source,
+    details: source.details && typeof source.details === 'object' ? source.details : {},
+    plan: planPayload,
+  }
+}
+
+function normalizeAgentTasks(items) {
+  return Array.isArray(items) ? items.map(normalizeAgentTask) : []
+}
+
+function getAgentTaskStatusText(status) {
+  switch (status) {
+    case 'pending':
+      return '待规划'
+    case 'in_progress':
+      return '规划中'
+    case 'ready':
+      return '待执行'
+    case 'completed':
+      return '已完成'
+    case 'failed':
+      return '失败'
+    default:
+      return status || '未知'
+  }
+}
+
+function getAgentTaskBadgeClass(status) {
+  switch (status) {
+    case 'completed':
+      return 'is-success'
+    case 'ready':
+      return 'is-warning'
+    case 'in_progress':
+      return 'is-warning'
+    case 'failed':
+      return 'is-danger'
+    default:
+      return 'is-muted'
+  }
+}
+
+function getAgentModeText(mode) {
+  switch (mode) {
+    case 'execution':
+      return '执行模式'
+    case 'planning_only':
+      return '规划模式'
+    default:
+      return mode || '未知'
+  }
+}
+
 function getJobResultSummary(job) {
   const result = job?.result || {}
   if (!Object.keys(result).length) {
@@ -181,11 +248,16 @@ export default function TaskGovernancePage() {
   const [jobs, setJobs] = useState([])
   const [selectedJobId, setSelectedJobId] = useState('')
   const [jobDetail, setJobDetail] = useState(null)
+  const [agentStatus, setAgentStatus] = useState(null)
+  const [agentTasks, setAgentTasks] = useState([])
+  const [selectedAgentTaskId, setSelectedAgentTaskId] = useState('')
+  const [agentTaskDetail, setAgentTaskDetail] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [jobStatusFilter, setJobStatusFilter] = useState('all')
   const [jobKeyword, setJobKeyword] = useState('')
   const [jobSort, setJobSort] = useState('updated_desc')
+  const [agentTaskFilter, setAgentTaskFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [banner, setBanner] = useState({ type: '', message: '' })
@@ -245,6 +317,30 @@ export default function TaskGovernancePage() {
     [jobs]
   )
 
+  const filteredAgentTasks = useMemo(() => {
+    const source = agentTaskFilter === 'all'
+      ? agentTasks
+      : agentTasks.filter((task) => task.status === agentTaskFilter)
+    return source
+      .slice()
+      .sort((left, right) => Number(right.priority || 0) - Number(left.priority || 0) || Number(left.id || 0) - Number(right.id || 0))
+  }, [agentTaskFilter, agentTasks])
+
+  const agentCompletedCount = useMemo(
+    () => agentTasks.filter((task) => task.status === 'completed').length,
+    [agentTasks]
+  )
+
+  const agentReadyCount = useMemo(
+    () => agentTasks.filter((task) => task.status === 'ready').length,
+    [agentTasks]
+  )
+
+  const agentFailedCount = useMemo(
+    () => agentTasks.filter((task) => task.status === 'failed').length,
+    [agentTasks]
+  )
+
   const loadJobs = async () => {
     const response = await api.getWorkbenchJobs(50)
     const nextJobs = normalizeJobs(response?.jobs)
@@ -272,6 +368,37 @@ export default function TaskGovernancePage() {
     }
   }
 
+  const loadAgentData = async () => {
+    const [statusResponse, tasksResponse] = await Promise.all([
+      api.getAgentStatus(),
+      api.getAgentTasks()
+    ])
+
+    const nextStatus = statusResponse?.data || null
+    const nextTasks = normalizeAgentTasks(tasksResponse?.tasks)
+    setAgentStatus(nextStatus)
+    setAgentTasks(nextTasks)
+    setSelectedAgentTaskId((current) => current || String(nextTasks[0]?.id || ''))
+    return { nextStatus, nextTasks }
+  }
+
+  const loadAgentTaskDetail = async (taskId) => {
+    if (!taskId) {
+      setAgentTaskDetail(null)
+      return null
+    }
+
+    try {
+      const response = await api.getAgentTask(taskId)
+      const nextDetail = normalizeAgentTask(response?.data)
+      setAgentTaskDetail(nextDetail)
+      return nextDetail
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, '加载 Agent 任务详情失败。'))
+      return null
+    }
+  }
+
   const refreshAll = async (silent = false) => {
     if (silent) {
       setRefreshing(true)
@@ -281,7 +408,7 @@ export default function TaskGovernancePage() {
     }
 
     try {
-      await loadJobs()
+      await Promise.all([loadJobs(), loadAgentData()])
     } catch (requestError) {
       setError(getErrorMessage(requestError, '加载任务治理数据失败。'))
     } finally {
@@ -303,7 +430,17 @@ export default function TaskGovernancePage() {
   }, [selectedJobId])
 
   useEffect(() => {
-    const shouldPoll = activeJobs > 0 || ['pending', 'running', 'cancelling'].includes(jobDetail?.status)
+    if (selectedAgentTaskId) {
+      loadAgentTaskDetail(selectedAgentTaskId)
+    } else {
+      setAgentTaskDetail(null)
+    }
+  }, [selectedAgentTaskId])
+
+  useEffect(() => {
+    const shouldPoll = activeJobs > 0
+      || ['pending', 'running', 'cancelling'].includes(jobDetail?.status)
+      || ['pending', 'in_progress', 'ready'].includes(agentTaskDetail?.status)
     if (!shouldPoll) {
       return undefined
     }
@@ -312,7 +449,9 @@ export default function TaskGovernancePage() {
       try {
         await Promise.all([
           loadJobs(),
-          selectedJobId ? loadJobDetail(selectedJobId, true) : Promise.resolve(null)
+          loadAgentData(),
+          selectedJobId ? loadJobDetail(selectedJobId, true) : Promise.resolve(null),
+          selectedAgentTaskId ? loadAgentTaskDetail(selectedAgentTaskId) : Promise.resolve(null)
         ])
       } catch {
         // polling errors stay silent
@@ -320,7 +459,7 @@ export default function TaskGovernancePage() {
     }, 3000)
 
     return () => window.clearInterval(timer)
-  }, [activeJobs, jobDetail?.status, selectedJobId])
+  }, [activeJobs, jobDetail?.status, selectedJobId, selectedAgentTaskId, agentTaskDetail?.status])
 
   useEffect(() => {
     setPage((current) => Math.min(Math.max(1, current), pageCount))
@@ -433,6 +572,172 @@ export default function TaskGovernancePage() {
           <div className="kpi-value">{formatNumber(failedCount)}</div>
           <div className="kpi-sub">建议优先排障的任务数量</div>
         </div>
+      </div>
+
+      <div className="governance-summary-grid">
+        <div className="glass-card mini-kpi-card">
+          <div className="kpi-label">Agent 模式</div>
+          <div className="kpi-value">{getAgentModeText(agentStatus?.mode)}</div>
+          <div className="kpi-sub">{agentStatus?.mode_reason || '暂无 Agent 运行说明。'}</div>
+        </div>
+        <div className="glass-card mini-kpi-card">
+          <div className="kpi-label">待执行任务</div>
+          <div className="kpi-value">{formatNumber(agentReadyCount)}</div>
+          <div className="kpi-sub">Agent 已规划完成，等待执行的任务</div>
+        </div>
+        <div className="glass-card mini-kpi-card">
+          <div className="kpi-label">已完成治理</div>
+          <div className="kpi-value">{formatNumber(agentCompletedCount)}</div>
+          <div className="kpi-sub">Agent 已完成的仓库整治任务</div>
+        </div>
+      </div>
+
+      <div className="governance-shell">
+        <section className="glass-card">
+          <div className="card-header">
+            <div>
+              <h2>Agent 执行队列</h2>
+              <p>展示 Agent Team 的治理任务、执行状态和当前计划文件。</p>
+            </div>
+          </div>
+
+          <div className="toolbar workbench-table-toolbar">
+            <div className="toolbar-group">
+              <div className="field compact-field">
+                <label htmlFor="agent_task_filter">Agent 状态</label>
+                <select
+                  id="agent_task_filter"
+                  className="select"
+                  value={agentTaskFilter}
+                  onChange={(event) => setAgentTaskFilter(event.target.value)}
+                >
+                  {agentTaskStatusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="workbench-help">
+              Agent 任务 {formatNumber(agentTasks.length)} 条，失败 {formatNumber(agentFailedCount)} 条。
+            </div>
+          </div>
+
+          {filteredAgentTasks.length ? (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>标题</th>
+                    <th>状态</th>
+                    <th>优先级</th>
+                    <th>更新时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAgentTasks.map((task) => (
+                    <tr key={task.id} className={String(task.id) === selectedAgentTaskId ? 'table-row-active' : ''}>
+                      <td className="mono">{task.id}</td>
+                      <td>
+                        <div className="table-primary">{task.title}</div>
+                        <div className="table-secondary">{task.description}</div>
+                      </td>
+                      <td>
+                        <span className={`badge ${getAgentTaskBadgeClass(task.status)}`}>{getAgentTaskStatusText(task.status)}</span>
+                      </td>
+                      <td>{formatNumber(task.priority || 0)}</td>
+                      <td>{formatDateTime(task.updated_at)}</td>
+                      <td>
+                        <div className="table-actions">
+                          <button type="button" className="button button-small button-secondary" onClick={() => setSelectedAgentTaskId(String(task.id))}>
+                            查看计划
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-state small">当前筛选下暂无 Agent 任务。</div>
+          )}
+        </section>
+
+        <section className="glass-card">
+          <div className="card-header">
+            <div>
+              <h2>Agent 任务详情</h2>
+              <p>查看 Agent 任务的计划摘要、目标文件、阻塞项和下一步动作。</p>
+            </div>
+          </div>
+
+          {agentTaskDetail ? (
+            <>
+              <div className="detail-grid">
+                <div className="detail-item">
+                  <div className="kpi-label">任务状态</div>
+                  <div className="detail-value">
+                    <span className={`badge ${getAgentTaskBadgeClass(agentTaskDetail.status)}`}>{getAgentTaskStatusText(agentTaskDetail.status)}</span>
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <div className="kpi-label">优先级</div>
+                  <div className="detail-value">{formatNumber(agentTaskDetail.priority || 0)}</div>
+                </div>
+                <div className="detail-item">
+                  <div className="kpi-label">计划摘要</div>
+                  <div className="detail-value">{agentTaskDetail.plan?.summary || agentTaskDetail.details?.plan_summary || agentTaskDetail.description}</div>
+                </div>
+                <div className="detail-item">
+                  <div className="kpi-label">计划文件</div>
+                  <div className="detail-value mono">{agentTaskDetail.details?.plan_file || '--'}</div>
+                </div>
+              </div>
+
+              <div className="detail-item">
+                <div className="kpi-label">目标文件</div>
+                  <div className="detail-value">
+                  {(agentTaskDetail.details?.target_files || agentTaskDetail.plan?.target_files || []).length
+                    ? (agentTaskDetail.details?.target_files || agentTaskDetail.plan?.target_files).map((item) => <div key={item} className="mono">{item}</div>)
+                    : '暂无目标文件。'}
+                </div>
+              </div>
+
+              <div className="detail-item">
+                <div className="kpi-label">下一步动作</div>
+                  <div className="detail-value">
+                  {(agentTaskDetail.details?.next_actions || agentTaskDetail.plan?.next_actions || []).length
+                    ? (agentTaskDetail.details?.next_actions || agentTaskDetail.plan?.next_actions).map((item) => <div key={item}>{item}</div>)
+                    : '暂无下一步动作。'}
+                </div>
+              </div>
+
+              <div className="detail-item">
+                <div className="kpi-label">验证步骤</div>
+                  <div className="detail-value">
+                  {(agentTaskDetail.details?.validation_steps || agentTaskDetail.plan?.validation_steps || []).length
+                    ? (agentTaskDetail.details?.validation_steps || agentTaskDetail.plan?.validation_steps).map((item) => <div key={item}>{item}</div>)
+                    : '暂无验证步骤。'}
+                </div>
+              </div>
+
+              <div className="detail-item">
+                <div className="kpi-label">阻塞项</div>
+                  <div className="detail-value">
+                  {(agentTaskDetail.details?.blockers || agentTaskDetail.plan?.blockers || []).length
+                    ? (agentTaskDetail.details?.blockers || agentTaskDetail.plan?.blockers).map((item) => <div key={item}>{item}</div>)
+                    : '暂无阻塞项。'}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="empty-state small">请选择一条 Agent 任务查看详情。</div>
+          )}
+        </section>
       </div>
 
       <div className="governance-shell">

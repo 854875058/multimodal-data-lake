@@ -26,7 +26,7 @@ class TestAgent(BaseAgent):
 
     def is_ready_for_autonomous_execution(self) -> bool:
         """当前实现是否具备可信的自动验收能力。"""
-        return False
+        return True
 
     def receive_code(self, code_info: Dict[str, Any]) -> bool:
         """接收代码"""
@@ -36,53 +36,115 @@ class TestAgent(BaseAgent):
         })
         return True
 
-    def generate_test_cases(self, code_info: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """生成测试用例（占位实现）"""
-        test_cases = []
+    def generate_test_cases(self, code_info: Dict[str, Any], project_root: Optional[Path] = None) -> List[Dict[str, Any]]:
+        """根据改动内容生成真实验证命令。"""
+        project_root = Path(project_root or '.').resolve()
+        changed_files = [Path(path) for path in code_info.get('files_modified', [])]
+        removed_files = [Path(path) for path in code_info.get('files_removed', [])]
+        changed_strings = [str(path) for path in changed_files + removed_files]
+        title = str(code_info.get('task_title') or '')
+        checks: List[Dict[str, Any]] = []
 
-        # 这里应该调用 Claude API 生成测试用例
-        # 暂时返回占位结果
-        for file_path in code_info.get('files_modified', []):
-            test_cases.append({
-                'test_file': f"tests/test_{Path(file_path).stem}.py",
-                'test_functions': ['test_basic_functionality', 'test_edge_cases'],
-                'coverage_target': 80,
+        python_files = [str(path) for path in changed_files if path.suffix == '.py' and path.exists()]
+        if python_files:
+            checks.append({
+                'name': 'python-compile',
+                'command': ['python', '-m', 'py_compile', *python_files],
+                'cwd': str(project_root),
+                'timeout': 120,
             })
 
-        self.log_action("generate_test_cases", {'count': len(test_cases)})
-        return test_cases
+        touches_frontend = any('frontend' in item for item in changed_strings) or '前端' in title or 'Vue' in title
+        if touches_frontend and (project_root / 'frontend' / 'package.json').exists():
+            checks.append({
+                'name': 'frontend-build',
+                'command': ['npm', 'run', 'build'],
+                'cwd': str(project_root / 'frontend'),
+                'timeout': 600,
+            })
 
-    def run_tests(self, test_files: List[str]) -> Dict[str, Any]:
-        """执行测试"""
+        touches_backend_or_agents = any('backend' in item or 'agents' in item for item in changed_strings) or '启动' in title or 'Agent Team' in title
+        if touches_backend_or_agents:
+            checks.append({
+                'name': 'backend-import',
+                'command': ['python', '-c', "from backend.main import app; print('backend-main-import-ok')"],
+                'cwd': str(project_root),
+                'timeout': 120,
+            })
+
+        if any('agents' in item for item in changed_strings) and (project_root / 'tests' / 'test_agents.py').exists():
+            checks.append({
+                'name': 'agent-tests',
+                'command': ['python', '-m', 'pytest', 'tests/test_agents.py', '-q'],
+                'cwd': str(project_root),
+                'timeout': 600,
+            })
+
+        if not checks:
+            checks.append({
+                'name': 'core-python-compile',
+                'command': ['python', '-m', 'py_compile', 'backend/main.py', 'start.py'],
+                'cwd': str(project_root),
+                'timeout': 120,
+            })
+
+        self.log_action("generate_test_cases", {'count': len(checks), 'task_title': title})
+        return checks
+
+    def run_tests(self, test_files: List[Any]) -> Dict[str, Any]:
+        """执行验证命令或兼容旧式测试文件。"""
         result = {
             'passed': 0,
             'failed': 0,
             'errors': [],
             'coverage': 0,
+            'checks': [],
         }
 
         for test_file in test_files:
-            if not Path(test_file).exists():
-                result['errors'].append(f"测试文件不存在: {test_file}")
-                continue
-
             try:
-                # 运行 pytest
-                proc = subprocess.run(
-                    ['python', '-m', 'pytest', test_file, '-v'],
-                    capture_output=True,
-                    text=True,
-                    timeout=60
-                )
-
-                if proc.returncode == 0:
-                    result['passed'] += 1
-                else:
-                    result['failed'] += 1
-                    result['errors'].append({
-                        'file': test_file,
-                        'output': proc.stdout + proc.stderr
+                if isinstance(test_file, dict) and test_file.get('command'):
+                    proc = subprocess.run(
+                        test_file['command'],
+                        cwd=test_file.get('cwd'),
+                        capture_output=True,
+                        text=True,
+                        timeout=int(test_file.get('timeout', 300)),
+                    )
+                    check_name = test_file.get('name', 'unnamed-check')
+                    result['checks'].append({
+                        'name': check_name,
+                        'returncode': proc.returncode,
+                        'stdout': proc.stdout,
+                        'stderr': proc.stderr,
                     })
+                    if proc.returncode == 0:
+                        result['passed'] += 1
+                    else:
+                        result['failed'] += 1
+                        result['errors'].append({
+                            'file': check_name,
+                            'output': proc.stdout + proc.stderr
+                        })
+                else:
+                    if not Path(test_file).exists():
+                        result['failed'] += 1
+                        result['errors'].append(f"测试文件不存在: {test_file}")
+                        continue
+                    proc = subprocess.run(
+                        ['python', '-m', 'pytest', test_file, '-v'],
+                        capture_output=True,
+                        text=True,
+                        timeout=60
+                    )
+                    if proc.returncode == 0:
+                        result['passed'] += 1
+                    else:
+                        result['failed'] += 1
+                        result['errors'].append({
+                            'file': test_file,
+                            'output': proc.stdout + proc.stderr
+                        })
             except Exception as e:
                 result['failed'] += 1
                 result['errors'].append({
@@ -90,6 +152,8 @@ class TestAgent(BaseAgent):
                     'error': str(e)
                 })
 
+        total_checks = result['passed'] + result['failed']
+        result['coverage'] = (result['passed'] / total_checks * 100) if total_checks > 0 else 0
         self.log_action("run_tests", result)
         self.test_results.append(result)
         return result
@@ -134,14 +198,6 @@ class TestAgent(BaseAgent):
                 'impact': 'medium',
             })
 
-        if test_result.get('failed', 0) == 0 and test_result.get('passed', 0) > 0:
-            suggestions.append({
-                'type': 'performance',
-                'priority': 1,
-                'description': '考虑添加性能测试和边界测试',
-                'impact': 'low',
-            })
-
         self.log_action("generate_optimization_suggestions", {'count': len(suggestions)})
         return suggestions
 
@@ -155,7 +211,8 @@ class TestAgent(BaseAgent):
             return {'status': 'code_received'}
         elif action == 'generate_tests':
             code_info = input_data.get('code_info', {})
-            test_cases = self.generate_test_cases(code_info)
+            project_root = input_data.get('project_root')
+            test_cases = self.generate_test_cases(code_info, Path(project_root) if project_root else None)
             return {'test_cases': test_cases}
         elif action == 'run_tests':
             test_files = input_data.get('test_files', [])

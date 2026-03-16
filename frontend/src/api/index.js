@@ -158,6 +158,18 @@ const api = {
     return apiClient.post('/workbench/build-index', payload)
   },
 
+  getAgentStatus() {
+    return apiClient.get('/agents/status')
+  },
+
+  getAgentTasks() {
+    return apiClient.get('/agents/tasks')
+  },
+
+  getAgentTask(taskId) {
+    return apiClient.get(`/agents/tasks/${encodeURIComponent(taskId)}`)
+  },
+
   getPlatformSettings() {
     return apiClient.get('/platform/settings')
   },

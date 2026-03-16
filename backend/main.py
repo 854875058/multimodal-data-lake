@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from backend.api import dashboard, files, platform, search, system, upload, workbench, users, permissions, ray_compute
+from backend.api import agents, dashboard, files, platform, search, system, upload, workbench, users, permissions, ray_compute
 from config import BACKEND_RELOAD, CORS_ALLOW_CREDENTIALS, CORS_ALLOW_ORIGINS
 
 logging.basicConfig(
@@ -89,6 +89,7 @@ app.include_router(search.router, prefix='/api/search', tags=['向量检索'])
 app.include_router(files.router, prefix='/api/files', tags=['文件管理'])
 app.include_router(dashboard.router, prefix='/api/dashboard', tags=['仪表盘'])
 app.include_router(system.router, prefix='/api/system', tags=['系统监控'])
+app.include_router(agents.router, prefix='/api/agents', tags=['Agent Team'])
 app.include_router(workbench.router, prefix='/api/workbench', tags=['接入工作台'])
 app.include_router(platform.router, prefix='/api/platform', tags=['平台能力'])
 app.include_router(users.router, prefix='/api/users', tags=['用户管理'])

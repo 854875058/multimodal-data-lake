@@ -81,7 +81,8 @@ class BrainAgent(BaseAgent):
         legacy_vue_main = project_root / "frontend" / "src" / "main.js"
         legacy_vue_app = project_root / "frontend" / "src" / "App.vue"
         legacy_vue_views = project_root / "frontend" / "src" / "views"
-        if frontend_main.exists() and (legacy_vue_main.exists() or legacy_vue_app.exists() or legacy_vue_views.exists()):
+        has_legacy_views = legacy_vue_views.exists() and any(legacy_vue_views.iterdir())
+        if frontend_main.exists() and (legacy_vue_main.exists() or legacy_vue_app.exists() or has_legacy_views):
             add_architecture_task(
                 "清理遗留 Vue 前端入口和页面文件",
                 "当前前端已切到 main.jsx / App.jsx，但仓库仍保留 main.js、App.vue、views 等旧 Vue 入口与页面，需要决定保留或清理策略。",
@@ -127,7 +128,14 @@ class BrainAgent(BaseAgent):
         test_agent_path = project_root / "agents" / "test_agent.py"
         code_agent_content = code_agent_path.read_text(encoding='utf-8') if code_agent_path.exists() else ''
         test_agent_content = test_agent_path.read_text(encoding='utf-8') if test_agent_path.exists() else ''
-        if "占位实现" in code_agent_content or "占位实现" in test_agent_content:
+        has_real_execution = (
+            'return True' in code_agent_content
+            and 'LocalTaskExecutor' in code_agent_content
+            and 'return True' in test_agent_content
+            and 'generate_test_cases' in test_agent_content
+            and 'backend-import' in test_agent_content
+        )
+        if not has_real_execution:
             add_architecture_task(
                 "补齐 Agent Team 的真实执行能力",
                 "CodeAgent / TestAgent 仍是占位实现，当前只能规划任务，无法可信地自动改码和验收。",
@@ -135,7 +143,10 @@ class BrainAgent(BaseAgent):
             )
             analysis['optimization_opportunities'].append("Agent Team 仍处于规划骨架阶段，优先适合作为 backlog 生成器。")
 
-        if "AgentCoordinator" not in backend_main_content:
+        agent_api_ready = (project_root / "backend" / "api" / "agents.py").exists()
+        governance_page_path = project_root / "frontend" / "src" / "pages" / "TaskGovernancePage.jsx"
+        governance_page_content = governance_page_path.read_text(encoding='utf-8') if governance_page_path.exists() else ''
+        if not (agent_api_ready and 'getAgentStatus' in governance_page_content):
             add_architecture_task(
                 "明确 Agent Team 的系统集成位置",
                 "Agent Team 目前是独立启动脚本，尚未接入后端生命周期、管理界面或状态 API，需要明确最终集成方案。",
@@ -325,9 +336,10 @@ class BrainAgent(BaseAgent):
         self.log_action("create_task", {'task_id': task['id'], 'title': title})
         return task
 
-    def get_next_task(self) -> Optional[Dict[str, Any]]:
+    def get_next_task(self, statuses: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
         """获取下一个待处理任务（按优先级）"""
-        pending_tasks = [t for t in self.task_queue if t['status'] == 'pending']
+        allowed_statuses = set(statuses or ['pending'])
+        pending_tasks = [t for t in self.task_queue if t['status'] in allowed_statuses]
         if not pending_tasks:
             return None
         return sorted(pending_tasks, key=lambda x: x['priority'], reverse=True)[0]

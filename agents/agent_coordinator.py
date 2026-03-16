@@ -40,7 +40,7 @@ class AgentCoordinator:
         """根据 Agent 能力选择运行模式。"""
         if self.code.is_ready_for_autonomous_execution() and self.test.is_ready_for_autonomous_execution():
             self.mode = 'execution'
-            self.mode_reason = '执行 Agent 已具备真实改码和测试能力。'
+            self.mode_reason = '执行 Agent 已具备离线改仓与真实验证能力。'
         else:
             self.mode = 'planning_only'
             self.mode_reason = 'CodeAgent/TestAgent 仍是占位实现，暂不进入自动改码流程。'
@@ -136,14 +136,20 @@ class AgentCoordinator:
 
     def _process_one_cycle(self):
         """处理一个工作循环"""
-        if self.mode == 'planning_only':
-            if time.time() - self._last_analysis_at >= self.analysis_interval_seconds:
-                self._refresh_backlog()
+        if time.time() - self._last_analysis_at >= self.analysis_interval_seconds:
+            self._refresh_backlog()
+
+        pending_task = self.brain.get_next_task(['pending'])
+        if pending_task:
             self._plan_one_task()
+            if self.mode == 'planning_only':
+                return
+
+        if self.mode == 'planning_only':
             return
 
         # 获取下一个任务
-        task = self.brain.get_next_task()
+        task = self.brain.get_next_task(['ready'])
         if not task:
             logger.debug("没有待处理任务")
             return
@@ -153,7 +159,7 @@ class AgentCoordinator:
 
         # Code Agent 实现代码
         self.code.receive_task(task)
-        code_result = self.code.implement_code(task)
+        code_result = self.code.implement_code(task, self.project_root)
 
         if code_result.get('error'):
             logger.error(f"代码实现失败: {code_result['error']}")
@@ -171,31 +177,20 @@ class AgentCoordinator:
         self.test.receive_code(code_result)
 
         # Test Agent 生成测试用例
-        test_cases = self.test.generate_test_cases(code_result)
+        test_cases = self.test.generate_test_cases(code_result, self.project_root)
         logger.info(f"生成 {len(test_cases)} 个测试用例")
 
         # Test Agent 执行测试
-        test_files = [tc['test_file'] for tc in test_cases]
-        test_result = self.test.run_tests(test_files)
-
-        retry_count = 0
-        while test_result['failed'] > 0 and retry_count < self.max_retry:
-            logger.warning(f"测试失败，尝试修复 (第 {retry_count + 1} 次)")
-
-            # 分析失败原因
-            analysis = self.test.analyze_failures(test_result)
-
-            if not analysis['should_retry']:
-                break
-
-            # 重新实现（这里简化处理，实际应该根据分析结果调整）
-            code_result = self.code.implement_code(task)
-            test_result = self.test.run_tests(test_files)
-            retry_count += 1
+        test_result = self.test.run_tests(test_cases)
 
         if test_result['failed'] > 0:
+            analysis = self.test.analyze_failures(test_result)
             logger.error(f"测试失败，已达最大重试次数")
-            self.brain.update_task_status(task['id'], 'failed', test_result)
+            self.brain.update_task_status(task['id'], 'failed', {
+                'code_result': code_result,
+                'test_result': test_result,
+                'failure_analysis': analysis,
+            })
             return
 
         # 测试通过，生成优化建议

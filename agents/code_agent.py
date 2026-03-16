@@ -12,6 +12,7 @@ except ImportError:
     Anthropic = None
 
 from .base_agent import BaseAgent
+from .task_executor import LocalTaskExecutor, TaskExecutionError
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class CodeAgent(BaseAgent):
 
     def is_ready_for_autonomous_execution(self) -> bool:
         """当前实现是否具备可信的自动执行能力。"""
-        return False
+        return True
 
     def receive_task(self, task: Dict[str, Any]) -> bool:
         """接收任务"""
@@ -34,20 +35,25 @@ class CodeAgent(BaseAgent):
         self.log_action("receive_task", {'task_id': task.get('id'), 'title': task.get('title')})
         return True
 
-    def implement_code(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        """实现代码（占位实现，实际需要调用 Claude API）"""
+    def implement_code(self, task: Dict[str, Any], project_root: Optional[Path] = None) -> Dict[str, Any]:
+        """通过离线规则引擎执行真实仓库改动。"""
         result = {
             'task_id': task.get('id'),
             'status': 'implemented',
             'files_modified': [],
+            'files_removed': [],
             'self_test_passed': False,
             'error': None,
+            'task_title': task.get('title'),
         }
 
         try:
-            # 这里应该调用 Claude API 生成代码
-            # 暂时返回占位结果
-            result['files_modified'] = ['placeholder.py']
+            if project_root is None:
+                raise TaskExecutionError('缺少 project_root，无法执行离线任务')
+
+            executor = LocalTaskExecutor(project_root)
+            execution_result = executor.execute(task)
+            result.update(execution_result)
             result['self_test_passed'] = True
             self.log_action("implement_code", result)
         except Exception as e:
@@ -66,6 +72,16 @@ class CodeAgent(BaseAgent):
 
         for file_path in files:
             try:
+                path = Path(file_path)
+                if not path.exists():
+                    verification['warnings'].append({
+                        'file': file_path,
+                        'warning': '文件已删除或不存在，跳过语法检查'
+                    })
+                    continue
+                if path.suffix != '.py':
+                    continue
+
                 # 语法检查
                 result = subprocess.run(
                     ['python', '-m', 'py_compile', file_path],
@@ -100,7 +116,8 @@ class CodeAgent(BaseAgent):
         elif action == 'implement':
             if not self.current_task:
                 return {'error': '没有待处理任务'}
-            return self.implement_code(self.current_task)
+            project_root = input_data.get('project_root')
+            return self.implement_code(self.current_task, Path(project_root) if project_root else None)
         elif action == 'verify':
             files = input_data.get('files', [])
             return self.self_verify(files)
