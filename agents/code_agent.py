@@ -6,7 +6,10 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from anthropic import Anthropic
+try:
+    from anthropic import Anthropic
+except ImportError:
+    Anthropic = None
 
 from .base_agent import BaseAgent
 
@@ -18,7 +21,7 @@ class CodeAgent(BaseAgent):
 
     def __init__(self, workspace_dir: Path, api_key: Optional[str] = None):
         super().__init__("CodeAgent", workspace_dir)
-        self.client = Anthropic(api_key=api_key) if api_key else None
+        self.client = Anthropic(api_key=api_key) if api_key and Anthropic else None
         self.current_task = None
 
     def receive_task(self, task: Dict[str, Any]) -> bool:

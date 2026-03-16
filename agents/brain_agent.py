@@ -6,7 +6,10 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from anthropic import Anthropic
+try:
+    from anthropic import Anthropic
+except ImportError:
+    Anthropic = None
 
 from .base_agent import BaseAgent
 
@@ -18,7 +21,7 @@ class BrainAgent(BaseAgent):
 
     def __init__(self, workspace_dir: Path, api_key: Optional[str] = None):
         super().__init__("BrainAgent", workspace_dir)
-        self.client = Anthropic(api_key=api_key) if api_key else None
+        self.client = Anthropic(api_key=api_key) if api_key and Anthropic else None
         self.task_queue_file = workspace_dir / "tasks" / "task_queue.json"
         self.task_queue_file.parent.mkdir(parents=True, exist_ok=True)
         self.task_queue = self._load_task_queue()

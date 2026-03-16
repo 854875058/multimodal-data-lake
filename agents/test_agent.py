@@ -6,7 +6,10 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from anthropic import Anthropic
+try:
+    from anthropic import Anthropic
+except ImportError:
+    Anthropic = None
 
 from .base_agent import BaseAgent
 
@@ -18,7 +21,7 @@ class TestAgent(BaseAgent):
 
     def __init__(self, workspace_dir: Path, api_key: Optional[str] = None):
         super().__init__("TestAgent", workspace_dir)
-        self.client = Anthropic(api_key=api_key) if api_key else None
+        self.client = Anthropic(api_key=api_key) if api_key and Anthropic else None
         self.test_results = []
 
     def receive_code(self, code_info: Dict[str, Any]) -> bool:
