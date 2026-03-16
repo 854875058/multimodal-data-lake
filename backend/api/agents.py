@@ -6,10 +6,12 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from agents.request_store import create_request, load_requests
+from config import SYSTEM_API_LOCAL_ONLY
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -36,6 +38,23 @@ class RequestPayload(BaseModel):
     description: str
     priority: int = 3
     acceptance_criteria: str = ''
+
+
+def _get_client_host(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for", "")
+    if forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+    if request.client:
+        return request.client.host
+    return ""
+
+
+def _ensure_local_access(request: Request):
+    if not SYSTEM_API_LOCAL_ONLY:
+        return
+    client_host = _get_client_host(request)
+    if client_host not in {"127.0.0.1", "::1", "localhost"}:
+        raise HTTPException(status_code=403, detail="该接口仅允许本机访问")
 
 
 def _load_json(path: Path, default: Any):
@@ -114,7 +133,8 @@ def _load_request_items() -> List[Dict[str, Any]]:
 
 
 @router.get('/status', response_model=GenericResponse)
-async def get_agent_status():
+async def get_agent_status(request: Request):
+    _ensure_local_access(request)
     tasks = _load_tasks()
     status = _load_status(tasks)
     requests = _load_request_items()
@@ -130,12 +150,14 @@ async def get_agent_status():
 
 
 @router.get('/tasks', response_model=TaskListResponse)
-async def list_agent_tasks():
+async def list_agent_tasks(request: Request):
+    _ensure_local_access(request)
     return TaskListResponse(success=True, tasks=_load_tasks())
 
 
 @router.get('/tasks/{task_id}', response_model=GenericResponse)
-async def get_agent_task(task_id: int):
+async def get_agent_task(task_id: int, request: Request):
+    _ensure_local_access(request)
     tasks = _load_tasks()
     task = next((item for item in tasks if int(item.get('id', 0) or 0) == task_id), None)
     if not task:
@@ -144,17 +166,19 @@ async def get_agent_task(task_id: int):
 
 
 @router.get('/requests', response_model=GenericResponse)
-async def list_agent_requests():
+async def list_agent_requests(request: Request):
+    _ensure_local_access(request)
     return GenericResponse(success=True, message='ok', data={'items': _load_request_items()})
 
 
 @router.post('/requests', response_model=GenericResponse)
-async def create_agent_request(payload: RequestPayload):
-    request = create_request(
+async def create_agent_request(payload: RequestPayload, request: Request):
+    _ensure_local_access(request)
+    request_item = create_request(
         WORKSPACE_DIR,
         title=payload.title,
         description=payload.description,
         priority=payload.priority,
         acceptance_criteria=payload.acceptance_criteria,
     )
-    return GenericResponse(success=True, message='需求已提交给 Agent Team', data=request)
+    return GenericResponse(success=True, message='需求已提交给 Agent Team', data=request_item)

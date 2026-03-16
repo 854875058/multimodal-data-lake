@@ -145,12 +145,11 @@ class BrainAgent(BaseAgent):
             analysis['optimization_opportunities'].append("Agent Team 仍处于规划骨架阶段，优先适合作为 backlog 生成器。")
 
         agent_api_ready = (project_root / "backend" / "api" / "agents.py").exists()
-        governance_page_path = project_root / "frontend" / "src" / "pages" / "TaskGovernancePage.jsx"
-        governance_page_content = governance_page_path.read_text(encoding='utf-8') if governance_page_path.exists() else ''
-        if not (agent_api_ready and 'getAgentStatus' in governance_page_content):
+        request_cli_ready = (project_root / "agents" / "submit_request.py").exists()
+        if not (agent_api_ready and request_cli_ready):
             add_architecture_task(
                 "明确 Agent Team 的系统集成位置",
-                "Agent Team 目前是独立启动脚本，尚未接入后端生命周期、管理界面或状态 API，需要明确最终集成方案。",
+                "Agent Team 应作为内部构建工具存在，需要保留内部状态 API 与本地需求投递入口，而不是侵入数据湖产品界面。",
                 priority=3,
             )
 

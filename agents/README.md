@@ -2,7 +2,8 @@
 
 ## 概述
 
-Agent Team 是一个由三个协作 AI Agent 组成的自动化开发系统，用于持续完善多模态数据湖项目。
+Agent Team 是一个内部自动化开发系统，用于持续完善多模态数据湖项目。
+它不是数据湖产品功能的一部分，而是仓库内的 builder / maintainer。
 
 ## 架构图
 
@@ -152,15 +153,13 @@ python agents/start_agents.py
 nohup python agents/start_agents.py > agent_team.log 2>&1 &
 ```
 
-### 方式三：集成到 FastAPI
-```python
-# 在 backend/main.py 中添加
-from agents import AgentCoordinator
-
-@app.on_event("startup")
-async def start_agents():
-    coordinator = AgentCoordinator(workspace_dir, api_key)
-    threading.Thread(target=coordinator.start, args=(ROOT_DIR,), daemon=True).start()
+### 提交内部需求
+```bash
+python agents/submit_request.py ^
+  --title "统一工作台分页策略" ^
+  --description "让任务治理页和工作台列表使用相同分页口径" ^
+  --priority 4 ^
+  --acceptance "前端构建通过，列表分页行为一致"
 ```
 
 ## 配置
