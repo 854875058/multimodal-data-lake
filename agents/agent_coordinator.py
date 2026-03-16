@@ -21,6 +21,8 @@ class AgentCoordinator:
         self.workspace_dir = workspace_dir
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
         self.status_file = self.workspace_dir / 'agent_team_status.json'
+        self.task_plan_dir = self.workspace_dir / 'task_plans'
+        self.task_plan_dir.mkdir(parents=True, exist_ok=True)
 
         self.brain = BrainAgent(workspace_dir, api_key)
         self.code = CodeAgent(workspace_dir, api_key)
@@ -30,7 +32,7 @@ class AgentCoordinator:
         self.max_retry = 3
         self.mode = 'planning_only'
         self.mode_reason = 'CodeAgent/TestAgent 仍是占位实现，暂不进入自动改码流程。'
-        self.analysis_interval_seconds = 60
+        self.analysis_interval_seconds = 300
         self.project_root: Optional[Path] = None
         self._last_analysis_at = 0.0
 
@@ -56,11 +58,56 @@ class AgentCoordinator:
         if not self.project_root:
             return
         analysis = self.brain.analyze_project(self.project_root)
-        created_tasks = self.brain.bootstrap_tasks_from_analysis(analysis)
+        task_sync = self.brain.bootstrap_tasks_from_analysis(analysis)
         self._last_analysis_at = time.time()
         logger.info("Agent backlog 刷新完成，当前任务总数: %s", len(self.brain.task_queue))
-        if created_tasks:
-            logger.info("本次分析覆盖任务数: %s", len(created_tasks))
+        logger.info(
+            "本次分析新增任务数: %s，已存在任务命中数: %s",
+            len(task_sync.get('created', [])),
+            len(task_sync.get('existing', [])),
+        )
+
+    def _write_task_plan(self, task_id: int, payload: Dict[str, Any]):
+        """写入任务规划结果。"""
+        plan_file = self.task_plan_dir / f'task_{task_id:03d}.json'
+        with open(plan_file, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    def _plan_one_task(self):
+        """在 planning-only 模式下推进一个待规划任务。"""
+        if not self.project_root:
+            return
+
+        task = self.brain.get_next_task()
+        if not task:
+            logger.debug("planning-only 模式下没有待处理任务")
+            return
+
+        logger.info("开始规划任务: %s", task['title'])
+        self.brain.update_task_status(task['id'], 'in_progress')
+
+        try:
+            plan = self.brain.plan_task(task, self.project_root)
+            plan_payload = {
+                'task_id': task['id'],
+                'title': task['title'],
+                'priority': task['priority'],
+                'status': 'ready',
+                'plan': plan,
+            }
+            self._write_task_plan(task['id'], plan_payload)
+            self.brain.update_task_status(task['id'], 'ready', {
+                'plan_file': str((self.task_plan_dir / f'task_{task["id"]:03d}.json').resolve()),
+                'plan_summary': plan['summary'],
+                'target_files': plan['target_files'],
+                'next_actions': plan['next_actions'],
+                'validation_steps': plan['validation_steps'],
+                'blockers': plan['blockers'],
+            })
+            logger.info("任务已进入 ready 状态: %s", task['title'])
+        except Exception as error:
+            logger.error("任务规划失败: %s", error, exc_info=True)
+            self.brain.update_task_status(task['id'], 'failed', {'error': str(error)})
 
     def start(self, project_root: Path):
         """启动协调器，持续运行"""
@@ -92,6 +139,7 @@ class AgentCoordinator:
         if self.mode == 'planning_only':
             if time.time() - self._last_analysis_at >= self.analysis_interval_seconds:
                 self._refresh_backlog()
+            self._plan_one_task()
             return
 
         # 获取下一个任务

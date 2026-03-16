@@ -152,32 +152,161 @@ class BrainAgent(BaseAgent):
                 return task
         return self.create_task(title, description, priority)
 
-    def bootstrap_tasks_from_analysis(self, analysis: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def bootstrap_tasks_from_analysis(self, analysis: Dict[str, Any]) -> Dict[str, Any]:
         """根据项目分析结果生成初始 backlog。"""
         created_tasks = []
+        existing_tasks = []
+
+        def sync_task(title: str, description: str, priority: int):
+            existing = next((task for task in self.task_queue if task['title'] == title), None)
+            task = self.ensure_task(title=title, description=description, priority=priority)
+            if existing is None:
+                created_tasks.append(task)
+            else:
+                existing_tasks.append(task)
 
         for feature in analysis.get('missing_features', []):
-            created_tasks.append(self.ensure_task(
+            sync_task(
                 title=f"实现{feature}",
                 description=f"完整实现{feature}功能，包括后端 API 和前端界面",
                 priority=3,
-            ))
+            )
 
         for module in analysis.get('incomplete_modules', []):
-            created_tasks.append(self.ensure_task(
+            sync_task(
                 title=f"补齐{module}",
                 description=f"完善 {module} 的缺失实现并补充验证。",
                 priority=3,
-            ))
+            )
 
         for item in analysis.get('architecture_tasks', []):
-            created_tasks.append(self.ensure_task(
+            sync_task(
                 title=item['title'],
                 description=item['description'],
                 priority=item.get('priority', 3),
-            ))
+            )
 
-        return created_tasks
+        return {
+            'created': created_tasks,
+            'existing': existing_tasks,
+        }
+
+    def plan_task(self, task: Dict[str, Any], project_root: Path) -> Dict[str, Any]:
+        """为任务生成可执行计划。"""
+        title = str(task.get('title') or '').strip()
+        lower_title = title.lower()
+
+        candidate_paths: List[Path] = []
+        validation_steps: List[str] = []
+        next_actions: List[str] = []
+        blockers: List[str] = []
+        notes: List[str] = []
+
+        def add_path(*parts: str):
+            path = project_root.joinpath(*parts)
+            if path.exists():
+                candidate_paths.append(path)
+
+        if 'vue' in lower_title:
+            add_path('frontend', 'src', 'main.js')
+            add_path('frontend', 'src', 'App.vue')
+            add_path('frontend', 'src', 'router', 'index.js')
+            add_path('frontend', 'src', 'views')
+            notes.append('需要先判断旧 Vue 代码是保留备用还是彻底迁移删除。')
+            validation_steps.extend([
+                '确认 frontend/index.html 仍以 main.jsx 为唯一入口。',
+                '运行 npm run build，确认删除遗留文件后不影响当前 React 构建。',
+            ])
+            next_actions.extend([
+                '梳理当前 React 已覆盖的页面与旧 Vue 页面映射关系。',
+                '删除未使用的 Vue 入口和路由，或迁移到 archive 目录。',
+            ])
+        elif '文档口径' in title or '多代前端' in title or ('文档' in title and '不一致' in title):
+            add_path('README.md')
+            add_path('README_VUE.md')
+            add_path('架构图.md')
+            add_path('docs', 'DEPLOY.md')
+            add_path('AGENTS.md')
+            notes.append('需要把当前有效实现、历史版本说明和废弃资料彻底分层。')
+            validation_steps.extend([
+                '检查 README、DEPLOY、AGENTS 三份文档的启动命令和端口是否一致。',
+                '确认历史文档被明确标记为 legacy/reference，而不是当前入口。',
+            ])
+            next_actions.extend([
+                '保留一份 current architecture 文档作为主入口。',
+                '将旧 Vue / Streamlit / NiceGUI 资料移入 legacy 文档区并加醒目标识。',
+            ])
+        elif '真实执行能力' in title:
+            add_path('agents', 'code_agent.py')
+            add_path('agents', 'test_agent.py')
+            add_path('agents', 'agent_coordinator.py')
+            add_path('agents', 'README.md')
+            validation_steps.extend([
+                '补齐真正的任务消费、改码、测试和失败回退链路。',
+                '为 agent 状态流转增加可验证的自动化测试。',
+            ])
+            next_actions.extend([
+                '为 CodeAgent 引入真实文件选择和改动执行策略。',
+                '为 TestAgent 增加最小可运行测试生成和验证流程。',
+            ])
+            blockers.append('当前没有接入安全可控的真实改码执行沙箱。')
+        elif '系统集成位置' in title:
+            add_path('agents', 'start_agents.py')
+            add_path('backend', 'main.py')
+            add_path('backend', 'api')
+            add_path('frontend', 'src', 'pages', 'TaskGovernancePage.jsx')
+            validation_steps.extend([
+                '明确 Agent Team 是独立守护进程、后端生命周期组件，还是平台内任务服务。',
+                '为 Agent 状态暴露统一查询入口或管理界面。',
+            ])
+            next_actions.extend([
+                '先定义 Agent Team 在平台中的角色和 API 边界。',
+                '再决定接入 FastAPI startup、独立进程管理还是工作台页面。'
+            ])
+        elif '端口' in title or '启动' in title:
+            add_path('backend', 'main.py')
+            add_path('start.py')
+            add_path('deploy.py')
+            add_path('README.md')
+            add_path('docs', 'DEPLOY.md')
+            validation_steps.extend([
+                '从仓库根运行 python backend/main.py 并验证 /api/health。',
+                '验证 start.py、deploy.py、README、AGENTS 的端口口径一致。',
+            ])
+            next_actions.extend([
+                '统一默认端口为 8090。',
+                '统一所有启动入口都从仓库根工作目录运行。',
+            ])
+        else:
+            add_path('README.md')
+            add_path('agents', 'README.md')
+            notes.append('当前任务未命中专门模板，使用通用规划模板。')
+            validation_steps.append('结合任务涉及文件补充最小可运行验证。')
+            next_actions.append('补充针对该任务的文件范围和验收标准。')
+
+        unique_paths = []
+        seen_paths = set()
+        for path in candidate_paths:
+            normalized = str(path.resolve())
+            if normalized in seen_paths:
+                continue
+            seen_paths.add(normalized)
+            unique_paths.append(normalized)
+
+        if not unique_paths:
+            blockers.append('尚未定位到明确的候选文件，需要人工补充任务上下文。')
+
+        plan = {
+            'summary': task.get('description') or title,
+            'goal': title,
+            'target_files': unique_paths,
+            'validation_steps': validation_steps,
+            'next_actions': next_actions,
+            'blockers': blockers,
+            'notes': notes,
+        }
+        self.log_action('plan_task', {'task_id': task.get('id'), 'goal': title, 'targets': len(unique_paths)})
+        return plan
 
     def create_task(self, title: str, description: str, priority: int = 1) -> Dict[str, Any]:
         """创建新任务"""
@@ -264,6 +393,7 @@ class BrainAgent(BaseAgent):
             'total_tasks': len(self.task_queue),
             'pending_tasks': len([t for t in self.task_queue if t['status'] == 'pending']),
             'in_progress_tasks': len([t for t in self.task_queue if t['status'] == 'in_progress']),
+            'ready_tasks': len([t for t in self.task_queue if t['status'] == 'ready']),
             'completed_tasks': len([t for t in self.task_queue if t['status'] == 'completed']),
         }
 
