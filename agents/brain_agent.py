@@ -247,6 +247,18 @@ class BrainAgent(BaseAgent):
                 '保留一份 current architecture 文档作为主入口。',
                 '将旧 Vue / Streamlit / NiceGUI 资料移入 legacy 文档区并加醒目标识。',
             ])
+        elif 'mock' in lower_title and any(keyword in title for keyword in ['关闭', '禁用', '去掉', '去除']):
+            add_path('backend', 'api', 'platform.py')
+            add_path('frontend', 'src', 'pages', 'ConfigCenterPage.jsx')
+            validation_steps.extend([
+                '确认平台配置默认值不再启用 Mock 回退。',
+                '运行 npm run build，并验证平台配置页仍可加载。',
+            ])
+            next_actions.extend([
+                '将 use_mock 默认值改为 false。',
+                '把 Mock 开关语义改成仅供内部调试。'
+            ])
+            notes.append('这是数据湖产品去 demo 化的重要一步。')
         elif '真实执行能力' in title:
             add_path('agents', 'code_agent.py')
             add_path('agents', 'test_agent.py')

@@ -103,6 +103,27 @@ def test_test_agent_generates_real_validation_commands():
         assert 'frontend-build' in names
 
 
+def test_local_task_executor_disables_mock_fallback():
+    from agents.task_executor import LocalTaskExecutor
+
+    with local_tempdir() as repo_root:
+        build_fake_repo(repo_root)
+        write_text(repo_root / 'backend' / 'api' / 'platform.py', "DEFAULT_PLATFORM_SETTINGS = {\n    'use_mock': True,\n}\nclass PlatformSettingsPayload:\n    use_mock: bool = True\n\ndef _normalize_platform_settings(payload):\n    normalized = {}\n    normalized['use_mock'] = bool(normalized.get('use_mock', True))\n    return normalized\n")
+        write_text(repo_root / 'frontend' / 'src' / 'pages' / 'ConfigCenterPage.jsx', "const defaultPlatformSettings = {\n  use_mock: true\n}\nconst label = '启用 Mock 回退模式'\n")
+
+        executor = LocalTaskExecutor(repo_root)
+        task = {'id': 3, 'title': '关闭平台默认 Mock 回退模式'}
+        result = executor.execute(task)
+
+        assert result['status'] == 'implemented'
+        platform_content = (repo_root / 'backend' / 'api' / 'platform.py').read_text(encoding='utf-8')
+        config_content = (repo_root / 'frontend' / 'src' / 'pages' / 'ConfigCenterPage.jsx').read_text(encoding='utf-8')
+        assert "'use_mock': False" in platform_content
+        assert 'use_mock: bool = False' in platform_content
+        assert "normalized['use_mock'] = bool(normalized.get('use_mock', False))" in platform_content
+        assert 'use_mock: false' in config_content
+
+
 def test_brain_agent_syncs_user_requests_into_task_queue():
     from agents.brain_agent import BrainAgent
     from agents.request_store import create_request, load_requests

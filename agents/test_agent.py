@@ -2,7 +2,9 @@
 """Test Agent - 测试 Agent"""
 
 import logging
+import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -14,6 +16,14 @@ except ImportError:
 from .base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
+
+
+def _python_command() -> str:
+    return sys.executable or 'python'
+
+
+def _npm_command() -> str:
+    return 'npm.cmd' if os.name == 'nt' else 'npm'
 
 
 class TestAgent(BaseAgent):
@@ -49,7 +59,7 @@ class TestAgent(BaseAgent):
         if python_files:
             checks.append({
                 'name': 'python-compile',
-                'command': ['python', '-m', 'py_compile', *python_files],
+                'command': [_python_command(), '-m', 'py_compile', *python_files],
                 'cwd': str(project_root),
                 'timeout': 120,
             })
@@ -58,7 +68,7 @@ class TestAgent(BaseAgent):
         if touches_frontend and (project_root / 'frontend' / 'package.json').exists():
             checks.append({
                 'name': 'frontend-build',
-                'command': ['npm', 'run', 'build'],
+                'command': [_npm_command(), 'run', 'build'],
                 'cwd': str(project_root / 'frontend'),
                 'timeout': 600,
             })
@@ -67,7 +77,7 @@ class TestAgent(BaseAgent):
         if touches_backend_or_agents:
             checks.append({
                 'name': 'backend-import',
-                'command': ['python', '-c', "from backend.main import app; print('backend-main-import-ok')"],
+                'command': [_python_command(), '-c', "from backend.main import app; print('backend-main-import-ok')"],
                 'cwd': str(project_root),
                 'timeout': 120,
             })
@@ -75,7 +85,7 @@ class TestAgent(BaseAgent):
         if any('agents' in item for item in changed_strings) and (project_root / 'tests' / 'test_agents.py').exists():
             checks.append({
                 'name': 'agent-tests',
-                'command': ['python', '-m', 'pytest', 'tests/test_agents.py', '-q'],
+                'command': [_python_command(), '-m', 'pytest', 'tests/test_agents.py', '-q'],
                 'cwd': str(project_root),
                 'timeout': 600,
             })
@@ -83,7 +93,7 @@ class TestAgent(BaseAgent):
         if not checks:
             checks.append({
                 'name': 'core-python-compile',
-                'command': ['python', '-m', 'py_compile', 'backend/main.py', 'start.py'],
+                'command': [_python_command(), '-m', 'py_compile', 'backend/main.py', 'start.py'],
                 'cwd': str(project_root),
                 'timeout': 120,
             })

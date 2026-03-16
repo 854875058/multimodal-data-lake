@@ -54,6 +54,8 @@ class LocalTaskExecutor:
             return 'cleanup_legacy_vue_frontend'
         if '多代前端' in title or ('文档' in title and '不一致' in title):
             return 'cleanup_legacy_architecture_artifacts'
+        if 'mock' in lowered and ('关闭' in title or '禁用' in title or '去掉' in title or '去除' in title):
+            return 'disable_mock_fallback'
         if '端口' in title or '启动脚本' in title or '启动方式' in title:
             return 'ensure_startup_contract'
         if '真实执行能力' in title:
@@ -115,6 +117,26 @@ class LocalTaskExecutor:
             result,
         )
         result['actions'].append('校正后端默认端口和仓库根启动方式。')
+
+    def _handle_disable_mock_fallback(self, task: Dict[str, Any], result: Dict[str, Any]):
+        self._replace_in_file(
+            Path('backend/api/platform.py'),
+            [
+                ("'use_mock': True,", "'use_mock': False,"),
+                ('use_mock: bool = True', 'use_mock: bool = False'),
+                ("normalized['use_mock'] = bool(normalized.get('use_mock', True))", "normalized['use_mock'] = bool(normalized.get('use_mock', False))"),
+            ],
+            result,
+        )
+        self._replace_in_file(
+            Path('frontend/src/pages/ConfigCenterPage.jsx'),
+            [
+                ('use_mock: true', 'use_mock: false'),
+                ('启用 Mock 回退模式', '启用 Mock 回退模式（仅内部调试）'),
+            ],
+            result,
+        )
+        result['actions'].append('默认关闭平台 Mock 回退模式，并将该开关降级为内部调试用途。')
 
     def _handle_verify_real_execution_capability(self, task: Dict[str, Any], result: Dict[str, Any]):
         required_paths = [

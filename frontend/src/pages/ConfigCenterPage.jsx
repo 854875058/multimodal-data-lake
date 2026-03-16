@@ -15,7 +15,7 @@ const defaultPlatformSettings = {
   doris_database: 'default',
   doris_user: 'root',
   doris_password: '',
-  use_mock: true
+  use_mock: false
 }
 
 const defaultWorkbenchSettings = {
@@ -311,7 +311,7 @@ export default function ConfigCenterPage() {
             </div>
             <label className="checkbox-field">
               <input type="checkbox" checked={platformSettings.use_mock} onChange={(event) => updatePlatformField('use_mock', event.target.checked)} />
-              <span>启用 Mock 回退模式</span>
+              <span>启用 Mock 回退模式（仅内部调试）</span>
             </label>
           </div>
 

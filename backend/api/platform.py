@@ -44,7 +44,7 @@ DEFAULT_PLATFORM_SETTINGS = {
     'doris_database': 'default',
     'doris_user': 'root',
     'doris_password': '',
-    'use_mock': True,
+    'use_mock': False,
 }
 
 CATALOG_BLUEPRINT = {
@@ -156,7 +156,7 @@ class PlatformSettingsPayload(BaseModel):
     doris_database: str = DEFAULT_PLATFORM_SETTINGS['doris_database']
     doris_user: str = DEFAULT_PLATFORM_SETTINGS['doris_user']
     doris_password: str = DEFAULT_PLATFORM_SETTINGS['doris_password']
-    use_mock: bool = True
+    use_mock: bool = False
 
     @field_validator(
         'gravitino_url',
@@ -267,7 +267,7 @@ def _normalize_platform_settings(payload: Optional[Dict[str, Any]]) -> Dict[str,
     normalized = dict(DEFAULT_PLATFORM_SETTINGS)
     normalized.update(payload or {})
     normalized['doris_mysql_port'] = PlatformSettingsPayload(**normalized).doris_mysql_port
-    normalized['use_mock'] = bool(normalized.get('use_mock', True))
+    normalized['use_mock'] = bool(normalized.get('use_mock', False))
     for key in normalized:
         if key == 'doris_mysql_port' or key == 'use_mock':
             continue
