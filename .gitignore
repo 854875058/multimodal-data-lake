@@ -18,7 +18,11 @@ frontend/.vite/
 # 临时文件
 temp_uploads/
 temp_extracted/
+.tmp/
 *.log
+
+# Agent 运行态
+agents/workspace/
 
 # Python 虚拟环境
 venv/
