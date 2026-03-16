@@ -86,7 +86,8 @@ multimodal-data-lake/
 │   │   ├── pages/          # 页面组件（Dashboard、Search、Upload 等）
 │   │   ├── components/     # 公共组件
 │   │   ├── api/            # 前端 API 封装
-│   │   └── views/          # 视图层
+│   │   ├── utils/          # 格式化与辅助函数
+│   │   └── main.jsx        # 前端入口
 │   └── vite.config.js
 ├── backend/                # FastAPI 后端
 │   ├── main.py             # 应用入口
