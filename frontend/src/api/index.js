@@ -218,6 +218,57 @@ const api = {
 
   buildWorkflowJob(payload) {
     return apiClient.post('/platform/workflow/build-job', payload)
+  },
+
+  // --- 用户管理 ---
+  getUsers(skip = 0, limit = 100) {
+    return apiClient.get('/users/list', { params: { skip, limit } })
+  },
+
+  createUser(payload) {
+    return apiClient.post('/users/register', payload)
+  },
+
+  updateUser(userId, payload) {
+    return apiClient.put(`/users/${userId}`, payload)
+  },
+
+  deleteUser(userId) {
+    return apiClient.delete(`/users/${userId}`)
+  },
+
+  login(username, password) {
+    const formData = new URLSearchParams()
+    formData.append('username', username)
+    formData.append('password', password)
+    return apiClient.post('/users/login', formData, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    })
+  },
+
+  // --- 权限管理 ---
+  getRoles() {
+    return apiClient.get('/permissions/roles')
+  },
+
+  createRole(payload) {
+    return apiClient.post('/permissions/roles', payload)
+  },
+
+  deleteRole(roleId) {
+    return apiClient.delete(`/permissions/roles/${roleId}`)
+  },
+
+  assignRole(userId, roleId) {
+    return apiClient.post('/permissions/assign', { user_id: userId, role_id: roleId })
+  },
+
+  revokeRole(userId, roleId) {
+    return apiClient.delete('/permissions/assign', { data: { user_id: userId, role_id: roleId } })
+  },
+
+  getUserRoles(userId) {
+    return apiClient.get(`/permissions/user/${userId}/roles`)
   }
 }
 

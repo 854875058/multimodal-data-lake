@@ -1,167 +1,206 @@
+import { useEffect, useState } from 'react'
+import api, { getErrorMessage } from '@/api'
 import { formatDateTime } from '@/utils/format'
 
-const users = [
-  {
-    name: 'lake-admin',
-    display_name: '平台管理员',
-    role: '超级管理员',
-    scope: '全局',
-    status: '启用',
-    last_login: '2026-03-15T09:20:00',
-    note: '负责平台配置、用户管理和权限策略维护'
-  },
-  {
-    name: 'ops-owner',
-    display_name: '接入负责人',
-    role: '运维管理员',
-    scope: '湖计算 / 接入',
-    status: '启用',
-    last_login: '2026-03-15T08:45:00',
-    note: '关注工作台、任务治理和组件状态'
-  },
-  {
-    name: 'analyst-demo',
-    display_name: '查询分析员',
-    role: '分析用户',
-    scope: '湖管理 / 查询',
-    status: '启用',
-    last_login: '2026-03-14T17:10:00',
-    note: '访问 Doris 查询台、资产目录和总览分析'
-  },
-  {
-    name: 'guest-review',
-    display_name: '外部访客',
-    role: '只读用户',
-    scope: '湖总览',
-    status: '待开通',
-    last_login: '',
-    note: '后续作为外部演示账号与权限隔离样例'
-  }
-]
-
-const roleBlueprint = [
-  {
-    title: '超级管理员',
-    copy: '拥有系统配置、用户管理和权限管理全量操作权限，负责租户底座和接入策略。'
-  },
-  {
-    title: '运维管理员',
-    copy: '聚焦接入工作台、计算编排、任务治理与日志排障，负责湖计算的日常执行。'
-  },
-  {
-    title: '分析用户',
-    copy: '面向查询分析、目录浏览和指标看板，默认不开放系统配置和高风险操作。'
-  }
-]
-
-function getStatusBadgeClass(status) {
-  if (status === '启用') {
-    return 'is-success'
-  }
-  if (status === '待开通') {
-    return 'is-warning'
-  }
-  return 'is-muted'
+function getStatusBadgeClass(isActive) {
+  return isActive ? 'is-success' : 'is-warning'
 }
 
 export default function UserManagementPage() {
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ username: '', email: '', password: '', full_name: '' })
+  const [submitting, setSubmitting] = useState(false)
+
+  const loadUsers = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const data = await api.getUsers()
+      setUsers(Array.isArray(data) ? data : [])
+    } catch (e) {
+      setError(getErrorMessage(e, '加载用户列表失败'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadUsers() }, [])
+
+  const handleCreate = async () => {
+    if (!form.username || !form.email || !form.password) return
+    setSubmitting(true)
+    try {
+      await api.createUser(form)
+      setForm({ username: '', email: '', password: '', full_name: '' })
+      setShowForm(false)
+      loadUsers()
+    } catch (e) {
+      setError(getErrorMessage(e, '创建用户失败'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (userId) => {
+    if (!confirm('确认删除该用户？')) return
+    try {
+      await api.deleteUser(userId)
+      loadUsers()
+    } catch (e) {
+      setError(getErrorMessage(e, '删除用户失败'))
+    }
+  }
+
+  const handleToggleActive = async (user) => {
+    try {
+      await api.updateUser(user.id, { is_active: !user.is_active })
+      loadUsers()
+    } catch (e) {
+      setError(getErrorMessage(e, '更新用户状态失败'))
+    }
+  }
+
   return (
     <div className="content-wrap">
       <div className="page-header">
         <div>
           <h1 className="page-title">用户管理</h1>
-          <p className="page-subtitle">先搭出账号、角色和用户隔离的控制面。当前先展示管理框架，后续再接注册 / 登录 / 按用户保存配置。</p>
+          <p className="page-subtitle">管理平台账号、角色绑定和用户状态。</p>
         </div>
         <div className="page-actions">
-          <button type="button" className="button button-secondary">导出名单</button>
-          <button type="button" className="button button-primary">新建用户</button>
+          <button type="button" className="button button-secondary" onClick={loadUsers} disabled={loading}>
+            {loading ? '加载中...' : '刷新'}
+          </button>
+          <button type="button" className="button button-primary" onClick={() => setShowForm(!showForm)}>
+            {showForm ? '取消' : '新建用户'}
+          </button>
         </div>
       </div>
+
+      {error ? <div className="error-banner">{error}</div> : null}
 
       <div className="mini-kpi-grid">
         <div className="glass-card mini-kpi-card">
           <div className="kpi-label">用户总数</div>
-          <div className="kpi-value">04</div>
-          <div className="kpi-sub">当前控制台内置的示例账号与角色入口</div>
+          <div className="kpi-value">{String(users.length).padStart(2, '0')}</div>
+          <div className="kpi-sub">当前平台注册用户数</div>
+        </div>
+        <div className="glass-card mini-kpi-card">
+          <div className="kpi-label">已启用</div>
+          <div className="kpi-value">{String(users.filter(u => u.is_active).length).padStart(2, '0')}</div>
+          <div className="kpi-sub">活跃账号数</div>
         </div>
         <div className="glass-card mini-kpi-card">
           <div className="kpi-label">管理员</div>
-          <div className="kpi-value">02</div>
-          <div className="kpi-sub">覆盖系统配置与湖计算运维</div>
+          <div className="kpi-value">{String(users.filter(u => u.is_admin).length).padStart(2, '0')}</div>
+          <div className="kpi-sub">拥有管理权限的账号</div>
         </div>
         <div className="glass-card mini-kpi-card">
-          <div className="kpi-label">只读 / 待开通</div>
-          <div className="kpi-value">02</div>
-          <div className="kpi-sub">为后续审批流和演示权限留出口</div>
-        </div>
-        <div className="glass-card mini-kpi-card">
-          <div className="kpi-label">下一步</div>
-          <div className="kpi-value">IAM</div>
-          <div className="kpi-sub">接账号体系、角色继承和用户级配置隔离</div>
+          <div className="kpi-label">权限模型</div>
+          <div className="kpi-value">RBAC</div>
+          <div className="kpi-sub">基于角色的访问控制</div>
         </div>
       </div>
 
-      <div className="workbench-grid workbench-grid-wide">
+      {showForm ? (
         <section className="glass-card">
           <div className="card-header">
             <div>
-              <h2>账号列表</h2>
-              <p>展示后续要接入注册、登录、角色绑定和状态管理的目标结构。</p>
+              <h2>新建用户</h2>
+              <p>填写用户信息创建新账号。</p>
             </div>
-            <span className="badge">Preview</span>
           </div>
+          <div className="workbench-form-grid">
+            <label className="field-group">
+              <span className="field-label">用户名</span>
+              <input className="field-input" value={form.username} onChange={e => setForm({...form, username: e.target.value})} placeholder="请输入用户名" />
+            </label>
+            <label className="field-group">
+              <span className="field-label">邮箱</span>
+              <input className="field-input" type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="请输入邮箱" />
+            </label>
+            <label className="field-group">
+              <span className="field-label">密码</span>
+              <input className="field-input" type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} placeholder="请输入密码" />
+            </label>
+            <label className="field-group">
+              <span className="field-label">姓名</span>
+              <input className="field-input" value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} placeholder="请输入姓名（可选）" />
+            </label>
+          </div>
+          <div className="page-actions" style={{marginTop: '16px'}}>
+            <button type="button" className="button button-primary" onClick={handleCreate} disabled={submitting}>
+              {submitting ? '创建中...' : '确认创建'}
+            </button>
+          </div>
+        </section>
+      ) : null}
+      <section className="glass-card">
+        <div className="card-header">
+          <div>
+            <h2>账号列表</h2>
+            <p>管理平台用户账号、状态和权限。</p>
+          </div>
+          <span className="badge">Live</span>
+        </div>
 
+        {loading ? (
+          <div style={{textAlign: 'center', padding: '40px', color: 'var(--text-muted)'}}>加载中...</div>
+        ) : users.length === 0 ? (
+          <div style={{textAlign: 'center', padding: '40px', color: 'var(--text-muted)'}}>暂无用户数据</div>
+        ) : (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>账号</th>
-                  <th>角色</th>
-                  <th>作用域</th>
+                  <th>ID</th>
+                  <th>用户名</th>
+                  <th>邮箱</th>
+                  <th>姓名</th>
                   <th>状态</th>
-                  <th>最后登录</th>
-                  <th>说明</th>
+                  <th>角色</th>
+                  <th>创建时间</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((item) => (
-                  <tr key={item.name}>
+                {users.map((user) => (
+                  <tr key={user.id}>
+                    <td className="mono">{user.id}</td>
+                    <td className="table-primary">{user.username}</td>
+                    <td className="mono">{user.email}</td>
+                    <td>{user.full_name || '--'}</td>
                     <td>
-                      <div className="table-primary">{item.display_name}</div>
-                      <div className="table-secondary mono">{item.name}</div>
+                      <span className={`badge ${getStatusBadgeClass(user.is_active)}`}>
+                        {user.is_active ? '启用' : '禁用'}
+                      </span>
                     </td>
-                    <td>{item.role}</td>
-                    <td>{item.scope}</td>
                     <td>
-                      <span className={`badge ${getStatusBadgeClass(item.status)}`}>{item.status}</span>
+                      <span className={`badge ${user.is_admin ? 'is-accent' : 'is-muted'}`}>
+                        {user.is_admin ? '管理员' : '普通用户'}
+                      </span>
                     </td>
-                    <td>{item.last_login ? formatDateTime(item.last_login) : '--'}</td>
-                    <td className="table-secondary">{item.note}</td>
+                    <td>{user.created_at ? formatDateTime(user.created_at) : '--'}</td>
+                    <td>
+                      <div className="toolbar-group">
+                        <button type="button" className="button button-small button-secondary" onClick={() => handleToggleActive(user)}>
+                          {user.is_active ? '禁用' : '启用'}
+                        </button>
+                        <button type="button" className="button button-small button-ghost" onClick={() => handleDelete(user.id)}>
+                          删除
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </section>
-
-        <section className="glass-card">
-          <div className="card-header">
-            <div>
-              <h2>角色基线</h2>
-              <p>先把平台内角色颗粒度固定下来，后续直接接后端账号体系和权限模型。</p>
-            </div>
-          </div>
-
-          <div className="detail-grid">
-            {roleBlueprint.map((item) => (
-              <div className="detail-item" key={item.title}>
-                <div className="kpi-label">{item.title}</div>
-                <div className="detail-value">{item.copy}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+        )}
+      </section>
     </div>
   )
 }

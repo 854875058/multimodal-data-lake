@@ -1,146 +1,182 @@
-const rolePolicies = [
-  {
-    role: '超级管理员',
-    lake_management: '读写',
-    lake_compute: '读写',
-    system_config: '读写',
-    approval: '可审批高风险变更',
-    note: '适合平台 owner 和系统管理员'
-  },
-  {
-    role: '运维管理员',
-    lake_management: '读取',
-    lake_compute: '读写',
-    system_config: '部分读写',
-    approval: '需二次确认',
-    note: '聚焦接入执行、任务治理和排障'
-  },
-  {
-    role: '分析用户',
-    lake_management: '读写查询',
-    lake_compute: '只读',
-    system_config: '只读',
-    approval: '不可审批',
-    note: '面向数据分析和目录检索'
-  },
-  {
-    role: '只读用户',
-    lake_management: '只读',
-    lake_compute: '不可见',
-    system_config: '不可见',
-    approval: '不可审批',
-    note: '适合外部演示和受限访客'
-  }
-]
-
-const scopeRules = [
-  {
-    title: '资源作用域',
-    copy: '后续按湖管理、湖计算、系统配置三大域切分授权范围，避免所有页面共用一套宽权限。'
-  },
-  {
-    title: '危险操作拦截',
-    copy: '批量接入、覆盖已有文件、修改平台连接信息等动作应接二次确认和审批记录。'
-  },
-  {
-    title: '用户级配置隔离',
-    copy: '配置中心未来按用户保存接入配置、默认模板和最近使用记录，避免多人共用一套表单状态。'
-  }
-]
+import { useEffect, useState } from 'react'
+import api, { getErrorMessage } from '@/api'
 
 export default function PermissionManagementPage() {
+  const [roles, setRoles] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ name: '', description: '', permissions: '' })
+  const [submitting, setSubmitting] = useState(false)
+
+  const loadRoles = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const data = await api.getRoles()
+      setRoles(Array.isArray(data) ? data : [])
+    } catch (e) {
+      setError(getErrorMessage(e, '加载角色列表失败'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { loadRoles() }, [])
+
+  const handleCreate = async () => {
+    if (!form.name) return
+    setSubmitting(true)
+    try {
+      const perms = form.permissions
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+      await api.createRole({ name: form.name, description: form.description, permissions: perms })
+      setForm({ name: '', description: '', permissions: '' })
+      setShowForm(false)
+      loadRoles()
+    } catch (e) {
+      setError(getErrorMessage(e, '创建角色失败'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (roleId) => {
+    if (!confirm('确认删除该角色？')) return
+    try {
+      await api.deleteRole(roleId)
+      loadRoles()
+    } catch (e) {
+      setError(getErrorMessage(e, '删除角色失败'))
+    }
+  }
+
   return (
     <div className="content-wrap">
       <div className="page-header">
         <div>
           <h1 className="page-title">权限管理</h1>
-          <p className="page-subtitle">先把角色、资源域和危险操作边界梳理清楚，为后面的账号体系和用户隔离提供约束。</p>
+          <p className="page-subtitle">管理角色、权限策略和用户角色分配。</p>
         </div>
         <div className="page-actions">
-          <button type="button" className="button button-secondary">查看审计日志</button>
-          <button type="button" className="button button-primary">新增策略</button>
+          <button type="button" className="button button-secondary" onClick={loadRoles} disabled={loading}>
+            {loading ? '加载中...' : '刷新'}
+          </button>
+          <button type="button" className="button button-primary" onClick={() => setShowForm(!showForm)}>
+            {showForm ? '取消' : '新增角色'}
+          </button>
         </div>
       </div>
 
+      {error ? <div className="error-banner">{error}</div> : null}
+
       <div className="mini-kpi-grid">
         <div className="glass-card mini-kpi-card">
-          <div className="kpi-label">角色策略</div>
-          <div className="kpi-value">04</div>
-          <div className="kpi-sub">对应四类典型账号角色与资源操作边界</div>
+          <div className="kpi-label">角色总数</div>
+          <div className="kpi-value">{String(roles.length).padStart(2, '0')}</div>
+          <div className="kpi-sub">当前系统定义的角色数量</div>
         </div>
         <div className="glass-card mini-kpi-card">
           <div className="kpi-label">资源域</div>
           <div className="kpi-value">03</div>
-          <div className="kpi-sub">湖管理、湖计算、系统配置三大控制域</div>
+          <div className="kpi-sub">湖管理、湖计算、系统配置</div>
         </div>
         <div className="glass-card mini-kpi-card">
-          <div className="kpi-label">高风险动作</div>
-          <div className="kpi-value">05+</div>
-          <div className="kpi-sub">平台连接、覆盖导入、权限变更等动作需要审批链</div>
+          <div className="kpi-label">权限模型</div>
+          <div className="kpi-value">RBAC</div>
+          <div className="kpi-sub">基于角色的访问控制</div>
         </div>
         <div className="glass-card mini-kpi-card">
           <div className="kpi-label">目标状态</div>
-          <div className="kpi-value">RBAC</div>
-          <div className="kpi-sub">后续接注册 / 登录 / 审批 / 审计的统一权限模型</div>
+          <div className="kpi-value">IAM</div>
+          <div className="kpi-sub">统一身份与访问管理</div>
         </div>
       </div>
 
-      <div className="workbench-grid workbench-grid-wide">
+      {showForm ? (
         <section className="glass-card">
           <div className="card-header">
             <div>
-              <h2>角色权限矩阵</h2>
-              <p>用最小可用的矩阵把三大控制域权限拆开，避免所有用户共享平台最高权限。</p>
+              <h2>新增角色</h2>
+              <p>定义角色名称、描述和权限列表。</p>
             </div>
-            <span className="badge">RBAC</span>
           </div>
+          <div className="workbench-form-grid">
+            <label className="field-group">
+              <span className="field-label">角色名称</span>
+              <input className="field-input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="如: data_analyst" />
+            </label>
+            <label className="field-group">
+              <span className="field-label">描述</span>
+              <input className="field-input" value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="角色描述" />
+            </label>
+            <label className="field-group">
+              <span className="field-label">权限列表</span>
+              <input className="field-input" value={form.permissions} onChange={e => setForm({...form, permissions: e.target.value})} placeholder="逗号分隔，如: read, write, upload" />
+            </label>
+          </div>
+          <div className="page-actions" style={{marginTop: '16px'}}>
+            <button type="button" className="button button-primary" onClick={handleCreate} disabled={submitting}>
+              {submitting ? '创建中...' : '确认创建'}
+            </button>
+          </div>
+        </section>
+      ) : null}
 
+      <section className="glass-card">
+        <div className="card-header">
+          <div>
+            <h2>角色列表</h2>
+            <p>系统中所有角色及其权限配置。</p>
+          </div>
+          <span className="badge">Live</span>
+        </div>
+
+        {loading ? (
+          <div style={{textAlign: 'center', padding: '40px', color: 'var(--text-muted)'}}>加载中...</div>
+        ) : roles.length === 0 ? (
+          <div style={{textAlign: 'center', padding: '40px', color: 'var(--text-muted)'}}>暂无角色数据</div>
+        ) : (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>角色</th>
-                  <th>湖管理</th>
-                  <th>湖计算</th>
-                  <th>系统配置</th>
-                  <th>审批能力</th>
-                  <th>说明</th>
+                  <th>ID</th>
+                  <th>角色名称</th>
+                  <th>描述</th>
+                  <th>权限</th>
+                  <th>创建时间</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
-                {rolePolicies.map((item) => (
-                  <tr key={item.role}>
-                    <td className="table-primary">{item.role}</td>
-                    <td>{item.lake_management}</td>
-                    <td>{item.lake_compute}</td>
-                    <td>{item.system_config}</td>
-                    <td>{item.approval}</td>
-                    <td className="table-secondary">{item.note}</td>
+                {roles.map((role) => (
+                  <tr key={role.id}>
+                    <td className="mono">{role.id}</td>
+                    <td className="table-primary">{role.name}</td>
+                    <td>{role.description || '--'}</td>
+                    <td>
+                      <div className="toolbar-group" style={{flexWrap: 'wrap', gap: '4px'}}>
+                        {(role.permissions || []).map((perm, i) => (
+                          <span key={i} className="badge is-muted">{perm}</span>
+                        ))}
+                      </div>
+                    </td>
+                    <td>{role.created_at || '--'}</td>
+                    <td>
+                      <button type="button" className="button button-small button-ghost" onClick={() => handleDelete(role.id)}>
+                        删除
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </section>
-
-        <section className="glass-card">
-          <div className="card-header">
-            <div>
-              <h2>规则设计要点</h2>
-              <p>这些规则会直接影响后面账号体系、用户配置隔离和操作审计的落地方式。</p>
-            </div>
-          </div>
-
-          <div className="detail-grid">
-            {scopeRules.map((item) => (
-              <div className="detail-item" key={item.title}>
-                <div className="kpi-label">{item.title}</div>
-                <div className="detail-value">{item.copy}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+        )}
+      </section>
     </div>
   )
 }
