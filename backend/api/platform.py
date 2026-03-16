@@ -76,14 +76,14 @@ CATALOG_BLUEPRINT = {
             'ods': {
                 'label': 'ODS',
                 'tables': [
-                    {'name': 'raw_ingestion_events', 'engine': 'Mock', 'description': '来源接入事件明细'},
-                    {'name': 'raw_asset_registry', 'engine': 'Mock', 'description': '资产登记原始视图'},
+                    {'name': 'raw_ingestion_events', 'engine': 'ODS View', 'description': '来源接入事件明细'},
+                    {'name': 'raw_asset_registry', 'engine': 'Registry View', 'description': '资产登记原始视图'},
                 ],
             },
             'ads': {
                 'label': 'ADS',
                 'tables': [
-                    {'name': 'asset_summary_view', 'engine': 'Mock', 'description': '多模态资产汇总指标'},
+                    {'name': 'asset_summary_view', 'engine': 'ADS View', 'description': '多模态资产汇总指标'},
                 ],
             },
         },
@@ -1077,7 +1077,7 @@ async def get_asset_detail(catalog: str, schema: str, table: str, limit: int = 8
             'table': table,
             'label': table_meta.get('label', table),
             'description': table_meta.get('description', ''),
-            'engine': table_meta.get('engine', 'Mock'),
+            'engine': table_meta.get('engine', 'Catalog View'),
             'row_count': _get_table_row_count(table),
             'columns': _get_table_schema(table),
             'sample_rows': sample_rows,
@@ -1122,12 +1122,12 @@ async def test_doris_connection(payload: PlatformSettingsPayload):
             'message': f"Doris 连接成功，版本：{version[0] if version else 'unknown'}",
         }
     except Exception as error:
-        logger.warning('Doris 连接失败，回退 Mock: %s', error)
+        logger.warning('Doris 连接失败: %s', error)
         return {
-            'success': True,
+            'success': False,
             'connected': False,
-            'mode': 'mock' if settings.get('use_mock', True) else 'error',
-            'message': f"Doris 实连失败，当前回退为 Mock 模式：{error}",
+            'mode': 'error',
+            'message': f"Doris 实连失败：{error}",
         }
 
 
@@ -1154,14 +1154,14 @@ async def execute_sql(payload: SqlPayload):
     query_lower = query.lower()
     if query_lower.startswith('show catalogs'):
         rows = [{'catalog_name': key, 'description': value['description']} for key, value in CATALOG_BLUEPRINT.items()]
-        return {'success': True, 'mode': 'mock', 'columns': ['catalog_name', 'description'], 'rows': rows, 'message': '已返回目录列表'}
+        return {'success': True, 'mode': 'catalog', 'columns': ['catalog_name', 'description'], 'rows': rows, 'message': '已返回目录列表'}
 
     if query_lower.startswith('show schemas'):
         rows = []
         for catalog_name, catalog_info in CATALOG_BLUEPRINT.items():
             for schema_name in catalog_info['schemas']:
                 rows.append({'catalog_name': catalog_name, 'schema_name': schema_name})
-        return {'success': True, 'mode': 'mock', 'columns': ['catalog_name', 'schema_name'], 'rows': rows, 'message': '已返回 Schema 列表'}
+        return {'success': True, 'mode': 'catalog', 'columns': ['catalog_name', 'schema_name'], 'rows': rows, 'message': '已返回 Schema 列表'}
 
     if query_lower.startswith('show tables'):
         rows = []
@@ -1170,9 +1170,9 @@ async def execute_sql(payload: SqlPayload):
                 'catalog_name': meta['catalog'],
                 'schema_name': meta['schema'],
                 'table_name': table_name,
-                'engine': meta.get('engine', 'Mock'),
+                'engine': meta.get('engine', 'Catalog View'),
             })
-        return {'success': True, 'mode': 'mock', 'columns': ['catalog_name', 'schema_name', 'table_name', 'engine'], 'rows': rows, 'message': '已返回表列表'}
+        return {'success': True, 'mode': 'catalog', 'columns': ['catalog_name', 'schema_name', 'table_name', 'engine'], 'rows': rows, 'message': '已返回表列表'}
 
     table_name = _resolve_sql_table(query)
     if table_name:
@@ -1188,10 +1188,7 @@ async def execute_sql(payload: SqlPayload):
                 'message': f'已基于当前本地数据返回 {len(rows)} 行结果',
             }
 
-    rows = [
-        {'query': query, 'status': 'mock', 'note': '当前 SQL 未命中本地表，已返回 Mock 结果'},
-    ]
-    return {'success': True, 'mode': 'mock', 'columns': ['query', 'status', 'note'], 'rows': rows, 'message': '当前为 Mock 执行结果'}
+    raise HTTPException(status_code=400, detail='当前 SQL 未命中可执行的本地表、目录命令或已登记外表。')
 
 
 def _guess_sql_from_prompt(prompt: str) -> str:

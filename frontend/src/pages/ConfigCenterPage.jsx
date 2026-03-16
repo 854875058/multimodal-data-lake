@@ -14,8 +14,7 @@ const defaultPlatformSettings = {
   doris_mysql_port: 9030,
   doris_database: 'default',
   doris_user: 'root',
-  doris_password: '',
-  use_mock: false
+  doris_password: ''
 }
 
 const defaultWorkbenchSettings = {
@@ -309,10 +308,6 @@ export default function ConfigCenterPage() {
               <label htmlFor="doris_password">Doris Password</label>
               <input id="doris_password" className="input" type="password" value={platformSettings.doris_password} onChange={(event) => updatePlatformField('doris_password', event.target.value)} />
             </div>
-            <label className="checkbox-field">
-              <input type="checkbox" checked={platformSettings.use_mock} onChange={(event) => updatePlatformField('use_mock', event.target.checked)} />
-              <span>启用 Mock 回退模式（仅内部调试）</span>
-            </label>
           </div>
 
           <div className="toolbar-group">

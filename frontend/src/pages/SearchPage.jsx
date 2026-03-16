@@ -346,7 +346,7 @@ export default function SearchPage() {
           <div className="card-header">
             <div>
               <h2>SQL 编辑器</h2>
-              <p>支持 `SHOW TABLES`、查询本地 `files / text_chunks / image_chunks`，未命中时回退 Mock 结果。</p>
+              <p>支持 `SHOW TABLES`、查询本地 `files / text_chunks / image_chunks`，未命中时返回明确错误，不再伪造 Mock 结果。</p>
             </div>
             {sqlResult.mode ? <span className="badge">{sqlResult.mode}</span> : null}
           </div>

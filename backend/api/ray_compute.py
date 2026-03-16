@@ -55,8 +55,8 @@ async def get_ray_status():
     if not client:
         return {
             'connected': False,
-            'mode': 'mock',
-            'message': 'Ray 未连接，当前为模拟模式',
+            'mode': 'error',
+            'message': 'Ray 未连接，当前无法提供计算编排服务',
             'cluster': {
                 'nodes': 0,
                 'cpus_total': 0,
@@ -104,16 +104,7 @@ async def submit_ray_job(job: RayJobSubmit):
     client = _get_ray_client()
 
     if not client:
-        # 模拟模式
-        import uuid
-        job_id = f"mock_{uuid.uuid4().hex[:8]}"
-        return RayJobResponse(
-            job_id=job_id,
-            name=job.name,
-            status='PENDING',
-            entrypoint=job.entrypoint,
-            created_at=datetime.now().isoformat()
-        )
+        raise HTTPException(status_code=503, detail='Ray 未连接，无法提交任务')
 
     try:
         runtime_env = job.runtime_env or {}
@@ -139,7 +130,7 @@ async def list_ray_jobs():
     client = _get_ray_client()
 
     if not client:
-        return {'jobs': [], 'mode': 'mock'}
+        raise HTTPException(status_code=503, detail='Ray 未连接，无法读取任务列表')
 
     try:
         jobs = client.list_jobs()
@@ -167,7 +158,7 @@ async def get_ray_job(job_id: str):
     client = _get_ray_client()
 
     if not client:
-        return {'job_id': job_id, 'status': 'UNKNOWN', 'mode': 'mock'}
+        raise HTTPException(status_code=503, detail='Ray 未连接，无法读取任务详情')
 
     try:
         status = client.get_job_status(job_id)
@@ -189,7 +180,7 @@ async def stop_ray_job(job_id: str):
     client = _get_ray_client()
 
     if not client:
-        return {'message': f'模拟模式：任务 {job_id} 已停止'}
+        raise HTTPException(status_code=503, detail='Ray 未连接，无法停止任务')
 
     try:
         client.stop_job(job_id)
