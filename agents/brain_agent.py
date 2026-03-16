@@ -12,6 +12,7 @@ except ImportError:
     Anthropic = None
 
 from .base_agent import BaseAgent
+from .request_store import load_requests, update_request
 
 logger = logging.getLogger(__name__)
 
@@ -377,6 +378,59 @@ class BrainAgent(BaseAgent):
 
         self.log_action("evaluate_optimization", evaluation)
         return evaluation
+
+    def sync_user_requests(self) -> Dict[str, int]:
+        """将用户请求同步为任务，并回写请求状态。"""
+        requests = load_requests(self.workspace_dir)
+        created = 0
+        updated = 0
+
+        for request in requests:
+            request_id = int(request.get('id', 0) or 0)
+            task_id = request.get('task_id')
+            status = str(request.get('status') or 'pending')
+
+            if status == 'pending' and not task_id:
+                description = request.get('description', '').strip()
+                acceptance = request.get('acceptance_criteria', '').strip()
+                if acceptance:
+                    description = f"{description}\n\n验收标准:\n{acceptance}".strip()
+                task = self.ensure_task(
+                    title=request.get('title', f'用户请求 {request_id}'),
+                    description=description,
+                    priority=int(request.get('priority', 3) or 3),
+                )
+                task_id = task['id']
+                update_request(self.workspace_dir, request_id, status='queued', task_id=task_id)
+                created += 1
+                continue
+
+            if not task_id:
+                continue
+
+            task = next((item for item in self.task_queue if int(item.get('id', 0) or 0) == int(task_id)), None)
+            if not task:
+                continue
+
+            task_status = str(task.get('status') or '')
+            next_status = None
+            message = request.get('result_message', '')
+            if task_status in {'pending', 'in_progress', 'ready'}:
+                next_status = task_status
+            elif task_status == 'completed':
+                next_status = 'completed'
+                message = 'Agent Team 已完成该请求。'
+            elif task_status == 'failed':
+                next_status = 'failed'
+                message = task.get('details', {}).get('error') or 'Agent Team 执行失败。'
+
+            if next_status and (next_status != status or message != request.get('result_message', '')):
+                update_request(self.workspace_dir, request_id, status=next_status, result_message=message, task_id=task_id)
+                updated += 1
+
+        if created or updated:
+            self.log_action('sync_user_requests', {'created': created, 'updated': updated})
+        return {'created': created, 'updated': updated}
 
     def process(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """处理输入"""

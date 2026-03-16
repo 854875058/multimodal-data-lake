@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from agents.request_store import create_request, load_requests
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -28,6 +29,13 @@ class GenericResponse(BaseModel):
 class TaskListResponse(BaseModel):
     success: bool
     tasks: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class RequestPayload(BaseModel):
+    title: str
+    description: str
+    priority: int = 3
+    acceptance_criteria: str = ''
 
 
 def _load_json(path: Path, default: Any):
@@ -100,10 +108,25 @@ def _load_tasks() -> List[Dict[str, Any]]:
     return normalized
 
 
+def _load_request_items() -> List[Dict[str, Any]]:
+    items = load_requests(WORKSPACE_DIR)
+    return [item for item in items if isinstance(item, dict)]
+
+
 @router.get('/status', response_model=GenericResponse)
 async def get_agent_status():
     tasks = _load_tasks()
-    return GenericResponse(success=True, message='ok', data=_load_status(tasks))
+    status = _load_status(tasks)
+    requests = _load_request_items()
+    status['requests'] = {
+        'total': len(requests),
+        'pending': len([item for item in requests if item.get('status') == 'pending']),
+        'queued': len([item for item in requests if item.get('status') == 'queued']),
+        'ready': len([item for item in requests if item.get('status') == 'ready']),
+        'completed': len([item for item in requests if item.get('status') == 'completed']),
+        'failed': len([item for item in requests if item.get('status') == 'failed']),
+    }
+    return GenericResponse(success=True, message='ok', data=status)
 
 
 @router.get('/tasks', response_model=TaskListResponse)
@@ -118,3 +141,20 @@ async def get_agent_task(task_id: int):
     if not task:
         raise HTTPException(status_code=404, detail='任务不存在')
     return GenericResponse(success=True, message='ok', data=task)
+
+
+@router.get('/requests', response_model=GenericResponse)
+async def list_agent_requests():
+    return GenericResponse(success=True, message='ok', data={'items': _load_request_items()})
+
+
+@router.post('/requests', response_model=GenericResponse)
+async def create_agent_request(payload: RequestPayload):
+    request = create_request(
+        WORKSPACE_DIR,
+        title=payload.title,
+        description=payload.description,
+        priority=payload.priority,
+        acceptance_criteria=payload.acceptance_criteria,
+    )
+    return GenericResponse(success=True, message='需求已提交给 Agent Team', data=request)

@@ -170,6 +170,14 @@ const api = {
     return apiClient.get(`/agents/tasks/${encodeURIComponent(taskId)}`)
   },
 
+  getAgentRequests() {
+    return apiClient.get('/agents/requests')
+  },
+
+  createAgentRequest(payload) {
+    return apiClient.post('/agents/requests', payload)
+  },
+
   getPlatformSettings() {
     return apiClient.get('/platform/settings')
   },

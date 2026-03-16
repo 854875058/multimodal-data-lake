@@ -250,8 +250,16 @@ export default function TaskGovernancePage() {
   const [jobDetail, setJobDetail] = useState(null)
   const [agentStatus, setAgentStatus] = useState(null)
   const [agentTasks, setAgentTasks] = useState([])
+  const [agentRequests, setAgentRequests] = useState([])
   const [selectedAgentTaskId, setSelectedAgentTaskId] = useState('')
   const [agentTaskDetail, setAgentTaskDetail] = useState(null)
+  const [agentRequestForm, setAgentRequestForm] = useState({
+    title: '',
+    description: '',
+    priority: '3',
+    acceptance_criteria: ''
+  })
+  const [submittingAgentRequest, setSubmittingAgentRequest] = useState(false)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [jobStatusFilter, setJobStatusFilter] = useState('all')
@@ -369,17 +377,20 @@ export default function TaskGovernancePage() {
   }
 
   const loadAgentData = async () => {
-    const [statusResponse, tasksResponse] = await Promise.all([
+    const [statusResponse, tasksResponse, requestsResponse] = await Promise.all([
       api.getAgentStatus(),
-      api.getAgentTasks()
+      api.getAgentTasks(),
+      api.getAgentRequests()
     ])
 
     const nextStatus = statusResponse?.data || null
     const nextTasks = normalizeAgentTasks(tasksResponse?.tasks)
+    const nextRequests = Array.isArray(requestsResponse?.data?.items) ? requestsResponse.data.items : []
     setAgentStatus(nextStatus)
     setAgentTasks(nextTasks)
+    setAgentRequests(nextRequests)
     setSelectedAgentTaskId((current) => current || String(nextTasks[0]?.id || ''))
-    return { nextStatus, nextTasks }
+    return { nextStatus, nextTasks, nextRequests }
   }
 
   const loadAgentTaskDetail = async (taskId) => {
@@ -498,6 +509,36 @@ export default function TaskGovernancePage() {
     navigate('/workbench')
   }
 
+  const handleSubmitAgentRequest = async (event) => {
+    event.preventDefault()
+    if (!agentRequestForm.title.trim() || !agentRequestForm.description.trim()) {
+      setBanner({ type: 'warning', message: '请填写需求标题和需求描述。' })
+      return
+    }
+
+    setSubmittingAgentRequest(true)
+    try {
+      const response = await api.createAgentRequest({
+        title: agentRequestForm.title.trim(),
+        description: agentRequestForm.description.trim(),
+        priority: Number(agentRequestForm.priority || 3),
+        acceptance_criteria: agentRequestForm.acceptance_criteria.trim()
+      })
+      setBanner({ type: 'success', message: response?.message || '需求已提交。' })
+      setAgentRequestForm({
+        title: '',
+        description: '',
+        priority: '3',
+        acceptance_criteria: ''
+      })
+      await loadAgentData()
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, '提交 Agent 需求失败。'))
+    } finally {
+      setSubmittingAgentRequest(false)
+    }
+  }
+
   const handleExportLogs = (job) => {
     const content = String(job?.logs || '').trim()
     if (!content) {
@@ -591,6 +632,74 @@ export default function TaskGovernancePage() {
           <div className="kpi-sub">Agent 已完成的仓库整治任务</div>
         </div>
       </div>
+
+      <section className="glass-card">
+        <div className="card-header">
+          <div>
+            <h2>提交 Agent 需求</h2>
+            <p>后续你只需要在这里提交需求，Agent Team 会自动入队、规划、执行并回写状态。</p>
+          </div>
+        </div>
+
+        <form className="workbench-form-grid" onSubmit={handleSubmitAgentRequest}>
+          <div className="field">
+            <label htmlFor="agent_request_title">需求标题</label>
+            <input
+              id="agent_request_title"
+              className="input"
+              value={agentRequestForm.title}
+              onChange={(event) => setAgentRequestForm((current) => ({ ...current, title: event.target.value }))}
+              placeholder="例如：增加 Agent 需求审批和回退机制"
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="agent_request_priority">优先级</label>
+            <select
+              id="agent_request_priority"
+              className="select"
+              value={agentRequestForm.priority}
+              onChange={(event) => setAgentRequestForm((current) => ({ ...current, priority: event.target.value }))}
+            >
+              <option value="5">5 - 紧急</option>
+              <option value="4">4 - 高</option>
+              <option value="3">3 - 中</option>
+              <option value="2">2 - 低</option>
+              <option value="1">1 - 储备</option>
+            </select>
+          </div>
+          <div className="field workbench-grid-wide">
+            <label htmlFor="agent_request_description">需求描述</label>
+            <textarea
+              id="agent_request_description"
+              className="textarea"
+              value={agentRequestForm.description}
+              onChange={(event) => setAgentRequestForm((current) => ({ ...current, description: event.target.value }))}
+              placeholder="描述你希望 Agent Team 完成的目标、涉及模块和边界条件。"
+            />
+          </div>
+          <div className="field workbench-grid-wide">
+            <label htmlFor="agent_request_acceptance">验收标准</label>
+            <textarea
+              id="agent_request_acceptance"
+              className="textarea"
+              value={agentRequestForm.acceptance_criteria}
+              onChange={(event) => setAgentRequestForm((current) => ({ ...current, acceptance_criteria: event.target.value }))}
+              placeholder="例如：1. 新 API 返回 200；2. 前端构建通过；3. 任务治理页可查看结果。"
+            />
+          </div>
+          <div className="page-actions">
+            <button type="submit" className="button button-primary" disabled={submittingAgentRequest}>
+              {submittingAgentRequest ? '提交中...' : '提交给 Agent Team'}
+            </button>
+          </div>
+        </form>
+
+        <div className="toolbar workbench-table-toolbar">
+          <div className="workbench-help">
+            已提交需求 {formatNumber(agentRequests.length)} 条。
+          </div>
+        </div>
+      </section>
 
       <div className="governance-shell">
         <section className="glass-card">

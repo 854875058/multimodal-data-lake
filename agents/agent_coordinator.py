@@ -57,14 +57,17 @@ class AgentCoordinator:
         """重新扫描项目并同步 backlog。"""
         if not self.project_root:
             return
+        request_sync = self.brain.sync_user_requests()
         analysis = self.brain.analyze_project(self.project_root)
         task_sync = self.brain.bootstrap_tasks_from_analysis(analysis)
         self._last_analysis_at = time.time()
         logger.info("Agent backlog 刷新完成，当前任务总数: %s", len(self.brain.task_queue))
         logger.info(
-            "本次分析新增任务数: %s，已存在任务命中数: %s",
+            "本次分析新增任务数: %s，已存在任务命中数: %s，请求入队: %s，请求状态回写: %s",
             len(task_sync.get('created', [])),
             len(task_sync.get('existing', [])),
+            request_sync.get('created', 0),
+            request_sync.get('updated', 0),
         )
 
     def _write_task_plan(self, task_id: int, payload: Dict[str, Any]):
@@ -136,6 +139,8 @@ class AgentCoordinator:
 
     def _process_one_cycle(self):
         """处理一个工作循环"""
+        self.brain.sync_user_requests()
+
         if time.time() - self._last_analysis_at >= self.analysis_interval_seconds:
             self._refresh_backlog()
 

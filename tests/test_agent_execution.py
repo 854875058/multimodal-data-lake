@@ -101,3 +101,20 @@ def test_test_agent_generates_real_validation_commands():
 
         names = [item['name'] for item in checks]
         assert 'frontend-build' in names
+
+
+def test_brain_agent_syncs_user_requests_into_task_queue():
+    from agents.brain_agent import BrainAgent
+    from agents.request_store import create_request, load_requests
+
+    with local_tempdir() as repo_root:
+      workspace = repo_root / 'workspace'
+      create_request(workspace, title='统一启动口径', description='统一后端默认端口与启动方式', priority=4)
+      brain = BrainAgent(workspace)
+      result = brain.sync_user_requests()
+
+      assert result['created'] == 1
+      assert brain.task_queue[0]['title'] == '统一启动口径'
+      requests = load_requests(workspace)
+      assert requests[0]['status'] == 'queued'
+      assert requests[0]['task_id'] == 1
