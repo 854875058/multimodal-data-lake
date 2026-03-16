@@ -144,13 +144,15 @@ async def serve_frontend_app(full_path: str):
 
 
 if __name__ == '__main__':
+    import os
     import uvicorn
 
+    port = int(os.getenv('BACKEND_PORT', '8090'))
     app_target = 'main:app' if BACKEND_RELOAD else app
     uvicorn.run(
         app_target,
         host='0.0.0.0',
-        port=8090,
+        port=port,
         reload=BACKEND_RELOAD,
         log_level='info',
     )
