@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional
 
 from .brain_agent import BrainAgent
 from .code_agent import CodeAgent
+from .git_ops import GitCommitError, commit_agent_changes
 from .test_agent import TestAgent
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,25 @@ class AgentCoordinator:
         plan_file = self.task_plan_dir / f'task_{task_id:03d}.json'
         with open(plan_file, 'w', encoding='utf-8') as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    def _auto_commit_task(self, task: Dict[str, Any], code_result: Dict[str, Any]) -> Optional[str]:
+        """为当前任务自动创建 git 提交。"""
+        if not self.project_root:
+            return None
+
+        paths = list(code_result.get('files_modified', [])) + list(code_result.get('files_removed', []))
+        if not paths:
+            return None
+
+        message = f"agent: {task['title']}"
+        try:
+            commit_sha = commit_agent_changes(self.project_root, paths, message)
+            if commit_sha:
+                logger.info("Agent 自动提交完成: %s", commit_sha)
+            return commit_sha
+        except GitCommitError as error:
+            logger.error("Agent 自动提交失败: %s", error)
+            return None
 
     def _plan_one_task(self):
         """在 planning-only 模式下推进一个待规划任务。"""
@@ -202,6 +222,8 @@ class AgentCoordinator:
         suggestions = self.test.generate_optimization_suggestions(code_result, test_result)
         logger.info(f"生成 {len(suggestions)} 条优化建议")
 
+        commit_sha = self._auto_commit_task(task, code_result)
+
         # Brain Agent 评估建议
         for suggestion in suggestions:
             evaluation = self.brain.evaluate_optimization(suggestion)
@@ -217,6 +239,7 @@ class AgentCoordinator:
             'code_result': code_result,
             'test_result': test_result,
             'suggestions': suggestions,
+            'commit_sha': commit_sha,
         })
         logger.info(f"任务完成: {task['title']}")
 
