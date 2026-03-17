@@ -19,6 +19,7 @@ frontend/.vite/
 temp_uploads/
 temp_extracted/
 .tmp/
+.aidiff/
 *.log
 
 # Agent 运行态
