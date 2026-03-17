@@ -20,7 +20,7 @@ const navGroups = [
     items: [
       { path: '/dashboard', code: '01', label: '湖总览', tag: 'Overview', description: '多模态数据湖规模、资产态势与关键链路总览' },
       { path: '/files', code: '02', label: '资产目录', tag: 'Catalog', description: '分层浏览入湖资产、Schema 与样本预览' },
-      { path: '/upload', code: '03', label: '数据接入', tag: 'Ingress', description: '手工上传、批量接入与演示入湖入口' },
+      { path: '/upload', code: '03', label: '数据接入', tag: 'Ingress', description: '手工上传、批量接入与统一入湖入口' },
       { path: '/search', code: '04', label: '查询分析', tag: 'Query', description: 'Doris 外表、SQL 分析与语义检索入口' }
     ]
   },

@@ -233,9 +233,9 @@ export default function DashboardPage() {
       return '当前平台处于稳定区间，适合继续扩大资产接入和索引覆盖，优先推进目录治理与 Doris 查询链路。'
     }
     if (stats.week_success_rate >= 0.75) {
-      return '平台已具备连续运行能力，但任务波动仍然存在。建议关注失败任务和工作流资源配置，避免成为商业化演示短板。'
+      return '平台已具备连续运行能力，但任务波动仍然存在。建议关注失败任务和工作流资源配置，避免成为平台稳定性短板。'
     }
-    return '当前平台还不具备稳定商业演示状态。应优先处理工作台失败任务、资源瓶颈和接入链路不稳定问题。'
+    return '当前平台还不具备稳定生产运行状态。应优先处理工作台失败任务、资源瓶颈和接入链路不稳定问题。'
   }, [stats.week_success_rate, stats.week_tasks_total])
 
   const serviceCards = useMemo(() => {

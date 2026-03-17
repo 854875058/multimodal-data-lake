@@ -26,6 +26,17 @@ def _npm_command() -> str:
     return 'npm.cmd' if os.name == 'nt' else 'npm'
 
 
+def _decode_output(data: bytes | None) -> str:
+    if not data:
+        return ''
+    for encoding in ('utf-8', 'gbk', sys.getdefaultencoding() or 'utf-8'):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode('utf-8', errors='replace')
+
+
 class TestAgent(BaseAgent):
     """测试 Agent：负责编写测试用例、执行测试、提出优化建议"""
 
@@ -118,15 +129,17 @@ class TestAgent(BaseAgent):
                         test_file['command'],
                         cwd=test_file.get('cwd'),
                         capture_output=True,
-                        text=True,
+                        text=False,
                         timeout=int(test_file.get('timeout', 300)),
                     )
                     check_name = test_file.get('name', 'unnamed-check')
+                    stdout = _decode_output(proc.stdout)
+                    stderr = _decode_output(proc.stderr)
                     result['checks'].append({
                         'name': check_name,
                         'returncode': proc.returncode,
-                        'stdout': proc.stdout,
-                        'stderr': proc.stderr,
+                        'stdout': stdout,
+                        'stderr': stderr,
                     })
                     if proc.returncode == 0:
                         result['passed'] += 1
@@ -134,7 +147,7 @@ class TestAgent(BaseAgent):
                         result['failed'] += 1
                         result['errors'].append({
                             'file': check_name,
-                            'output': proc.stdout + proc.stderr
+                            'output': stdout + stderr
                         })
                 else:
                     if not Path(test_file).exists():
@@ -144,16 +157,18 @@ class TestAgent(BaseAgent):
                     proc = subprocess.run(
                         ['python', '-m', 'pytest', test_file, '-v'],
                         capture_output=True,
-                        text=True,
+                        text=False,
                         timeout=60
                     )
+                    stdout = _decode_output(proc.stdout)
+                    stderr = _decode_output(proc.stderr)
                     if proc.returncode == 0:
                         result['passed'] += 1
                     else:
                         result['failed'] += 1
                         result['errors'].append({
                             'file': test_file,
-                            'output': proc.stdout + proc.stderr
+                            'output': stdout + stderr
                         })
             except Exception as e:
                 result['failed'] += 1

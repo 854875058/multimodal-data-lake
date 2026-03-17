@@ -50,7 +50,7 @@ export default function SearchPage() {
     source_path: 'seaweedfs://multimodal/lance_vectors',
     file_format: 'lance',
     schema: 'federated',
-    comment: 'Lance 向量外表示例'
+    comment: 'Lance 向量外表'
   })
   const [creatingExternalTable, setCreatingExternalTable] = useState(false)
   const [nlPrompt, setNlPrompt] = useState('查询最近导入的图片资产')
@@ -250,7 +250,7 @@ export default function SearchPage() {
           <div className="card-header">
             <div>
               <h2>Doris 连接配置</h2>
-              <p>用于联邦查询、外表创建和 SQL 演示执行。</p>
+              <p>用于联邦查询、外表创建和 SQL 执行。</p>
             </div>
             {dorisStatus ? <span className={`badge ${dorisStatus.connected ? 'is-success' : 'is-warning'}`}>{dorisStatus.mode}</span> : null}
           </div>
@@ -361,7 +361,7 @@ export default function SearchPage() {
               {executingSql ? '执行中...' : '执行 SQL'}
             </button>
             <button type="button" className="button button-secondary" onClick={() => setSqlQuery('SHOW TABLES;')}>
-              恢复示例
+              恢复默认 SQL
             </button>
           </div>
 

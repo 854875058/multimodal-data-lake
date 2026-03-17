@@ -41,7 +41,7 @@ def _get_ray_client():
         ray_url = os.getenv('RAY_DASHBOARD_URL', 'http://127.0.0.1:8265')
         return JobSubmissionClient(ray_url)
     except ImportError:
-        logger.warning("Ray 未安装，使用模拟模式")
+        logger.warning("Ray 未安装，当前计算编排不可用")
         return None
     except Exception as e:
         logger.warning(f"Ray 连接失败: {e}")

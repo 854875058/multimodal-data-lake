@@ -324,7 +324,7 @@ export default function ConfigCenterPage() {
           <div className="card-header">
             <div>
               <h2>默认接入模板</h2>
-              <p>统一管理 AI 工作台默认来源、扫描和索引策略，避免每次演示都手工重填。</p>
+              <p>统一管理 AI 工作台默认来源、扫描和索引策略，避免每次接入都手工重填。</p>
             </div>
           </div>
 

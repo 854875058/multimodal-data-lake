@@ -34,7 +34,7 @@ PLATFORM_COMPONENT_HISTORY_KEY = 'platform_component_history'
 
 DEFAULT_PLATFORM_SETTINGS = {
     'gravitino_url': 'http://192.168.11.17:8090',
-    'metalake': 'demo_lake',
+    'metalake': 'multimodal_lake',
     'ray_dashboard_url': 'http://192.168.20.2:8265',
     'seaweedfs_master_url': 'http://192.168.20.2:9333',
     'seaweedfs_s3_url': 'http://192.168.20.4:8333',
@@ -95,8 +95,8 @@ CATALOG_BLUEPRINT = {
             'federated': {
                 'label': 'Federated SQL',
                 'tables': [
-                    {'name': 'seaweedfs_external_table', 'engine': 'Doris', 'description': 'SeaweedFS 外表示例'},
-                    {'name': 'lance_vector_table', 'engine': 'Doris', 'description': 'Lance 向量外表示例'},
+                    {'name': 'seaweedfs_external_table', 'engine': 'Doris', 'description': 'SeaweedFS 外表'},
+                    {'name': 'lance_vector_table', 'engine': 'Doris', 'description': 'Lance 向量外表'},
                 ],
             },
             'query_tools': {
@@ -337,7 +337,7 @@ def _request_gravitino(path: str) -> Optional[Dict[str, Any]]:
 
 def _get_live_catalog_items() -> List[Dict[str, Any]]:
     settings = _get_platform_settings()
-    metalake = settings.get('metalake', 'demo_lake')
+    metalake = settings.get('metalake', 'multimodal_lake')
     data = _request_gravitino(f'/api/metalakes/{metalake}/catalogs')
     if not isinstance(data, dict):
         return []
@@ -359,7 +359,7 @@ def _get_live_catalog_items() -> List[Dict[str, Any]]:
 
 def _get_live_schema_items(catalog: str) -> List[Dict[str, Any]]:
     settings = _get_platform_settings()
-    metalake = settings.get('metalake', 'demo_lake')
+    metalake = settings.get('metalake', 'multimodal_lake')
     data = _request_gravitino(f'/api/metalakes/{metalake}/catalogs/{catalog}/schemas')
     if not isinstance(data, dict):
         return []
@@ -380,7 +380,7 @@ def _get_live_schema_items(catalog: str) -> List[Dict[str, Any]]:
 
 def _get_live_table_items(catalog: str, schema: str) -> List[Dict[str, Any]]:
     settings = _get_platform_settings()
-    metalake = settings.get('metalake', 'demo_lake')
+    metalake = settings.get('metalake', 'multimodal_lake')
     data = _request_gravitino(f'/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables')
     if not isinstance(data, dict):
         return []
@@ -403,7 +403,7 @@ def _get_live_table_items(catalog: str, schema: str) -> List[Dict[str, Any]]:
 
 def _get_live_table_detail(catalog: str, schema: str, table: str) -> Optional[Dict[str, Any]]:
     settings = _get_platform_settings()
-    metalake = settings.get('metalake', 'demo_lake')
+    metalake = settings.get('metalake', 'multimodal_lake')
     data = _request_gravitino(f'/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}')
     if not isinstance(data, dict):
         return None
@@ -668,7 +668,7 @@ def _build_component_status(component_id: str = '') -> List[Dict[str, Any]]:
             'Gravitino',
             settings.get('gravitino_url', ''),
             paths=['/api/version', ''],
-            note=f"Metalake: {settings.get('metalake', 'demo_lake')}",
+            note=f"Metalake: {settings.get('metalake', 'multimodal_lake')}",
         ),
         _probe_http_component(
             'ray',
@@ -1214,7 +1214,7 @@ def _guess_sql_from_prompt(prompt: str) -> str:
 @router.post('/doris/nl2sql')
 async def nl_to_sql(payload: NaturalLanguagePayload):
     sql = _guess_sql_from_prompt(payload.prompt)
-    reasoning = '已根据关键词将自然语言映射到本地可执行的演示 SQL。'
+    reasoning = '已根据关键词将自然语言映射到当前可执行 SQL。'
     return {'success': True, 'sql': sql, 'reasoning': reasoning}
 
 

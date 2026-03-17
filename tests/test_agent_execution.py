@@ -124,6 +124,30 @@ def test_local_task_executor_disables_mock_fallback():
         assert 'use_mock: false' in config_content
 
 
+def test_local_task_executor_sanitizes_demo_copy():
+    from agents.task_executor import LocalTaskExecutor
+
+    with local_tempdir() as repo_root:
+        build_fake_repo(repo_root)
+        write_text(repo_root / 'backend' / 'api' / 'platform.py', "'metalake': 'demo_lake',\nsettings.get('metalake', 'demo_lake')\nSeaweedFS 外表示例\nLance 向量外表示例\n已根据关键词将自然语言映射到本地可执行的演示 SQL。\n")
+        write_text(repo_root / 'backend' / 'api' / 'ray_compute.py', 'logger.warning(\"Ray 未安装，使用模拟模式\")\n')
+        write_text(repo_root / 'frontend' / 'src' / 'App.jsx', '手工上传、批量接入与演示入湖入口\n')
+        write_text(repo_root / 'frontend' / 'src' / 'pages' / 'SearchPage.jsx', "comment: 'Lance 向量外表示例'\n用于联邦查询、外表创建和 SQL 演示执行。\n恢复示例\n")
+        write_text(repo_root / 'frontend' / 'src' / 'pages' / 'WorkflowCenterPage.jsx', '减少每次重新手拼节点导致的演示不稳定。\n')
+        write_text(repo_root / 'frontend' / 'src' / 'pages' / 'DashboardPage.jsx', '避免成为商业化演示短板。\n当前平台还不具备稳定商业演示状态。\n')
+        write_text(repo_root / 'frontend' / 'src' / 'pages' / 'IngestionWorkbenchPage.jsx', '降低演示过程中的解释成本。\nplaceholder=\"demo-bucket\"\n')
+        write_text(repo_root / 'frontend' / 'src' / 'pages' / 'ConfigCenterPage.jsx', '避免每次演示都手工重填。\n')
+
+        executor = LocalTaskExecutor(repo_root)
+        task = {'id': 4, 'title': '去除产品界面和平台默认值中的 demo 文案'}
+        result = executor.execute(task)
+
+        assert result['status'] == 'implemented'
+        assert 'multimodal_lake' in (repo_root / 'backend' / 'api' / 'platform.py').read_text(encoding='utf-8')
+        assert '恢复默认 SQL' in (repo_root / 'frontend' / 'src' / 'pages' / 'SearchPage.jsx').read_text(encoding='utf-8')
+        assert 'multimodal-lake-bucket' in (repo_root / 'frontend' / 'src' / 'pages' / 'IngestionWorkbenchPage.jsx').read_text(encoding='utf-8')
+
+
 def test_brain_agent_syncs_user_requests_into_task_queue():
     from agents.brain_agent import BrainAgent
     from agents.request_store import create_request, load_requests

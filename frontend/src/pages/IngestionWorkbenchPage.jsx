@@ -565,7 +565,7 @@ export default function IngestionWorkbenchPage() {
     {
       title: '来源合同',
       copy: form.source_type === 's3'
-        ? '统一描述 SeaweedFS / S3 来源、扫描范围和可复用配置，降低演示过程中的解释成本。'
+        ? '统一描述 SeaweedFS / S3 来源、扫描范围和可复用配置，降低接入过程中的解释成本。'
         : '保留 SFTP 作为补充接入路径，但整体展示仍以对象存储和 Lance 为主线。'
     },
     {
@@ -1191,7 +1191,7 @@ export default function IngestionWorkbenchPage() {
 
               <div className="field">
                 <label htmlFor="bucket_name">Bucket</label>
-                <input id="bucket_name" name="bucket_name" className="input" value={form.bucket_name} onChange={handleInputChange} placeholder="demo-bucket" />
+                <input id="bucket_name" name="bucket_name" className="input" value={form.bucket_name} onChange={handleInputChange} placeholder="multimodal-lake-bucket" />
               </div>
 
               <div className="field">

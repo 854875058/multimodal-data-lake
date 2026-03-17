@@ -153,6 +153,24 @@ class BrainAgent(BaseAgent):
                 priority=3,
             )
 
+        product_copy_targets = [
+            project_root / "backend" / "api" / "platform.py",
+            project_root / "backend" / "api" / "ray_compute.py",
+            project_root / "frontend" / "src" / "App.jsx",
+            project_root / "frontend" / "src" / "pages" / "SearchPage.jsx",
+            project_root / "frontend" / "src" / "pages" / "WorkflowCenterPage.jsx",
+            project_root / "frontend" / "src" / "pages" / "DashboardPage.jsx",
+            project_root / "frontend" / "src" / "pages" / "IngestionWorkbenchPage.jsx",
+            project_root / "frontend" / "src" / "pages" / "ConfigCenterPage.jsx",
+        ]
+        demo_markers = ['演示', '示例', 'demo_', 'demo-bucket', 'demo_lake', '模拟模式']
+        if any(path.exists() and any(marker in path.read_text(encoding='utf-8') for marker in demo_markers) for path in product_copy_targets):
+            add_architecture_task(
+                "去除产品界面和平台默认值中的 demo 文案",
+                "产品界面和平台默认配置里仍残留演示、示例、demo_lake、demo-bucket 等措辞，需要统一替换为正式产品文案。",
+                priority=4,
+            )
+
         self.log_action("analyze_project", analysis)
         return analysis
 
@@ -259,6 +277,24 @@ class BrainAgent(BaseAgent):
                 '把 Mock 开关语义改成仅供内部调试。'
             ])
             notes.append('这是数据湖产品去 demo 化的重要一步。')
+        elif 'demo' in lower_title or '示例' in title or '演示' in title:
+            add_path('backend', 'api', 'platform.py')
+            add_path('backend', 'api', 'ray_compute.py')
+            add_path('frontend', 'src', 'App.jsx')
+            add_path('frontend', 'src', 'pages', 'SearchPage.jsx')
+            add_path('frontend', 'src', 'pages', 'WorkflowCenterPage.jsx')
+            add_path('frontend', 'src', 'pages', 'DashboardPage.jsx')
+            add_path('frontend', 'src', 'pages', 'IngestionWorkbenchPage.jsx')
+            add_path('frontend', 'src', 'pages', 'ConfigCenterPage.jsx')
+            validation_steps.extend([
+                '确认产品界面和平台默认值不再出现 demo、示例、演示等措辞。',
+                '运行 npm run build，验证前端页面文案替换后不影响构建。',
+            ])
+            next_actions.extend([
+                '将 demo_lake、demo-bucket 等默认值替换为正式产品命名。',
+                '将产品页面中的示例/演示措辞替换为平台化表述。'
+            ])
+            notes.append('这一步用于持续去 demo 化，让产品对外表述更稳定。')
         elif '真实执行能力' in title:
             add_path('agents', 'code_agent.py')
             add_path('agents', 'test_agent.py')

@@ -107,7 +107,7 @@ export default function WorkflowCenterPage() {
           <div className="platform-roadmap-list">
             <div className="platform-roadmap-item">
               <div className="platform-roadmap-title">先定模板，再调资源</div>
-              <div className="platform-roadmap-copy">优先从预设工作流开始，减少每次重新手拼节点导致的演示不稳定。</div>
+              <div className="platform-roadmap-copy">优先从预设工作流开始，减少每次重新手拼节点导致的平台运行不稳定。</div>
             </div>
             <div className="platform-roadmap-item">
               <div className="platform-roadmap-title">任务治理和编排分离</div>

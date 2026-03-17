@@ -56,6 +56,8 @@ class LocalTaskExecutor:
             return 'cleanup_legacy_architecture_artifacts'
         if 'mock' in lowered and ('关闭' in title or '禁用' in title or '去掉' in title or '去除' in title):
             return 'disable_mock_fallback'
+        if 'demo' in lowered or '示例' in title or '演示' in title:
+            return 'sanitize_demo_copy'
         if '端口' in title or '启动脚本' in title or '启动方式' in title:
             return 'ensure_startup_contract'
         if '真实执行能力' in title:
@@ -137,6 +139,47 @@ class LocalTaskExecutor:
             result,
         )
         result['actions'].append('默认关闭平台 Mock 回退模式，并将该开关降级为内部调试用途。')
+
+    def _handle_sanitize_demo_copy(self, task: Dict[str, Any], result: Dict[str, Any]):
+        file_replacements = {
+            Path('backend/api/platform.py'): [
+                ("'metalake': 'demo_lake',", "'metalake': 'multimodal_lake',"),
+                ("settings.get('metalake', 'demo_lake')", "settings.get('metalake', 'multimodal_lake')"),
+                ('SeaweedFS 外表示例', 'SeaweedFS 外表'),
+                ('Lance 向量外表示例', 'Lance 向量外表'),
+                ('已根据关键词将自然语言映射到本地可执行的演示 SQL。', '已根据关键词将自然语言映射到当前可执行 SQL。'),
+            ],
+            Path('backend/api/ray_compute.py'): [
+                ('logger.warning("Ray 未安装，使用模拟模式")', 'logger.warning("Ray 未安装，当前计算编排不可用")'),
+            ],
+            Path('frontend/src/App.jsx'): [
+                ('手工上传、批量接入与演示入湖入口', '手工上传、批量接入与统一入湖入口'),
+            ],
+            Path('frontend/src/pages/SearchPage.jsx'): [
+                ("comment: 'Lance 向量外表示例'", "comment: 'Lance 向量外表'"),
+                ('用于联邦查询、外表创建和 SQL 演示执行。', '用于联邦查询、外表创建和 SQL 执行。'),
+                ('恢复示例', '恢复默认 SQL'),
+            ],
+            Path('frontend/src/pages/WorkflowCenterPage.jsx'): [
+                ('减少每次重新手拼节点导致的演示不稳定。', '减少每次重新手拼节点导致的平台运行不稳定。'),
+            ],
+            Path('frontend/src/pages/DashboardPage.jsx'): [
+                ('避免成为商业化演示短板。', '避免成为平台稳定性短板。'),
+                ('当前平台还不具备稳定商业演示状态。', '当前平台还不具备稳定生产运行状态。'),
+            ],
+            Path('frontend/src/pages/IngestionWorkbenchPage.jsx'): [
+                ('降低演示过程中的解释成本。', '降低接入过程中的解释成本。'),
+                ('placeholder="demo-bucket"', 'placeholder="multimodal-lake-bucket"'),
+            ],
+            Path('frontend/src/pages/ConfigCenterPage.jsx'): [
+                ('避免每次演示都手工重填。', '避免每次接入都手工重填。'),
+            ],
+        }
+
+        for path, replacements in file_replacements.items():
+            self._replace_in_file(path, replacements, result)
+
+        result['actions'].append('清理产品界面和平台默认值中的 demo/示例/演示 文案。')
 
     def _handle_verify_real_execution_capability(self, task: Dict[str, Any], result: Dict[str, Any]):
         required_paths = [
