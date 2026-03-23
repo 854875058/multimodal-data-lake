@@ -18,10 +18,10 @@ const navGroups = [
     title: '湖管理',
     note: '围绕总览、目录、接入与查询组织湖管理主界面',
     items: [
-      { path: '/dashboard', code: '01', label: '湖总览', tag: 'Overview', description: '多模态数据湖规模、资产态势与关键链路总览' },
-      { path: '/files', code: '02', label: '资产目录', tag: 'Catalog', description: '分层浏览入湖资产、Schema 与样本预览' },
-      { path: '/upload', code: '03', label: '数据接入', tag: 'Ingress', description: '手工上传、批量接入与统一入湖入口' },
-      { path: '/search', code: '04', label: '查询分析', tag: 'Query', description: 'Doris 外表、SQL 分析与语义检索入口' }
+      { path: '/dashboard', code: '01', label: '湖总览', tag: '总览', description: '多模态数据湖规模、资产态势与关键链路总览' },
+      { path: '/files', code: '02', label: '资产目录', tag: '目录', description: '分层浏览入湖资产、Schema 与样本预览' },
+      { path: '/upload', code: '03', label: '数据接入', tag: '接入', description: '手工上传、批量接入与统一入湖入口' },
+      { path: '/search', code: '04', label: '查询分析', tag: '查询', description: 'Doris 外表、SQL 分析与语义检索入口' }
     ]
   },
   {
@@ -29,10 +29,10 @@ const navGroups = [
     title: '湖计算',
     note: '聚焦接入工作台、计算编排与任务治理链路',
     items: [
-      { path: '/workbench', code: '05', label: '接入工作台', tag: 'LakeOps', description: '统一组织来源连接、扫描、索引和接入执行' },
-      { path: '/workflow', code: '06', label: '计算编排', tag: 'Workflow', description: '围绕 Ray、Daft 与任务模板组织计算流程' },
-      { path: '/governance', code: '07', label: '任务治理', tag: 'Ops', description: '跟踪批量任务状态、日志与回填结果' },
-      { path: '/logs', code: '08', label: '系统日志', tag: 'Logs', description: '查看运行日志、诊断线索与系统告警' }
+      { path: '/workbench', code: '05', label: '接入工作台', tag: '工作台', description: '统一组织来源连接、扫描、索引和接入执行' },
+      { path: '/workflow', code: '06', label: '计算编排', tag: '编排', description: '围绕 Ray、Daft 与任务模板组织计算流程' },
+      { path: '/governance', code: '07', label: '任务治理', tag: '治理', description: '跟踪批量任务状态、日志与回填结果' },
+      { path: '/logs', code: '08', label: '系统日志', tag: '日志', description: '查看运行日志、诊断线索与系统告警' }
     ]
   },
   {
@@ -40,9 +40,9 @@ const navGroups = [
     title: '系统配置',
     note: '沉淀账号、接入与权限治理入口，作为平台配置面',
     items: [
-      { path: '/settings/access', code: '09', label: '接入配置', tag: 'Config', description: '统一管理平台连接、接入模板和组件状态卡' },
-      { path: '/settings/users', code: '10', label: '用户管理', tag: 'Users', description: '维护账号、角色和后续用户隔离能力底座' },
-      { path: '/settings/permissions', code: '11', label: '权限管理', tag: 'IAM', description: '整理角色权限、资源范围和审批规则' }
+      { path: '/settings/access', code: '09', label: '接入配置', tag: '配置', description: '统一管理平台连接、接入模板和组件状态卡' },
+      { path: '/settings/users', code: '10', label: '用户管理', tag: '用户', description: '维护账号、角色和后续用户隔离能力底座' },
+      { path: '/settings/permissions', code: '11', label: '权限管理', tag: '权限', description: '整理角色权限、资源范围和审批规则' }
     ]
   }
 ]
@@ -80,8 +80,8 @@ function AppShell() {
         <div className="brand-block">
           <div className="brand-logo">ML</div>
           <div className="brand-copy">
-            <div className="shell-eyebrow">Multimodal Data Lake</div>
-            <div className="brand-title">Lake Control Center</div>
+            <div className="shell-eyebrow">多模态数据湖</div>
+            <div className="brand-title">湖仓控制台</div>
             <div className="brand-subtitle">湖管理 · 湖计算 · 系统配置</div>
           </div>
         </div>
@@ -114,7 +114,7 @@ function AppShell() {
         </nav>
 
         <div className="sidebar-runtime-card">
-          <div className="sidebar-section-label">Control Room</div>
+          <div className="sidebar-section-label">控制室</div>
           <div className="sidebar-runtime-grid">
             <div className="runtime-metric">
               <div className="runtime-metric-label">当前模块</div>
@@ -129,13 +129,13 @@ function AppShell() {
             <div className="runtime-metric is-wide">
               <div className="runtime-metric-label">当前路径</div>
               <div className="runtime-metric-path">{currentNav.path}</div>
-              <div className="runtime-metric-note">Lake control routing</div>
+              <div className="runtime-metric-note">控制台路由定位</div>
             </div>
           </div>
         </div>
 
         <div className="sidebar-foot">
-          <div className="sidebar-section-label">Platform Fabric</div>
+          <div className="sidebar-section-label">平台基座</div>
           <div className="sidebar-pill-row">
             <span className="sidebar-pill">Gravitino</span>
             <span className="sidebar-pill">SeaweedFS</span>
@@ -148,7 +148,7 @@ function AppShell() {
             <span className="sidebar-pill">FastAPI</span>
           </div>
           <div className="sidebar-note">
-            当前界面按湖管理、湖计算、系统配置三组重排，先把控制面收口成白底黑字的湖平台风格。
+            当前界面按湖管理、湖计算、系统配置三组重排，突出控制台主路径、状态信息与模块切换关系。
           </div>
         </div>
       </aside>
@@ -156,29 +156,29 @@ function AppShell() {
       <main className="app-main">
         <section className="shell-toolbar shell-panel">
           <div className="shell-toolbar-main">
-            <div className="shell-toolbar-kicker">Arco-aligned Enterprise Console</div>
-            <div className="shell-toolbar-title">Lake Operations Control Surface</div>
+            <div className="shell-toolbar-kicker">多模态数据湖统一控制面</div>
+            <div className="shell-toolbar-title">湖仓运行控制台</div>
             <div className="shell-toolbar-meta">
               <span className="toolbar-token is-primary">{currentGroup.title}</span>
-              <span className="toolbar-token">Module {currentNav.code}</span>
+              <span className="toolbar-token">模块 {currentNav.code}</span>
               <span className="toolbar-token">{currentNav.path}</span>
             </div>
           </div>
           <div className="shell-toolbar-rail">
             <div className="toolbar-pulse-card">
-              <div className="toolbar-pulse-label">Control Plane</div>
+              <div className="toolbar-pulse-label">控制面</div>
               <div className="toolbar-pulse-value">{String(navItems.length).padStart(2, '0')}</div>
-              <div className="toolbar-pulse-note">功能模块已编排</div>
+              <div className="toolbar-pulse-note">功能模块已编入控制台</div>
             </div>
             <div className="toolbar-pulse-card">
-              <div className="toolbar-pulse-label">Current Group</div>
+              <div className="toolbar-pulse-label">当前分组</div>
               <div className="toolbar-pulse-value">{currentGroup.title}</div>
               <div className="toolbar-pulse-note">企业控制台主分区</div>
             </div>
             <div className="toolbar-pulse-card">
-              <div className="toolbar-pulse-label">Checked</div>
+              <div className="toolbar-pulse-label">巡检日期</div>
               <div className="toolbar-pulse-value">{absoluteDate}</div>
-              <div className="toolbar-pulse-note">控制面巡检日期</div>
+              <div className="toolbar-pulse-note">控制面最近核验日期</div>
             </div>
           </div>
         </section>
@@ -216,14 +216,14 @@ function AppShell() {
 
           <div className="shell-side-panel">
             <div className="shell-brief-card">
-              <div className="shell-stat-label">Console Brief</div>
+              <div className="shell-stat-label">控制台简报</div>
               <div className="shell-brief-title">统一接入、编排、治理与权限控制</div>
               <div className="shell-brief-copy">
-                以更接近 Arco Design 的企业控制台语言重排主壳层：强化层级、收敛色彩、突出状态与路径感。
+                以平台控制面的方式组织导航、状态卡和子路由，减少每个业务页重复承担配置与运行入口。
               </div>
               <div className="shell-brief-metrics">
                 <div className="shell-brief-metric">
-                  <div className="shell-brief-metric-label">Active Route</div>
+                  <div className="shell-brief-metric-label">当前路由</div>
                   <div className="shell-brief-metric-value">{currentNav.path}</div>
                 </div>
                 <div className="shell-brief-metric">
@@ -244,7 +244,7 @@ function AppShell() {
                 <div className="shell-stat-note">当前分组下可切换的功能模块</div>
               </div>
               <div className="shell-stat-card">
-                <div className="shell-stat-label">核心栈</div>
+                <div className="shell-stat-label">技术底座</div>
                 <div className="shell-stat-value">R / F</div>
                 <div className="shell-stat-note">React / FastAPI / Gravitino / Lance</div>
               </div>
