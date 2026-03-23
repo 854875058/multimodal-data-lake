@@ -19,13 +19,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 COMPONENT_ACTION_ROUTES = {
-    'gravitino': '/settings',
-    'ray': '/settings',
-    'seaweedfs_master': '/settings',
-    'seaweedfs_s3': '/settings',
-    'doris': '/settings',
+    'gravitino': '/settings/access',
+    'ray': '/settings/access',
+    'seaweedfs_master': '/settings/access',
+    'seaweedfs_s3': '/settings/access',
+    'doris': '/settings/access',
     'lancedb': '/workbench',
-    'models': '/settings',
+    'models': '/settings/access',
 }
 
 PLATFORM_SETTINGS_KEY = 'platform_service_settings'

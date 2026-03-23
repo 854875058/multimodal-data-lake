@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api, { getErrorMessage } from '@/api'
-import { truncateText } from '@/utils/format'
+import { formatDateTime, truncateText } from '@/utils/format'
 
 function ResultTable({ columns, rows }) {
   if (!Array.isArray(rows) || !rows.length) {
@@ -36,10 +37,26 @@ function ResultTable({ columns, rows }) {
   )
 }
 
+function normalizeDorisStatus(item) {
+  if (!item) {
+    return null
+  }
+
+  return {
+    connected: Boolean(item.online),
+    mode: item.online ? 'live' : 'offline',
+    status: item.status || '',
+    message: item.note || '',
+    endpoint: item.endpoint || '--',
+    latency_ms: item.latency_ms ?? null,
+    probed_at: item.probed_at || ''
+  }
+}
+
 export default function SearchPage() {
+  const navigate = useNavigate()
   const [settings, setSettings] = useState(null)
   const [externalTables, setExternalTables] = useState([])
-  const [savingSettings, setSavingSettings] = useState(false)
   const [testingDoris, setTestingDoris] = useState(false)
   const [dorisStatus, setDorisStatus] = useState(null)
   const [sqlQuery, setSqlQuery] = useState('SHOW TABLES;')
@@ -72,12 +89,15 @@ export default function SearchPage() {
   const loadPageData = async () => {
     setError('')
     try {
-      const [settingsResponse, externalResponse] = await Promise.all([
+      const [settingsResponse, externalResponse, componentResponse] = await Promise.all([
         api.getPlatformSettings(),
-        api.getExternalTables()
+        api.getExternalTables(),
+        api.getPlatformComponentStatus('doris')
       ])
       setSettings(settingsResponse?.data || null)
       setExternalTables(Array.isArray(externalResponse?.items) ? externalResponse.items : [])
+      const componentItem = Array.isArray(componentResponse?.items) ? componentResponse.items[0] : null
+      setDorisStatus(normalizeDorisStatus(componentItem))
     } catch (requestError) {
       setError(getErrorMessage(requestError, '加载 Doris 查询台配置失败。'))
     }
@@ -87,27 +107,6 @@ export default function SearchPage() {
     loadPageData()
   }, [])
 
-  const updateSetting = (key, value) => {
-    setSettings((current) => ({ ...(current || {}), [key]: value }))
-  }
-
-  const handleSaveSettings = async () => {
-    if (!settings) {
-      return
-    }
-    setSavingSettings(true)
-    setError('')
-    try {
-      const response = await api.savePlatformSettings(settings)
-      setSettings((current) => ({ ...(current || {}), ...(response?.data || {}) }))
-      setBanner({ type: 'success', message: response?.message || '平台配置已保存。' })
-    } catch (requestError) {
-      setError(getErrorMessage(requestError, '保存平台配置失败。'))
-    } finally {
-      setSavingSettings(false)
-    }
-  }
-
   const handleTestDoris = async () => {
     if (!settings) {
       return
@@ -116,7 +115,21 @@ export default function SearchPage() {
     setError('')
     try {
       const response = await api.testDorisConnection(settings)
-      setDorisStatus(response || null)
+      const componentResponse = await api.getPlatformComponentStatus('doris')
+      const componentItem = Array.isArray(componentResponse?.items) ? componentResponse.items[0] : null
+      setDorisStatus(
+        componentItem
+          ? normalizeDorisStatus(componentItem)
+          : {
+              connected: Boolean(response?.connected),
+              mode: response?.mode || '',
+              status: response?.connected ? '在线' : '离线',
+              message: response?.message || '',
+              endpoint: settings?.doris_mysql_host ? `${settings.doris_mysql_host}:${settings.doris_mysql_port || 9030}` : '--',
+              latency_ms: null,
+              probed_at: ''
+            }
+      )
       setBanner({ type: response?.connected ? 'success' : 'warning', message: response?.message || '连接测试完成。' })
     } catch (requestError) {
       setError(getErrorMessage(requestError, '测试 Doris 连接失败。'))
@@ -233,6 +246,9 @@ export default function SearchPage() {
     }
   }
 
+  const dorisEndpoint = settings?.doris_mysql_host ? `${settings.doris_mysql_host}:${settings.doris_mysql_port || 9030}` : '--'
+  const dorisPasswordStatus = settings?.doris_password ? '已配置' : '未配置'
+
   return (
     <div className="content-wrap">
       <div className="page-header">
@@ -249,42 +265,57 @@ export default function SearchPage() {
         <section className="glass-card">
           <div className="card-header">
             <div>
-              <h2>Doris 连接配置</h2>
-              <p>用于联邦查询、外表创建和 SQL 执行。</p>
+              <h2>Doris 连接状态</h2>
+              <p>Doris 连接参数已统一收口到“接入配置”，查询台只消费已保存配置并负责联邦查询执行。</p>
             </div>
-            {dorisStatus ? <span className={`badge ${dorisStatus.connected ? 'is-success' : 'is-warning'}`}>{dorisStatus.mode}</span> : null}
+            {dorisStatus ? <span className={`badge ${dorisStatus.connected ? 'is-success' : 'is-warning'}`}>{dorisStatus.status || dorisStatus.mode}</span> : null}
           </div>
 
-          <div className="query-settings-grid">
-            <div className="field">
-              <label htmlFor="doris_http_url">Doris HTTP</label>
-              <input id="doris_http_url" className="input" value={settings?.doris_http_url || ''} onChange={(event) => updateSetting('doris_http_url', event.target.value)} />
+          <div className="detail-grid">
+            <div className="detail-item">
+              <div className="kpi-label">配置归口</div>
+              <div className="detail-value">接入配置</div>
             </div>
-            <div className="field">
-              <label htmlFor="doris_mysql_host">MySQL Host</label>
-              <input id="doris_mysql_host" className="input" value={settings?.doris_mysql_host || ''} onChange={(event) => updateSetting('doris_mysql_host', event.target.value)} />
+            <div className="detail-item">
+              <div className="kpi-label">Doris HTTP</div>
+              <div className="detail-value mono">{settings?.doris_http_url || '--'}</div>
             </div>
-            <div className="field">
-              <label htmlFor="doris_mysql_port">MySQL Port</label>
-              <input id="doris_mysql_port" className="input" type="number" value={settings?.doris_mysql_port || 9030} onChange={(event) => updateSetting('doris_mysql_port', Number(event.target.value || 9030))} />
+            <div className="detail-item">
+              <div className="kpi-label">MySQL 地址</div>
+              <div className="detail-value mono">{dorisEndpoint}</div>
             </div>
-            <div className="field">
-              <label htmlFor="doris_database">Database</label>
-              <input id="doris_database" className="input" value={settings?.doris_database || ''} onChange={(event) => updateSetting('doris_database', event.target.value)} />
+            <div className="detail-item">
+              <div className="kpi-label">Database</div>
+              <div className="detail-value">{settings?.doris_database || '--'}</div>
             </div>
-            <div className="field">
-              <label htmlFor="doris_user">User</label>
-              <input id="doris_user" className="input" value={settings?.doris_user || ''} onChange={(event) => updateSetting('doris_user', event.target.value)} />
+            <div className="detail-item">
+              <div className="kpi-label">User</div>
+              <div className="detail-value">{settings?.doris_user || '--'}</div>
             </div>
-            <div className="field">
-              <label htmlFor="doris_password">Password</label>
-              <input id="doris_password" className="input" type="password" value={settings?.doris_password || ''} onChange={(event) => updateSetting('doris_password', event.target.value)} />
+            <div className="detail-item">
+              <div className="kpi-label">Password</div>
+              <div className="detail-value">{dorisPasswordStatus}</div>
+            </div>
+            <div className="detail-item">
+              <div className="kpi-label">最近探测</div>
+              <div className="detail-value">{dorisStatus?.probed_at ? formatDateTime(dorisStatus.probed_at) : '--'}</div>
+            </div>
+            <div className="detail-item">
+              <div className="kpi-label">探测说明</div>
+              <div className="detail-value">{dorisStatus?.message || '尚未进行探测'}</div>
+            </div>
+            <div className="detail-item">
+              <div className="kpi-label">延迟</div>
+              <div className="detail-value">{Number.isFinite(dorisStatus?.latency_ms) ? `${dorisStatus.latency_ms} ms` : '--'}</div>
             </div>
           </div>
 
           <div className="toolbar-group">
-            <button type="button" className="button button-primary" onClick={handleSaveSettings} disabled={savingSettings}>
-              {savingSettings ? '保存中...' : '保存配置'}
+            <button type="button" className="button button-primary" onClick={() => navigate('/settings/access')}>
+              前往接入配置
+            </button>
+            <button type="button" className="button button-secondary" onClick={loadPageData}>
+              刷新配置
             </button>
             <button type="button" className="button button-secondary" onClick={handleTestDoris} disabled={testingDoris}>
               {testingDoris ? '测试中...' : '测试 Doris 连接'}
