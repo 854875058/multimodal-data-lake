@@ -967,9 +967,9 @@ export default function IngestionWorkbenchPage() {
     <div className="content-wrap">
       <div className="page-header">
         <div>
-          <h1 className="page-title">AI 工作台</h1>
+          <h1 className="page-title">接入工作台</h1>
           <p className="page-subtitle">
-            配置 SeaweedFS / S3 或 SFTP 来源，扫描待处理文件，并围绕 Lance 向量化与批量任务执行组织接入流程。
+            配置 SeaweedFS / S3 或 SFTP 来源，扫描待处理文件，并围绕 Lance 向量化与批量任务执行组织接入流程。本地文件或压缩包上传请前往“本地上传”。
           </p>
         </div>
         <div className="page-actions">

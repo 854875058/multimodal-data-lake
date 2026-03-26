@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { NavLink } from 'react-router-dom'
 import api, { getErrorMessage } from '@/api'
 import { formatBytes } from '@/utils/format'
 
@@ -100,8 +101,13 @@ export default function UploadPage() {
     <div className="content-wrap">
       <div className="page-header">
         <div>
-          <h1 className="page-title">数据接入</h1>
-          <p className="page-subtitle">支持批量上传文本、图片、音频、视频等多模态文件，作为资产浏览和 AI 工作台的手动接入入口。</p>
+          <h1 className="page-title">本地上传</h1>
+          <p className="page-subtitle">支持批量上传本地文本、图片、音频、视频与压缩包文件，作为离线材料的快速入湖入口。S3 / SeaweedFS 与 SFTP 来源接入请使用“接入工作台”。</p>
+        </div>
+        <div className="page-actions">
+          <NavLink to="/workbench" className="button button-secondary">
+            前往接入工作台
+          </NavLink>
         </div>
       </div>
 
@@ -133,7 +139,7 @@ export default function UploadPage() {
         >
           <div className="upload-icon">FILES</div>
           <h2>拖拽文件到这里，或点击选择文件</h2>
-          <p>支持 `txt`、`pdf`、`docx`、`pptx`、`jpg`、`png`、`mp3`、`wav`、`mp4` 等格式。</p>
+          <p>支持 `txt`、`pdf`、`docx`、`pptx`、`jpg`、`png`、`mp3`、`wav`、`mp4`、`zip`、`tar`、`gz`、`tgz` 等格式。</p>
           <button type="button" className="button button-primary">选择文件</button>
           <input ref={inputRef} type="file" multiple className="hidden-input" onChange={handleInputChange} />
         </div>

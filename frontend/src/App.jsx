@@ -41,8 +41,8 @@ const navGroups = [
     title: '湖存储',
     note: '接入、上传与存储配置',
     items: [
-      { path: '/workbench', code: '07', label: '接入工作台', tag: '工作台', description: '来源连接、扫描与入湖' },
-      { path: '/upload', code: '08', label: '手动上传', tag: '上传', description: '单次文件上传入湖' },
+      { path: '/workbench', code: '07', label: '接入工作台', tag: '工作台', description: 'S3、SFTP 与批量入湖' },
+      { path: '/upload', code: '08', label: '本地上传', tag: '上传', description: '本地文件与压缩包上传' },
       { path: '/settings/access', code: '09', label: '接入配置', tag: '配置', description: '连接参数与默认模板' }
     ]
   }
