@@ -14,9 +14,9 @@ import WorkflowCenterPage from './pages/WorkflowCenterPage.jsx'
 
 const navGroups = [
   {
-    key: 'lake-management',
-    title: '湖管理',
-    note: '围绕总览、目录、接入与查询组织湖管理主界面',
+    key: 'data-lake',
+    title: '数据湖',
+    note: '围绕总览、目录、接入与查询组织数据湖主界面',
     items: [
       { path: '/dashboard', code: '01', label: '湖总览', tag: '总览', description: '多模态数据湖规模、资产态势与关键链路总览' },
       { path: '/files', code: '02', label: '资产目录', tag: '目录', description: '分层浏览入湖资产、Schema 与样本预览' },
@@ -25,21 +25,21 @@ const navGroups = [
     ]
   },
   {
-    key: 'lake-compute',
-    title: '湖计算',
-    note: '聚焦接入工作台、计算编排与任务治理链路',
+    key: 'task-center',
+    title: '任务中心',
+    note: '聚焦接入执行、计算编排与任务治理链路',
     items: [
       { path: '/workbench', code: '05', label: '接入工作台', tag: '工作台', description: '统一组织来源连接、扫描、索引和接入执行' },
-      { path: '/workflow', code: '06', label: '计算编排', tag: '编排', description: '围绕 Ray、Daft 与任务模板组织计算流程' },
-      { path: '/governance', code: '07', label: '任务治理', tag: '治理', description: '跟踪批量任务状态、日志与回填结果' },
-      { path: '/logs', code: '08', label: '系统日志', tag: '日志', description: '查看运行日志、诊断线索与系统告警' }
+      { path: '/workflow', code: '06', label: '工作流编排', tag: '编排', description: '围绕 Ray、Daft 与任务模板组织计算流程' },
+      { path: '/governance', code: '07', label: '任务治理', tag: '治理', description: '跟踪批量任务状态、执行回填与任务结果' }
     ]
   },
   {
-    key: 'system-config',
-    title: '系统配置',
-    note: '沉淀账号、接入与权限治理入口，作为平台配置面',
+    key: 'platform-admin',
+    title: '平台管理',
+    note: '统一承接平台配置、账号权限与系统运维入口',
     items: [
+      { path: '/logs', code: '08', label: '系统日志', tag: '日志', description: '查看运行日志、诊断线索、系统告警与巡检状态' },
       { path: '/settings/access', code: '09', label: '接入配置', tag: '配置', description: '统一管理平台连接、接入模板和组件状态卡' },
       { path: '/settings/users', code: '10', label: '用户管理', tag: '用户', description: '维护账号、角色和后续用户隔离能力底座' },
       { path: '/settings/permissions', code: '11', label: '权限管理', tag: '权限', description: '整理角色权限、资源范围和审批规则' }
@@ -82,7 +82,7 @@ function AppShell() {
           <div className="brand-copy">
             <div className="shell-eyebrow">多模态数据湖</div>
             <div className="brand-title">湖仓控制台</div>
-            <div className="brand-subtitle">湖管理 · 湖计算 · 系统配置</div>
+            <div className="brand-subtitle">数据湖 · 任务中心 · 平台管理</div>
           </div>
         </div>
 
@@ -148,7 +148,7 @@ function AppShell() {
             <span className="sidebar-pill">FastAPI</span>
           </div>
           <div className="sidebar-note">
-            当前界面按湖管理、湖计算、系统配置三组重排，突出控制台主路径、状态信息与模块切换关系。
+            当前界面按数据湖、任务中心、平台管理三组重排，突出控制台主路径、状态信息与模块切换关系。
           </div>
         </div>
       </aside>
@@ -217,9 +217,9 @@ function AppShell() {
           <div className="shell-side-panel">
             <div className="shell-brief-card">
               <div className="shell-stat-label">控制台简报</div>
-              <div className="shell-brief-title">统一接入、编排、治理与权限控制</div>
+              <div className="shell-brief-title">统一接入、任务协同与平台治理</div>
               <div className="shell-brief-copy">
-                以平台控制面的方式组织导航、状态卡和子路由，减少每个业务页重复承担配置与运行入口。
+                以平台控制面的方式组织导航、状态卡和子路由，让业务操作、任务执行与系统管理各归其位。
               </div>
               <div className="shell-brief-metrics">
                 <div className="shell-brief-metric">
