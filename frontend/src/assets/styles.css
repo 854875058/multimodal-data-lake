@@ -1547,6 +1547,51 @@ pre {
   gap: 12px;
 }
 
+.ingest-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ingest-entry-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ingest-entry-card.is-current {
+  background:
+    linear-gradient(180deg, rgba(22, 93, 255, 0.06), rgba(22, 93, 255, 0.015)),
+    #ffffff;
+  border-color: rgba(22, 93, 255, 0.18);
+}
+
+.ingest-entry-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ingest-entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ingest-entry-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #f7f8fa;
+  border: 1px solid #eef0f3;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.ingest-entry-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .upload-dropzone {
   position: relative;
   overflow: hidden;
@@ -1614,6 +1659,15 @@ pre {
   flex-wrap: wrap;
   color: var(--text-secondary);
   font-size: 0.92rem;
+}
+
+.upload-mode-note {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(22, 93, 255, 0.06);
+  border: 1px solid rgba(22, 93, 255, 0.14);
+  color: var(--text-secondary);
+  line-height: 1.68;
 }
 
 .progress-block {
@@ -2976,6 +3030,7 @@ pre {
   .platform-capability-grid,
   .governance-summary-grid,
   .dashboard-pulse-row,
+  .ingest-entry-grid,
   .catalog-selectors,
   .query-settings-grid,
   .catalog-preview-actions,

@@ -979,6 +979,53 @@ export default function IngestionWorkbenchPage() {
         </div>
       </div>
 
+      <div className="ingest-entry-grid">
+        <section className="glass-card ingest-entry-card is-current">
+          <div className="card-header">
+            <div>
+              <h2>当前页负责什么</h2>
+              <p>这里处理的是来源级接入，不是本地文件直传页。</p>
+            </div>
+            <span className="badge">Workbench</span>
+          </div>
+          <div className="ingest-entry-tags">
+            <span className="badge is-muted">S3 / SeaweedFS</span>
+            <span className="badge is-muted">SFTP</span>
+            <span className="badge is-muted">批量任务</span>
+          </div>
+          <div className="ingest-entry-list">
+            <div className="ingest-entry-item">适合：远程来源连接、目录扫描、批量入湖、索引构建与配置复用。</div>
+            <div className="ingest-entry-item">流程：先连来源，再扫描，再决定批量执行与索引策略。</div>
+            <div className="ingest-entry-item">优势：接入配置可保存，后续重复执行不用每次重新填参数。</div>
+          </div>
+        </section>
+
+        <section className="glass-card ingest-entry-card">
+          <div className="card-header">
+            <div>
+              <h2>什么情况不要用这里</h2>
+              <p>如果数据已经在本机，只想直接拖拽上传，就没必要绕到工作台。</p>
+            </div>
+            <span className="badge">Local</span>
+          </div>
+          <div className="ingest-entry-tags">
+            <span className="badge is-muted">本地文件</span>
+            <span className="badge is-muted">压缩包</span>
+            <span className="badge is-muted">快速入湖</span>
+          </div>
+          <div className="ingest-entry-list">
+            <div className="ingest-entry-item">适合：本地文件、离线材料、压缩包一次性上传。</div>
+            <div className="ingest-entry-item">本地上传页同样支持批量文件与压缩包，不需要先建远程来源。</div>
+            <div className="ingest-entry-item">如果只是把本机文件拖进去，直接去“本地上传”会更短更清楚。</div>
+          </div>
+          <div className="ingest-entry-actions">
+            <button type="button" className="button button-secondary" onClick={() => navigate('/upload')}>
+              前往本地上传
+            </button>
+          </div>
+        </section>
+      </div>
+
       {banner.message ? <div className={`${banner.type}-banner`}>{banner.message}</div> : null}
       {error ? <div className="error-banner">{error}</div> : null}
 

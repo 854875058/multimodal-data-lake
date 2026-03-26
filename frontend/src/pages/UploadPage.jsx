@@ -111,6 +111,53 @@ export default function UploadPage() {
         </div>
       </div>
 
+      <div className="ingest-entry-grid">
+        <section className="glass-card ingest-entry-card is-current">
+          <div className="card-header">
+            <div>
+              <h2>什么时候用本地上传</h2>
+              <p>适合你已经拿到本机文件，想直接拖拽上传并快速入湖的场景。</p>
+            </div>
+            <span className="badge">Local</span>
+          </div>
+          <div className="ingest-entry-tags">
+            <span className="badge is-muted">批量文件</span>
+            <span className="badge is-muted">压缩包</span>
+            <span className="badge is-muted">离线材料</span>
+          </div>
+          <div className="ingest-entry-list">
+            <div className="ingest-entry-item">适合：本地临时文件、离线交付件、压缩包直接导入。</div>
+            <div className="ingest-entry-item">支持：`zip / tar / gz / tgz` 压缩包会在服务端自动解包后继续处理。</div>
+            <div className="ingest-entry-item">不适合：需要保存远程来源连接、先扫描目录再批量入湖的场景。</div>
+          </div>
+        </section>
+
+        <section className="glass-card ingest-entry-card">
+          <div className="card-header">
+            <div>
+              <h2>什么时候用接入工作台</h2>
+              <p>适合来源级接入，而不是单次上传动作。</p>
+            </div>
+            <span className="badge">Source</span>
+          </div>
+          <div className="ingest-entry-tags">
+            <span className="badge is-muted">S3 / SeaweedFS</span>
+            <span className="badge is-muted">SFTP</span>
+            <span className="badge is-muted">批量扫描</span>
+          </div>
+          <div className="ingest-entry-list">
+            <div className="ingest-entry-item">适合：远程目录、对象存储、来源连接复用、扫描后再执行批量入湖。</div>
+            <div className="ingest-entry-item">支持：保存连接配置、扫描待处理对象、批量任务执行与索引构建。</div>
+            <div className="ingest-entry-item">如果数据还在 SFTP 或对象存储里，不要先手动下载到本地再回来上传。</div>
+          </div>
+          <div className="ingest-entry-actions">
+            <NavLink to="/workbench" className="button button-secondary">
+              去接入工作台
+            </NavLink>
+          </div>
+        </section>
+      </div>
+
       <div className="glass-card upload-card">
         <div
           className={`upload-dropzone${dragging ? ' is-dragging' : ''}`}
@@ -147,6 +194,10 @@ export default function UploadPage() {
         <div className="upload-meta">
           <span>已选文件 {selectedFiles.length} 个</span>
           <span>总大小 {formatBytes(totalSize)}</span>
+        </div>
+
+        <div className="upload-mode-note">
+          当前页处理的是本地文件直传。若你需要连接 S3 / SeaweedFS 或 SFTP、先扫描目录、复用接入模板，再执行批量任务，请切换到“接入工作台”。
         </div>
 
         {progress > 0 ? (
