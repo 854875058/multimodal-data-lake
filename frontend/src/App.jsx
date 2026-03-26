@@ -17,38 +17,46 @@ import WorkflowCenterPage from './pages/WorkflowCenterPage.jsx'
 
 const navGroups = [
   {
-    key: 'data-lake',
-    title: '数据湖',
-    note: '围绕总览、目录、接入与查询组织数据湖主界面',
+    key: 'lake-overview',
+    title: '湖总览',
+    note: '概览、目录与运行态势',
     items: [
-      { path: '/dashboard', code: '01', label: '湖总览', tag: '总览', description: '多模态数据湖规模、资产态势与关键链路总览' },
-      { path: '/files', code: '02', label: '资产目录', tag: '目录', description: '分层浏览入湖资产、Schema 与样本预览' },
-      { path: '/upload', code: '03', label: '数据接入', tag: '接入', description: '手工上传、批量接入与统一入湖入口' },
-      { path: '/search', code: '04', label: '查询分析', tag: '查询', description: 'Doris 外表、SQL 分析与语义检索入口' }
+      { path: '/dashboard', code: '01', label: '湖总览', tag: '总览', description: '指标总览与运行态势' },
+      { path: '/files', code: '02', label: '资产目录', tag: '目录', description: '分层浏览入湖资产' },
+      { path: '/logs', code: '03', label: '系统日志', tag: '日志', description: '日志诊断与巡检视图' }
     ]
   },
   {
-    key: 'task-center',
-    title: '任务中心',
-    note: '聚焦接入执行、计算编排与任务治理链路',
+    key: 'lake-compute',
+    title: '湖计算',
+    note: '查询、编排与任务治理',
     items: [
-      { path: '/workbench', code: '05', label: '接入工作台', tag: '工作台', description: '统一组织来源连接、扫描、索引和接入执行' },
-      { path: '/workflow', code: '06', label: '工作流编排', tag: '编排', description: '围绕 Ray、Daft 与任务模板组织计算流程' },
-      { path: '/governance', code: '07', label: '任务治理', tag: '治理', description: '跟踪批量任务状态、执行回填与任务结果' }
+      { path: '/search', code: '04', label: '查询分析', tag: '查询', description: 'SQL 与语义检索' },
+      { path: '/workflow', code: '05', label: '工作流编排', tag: '编排', description: '流程模板与资源编排' },
+      { path: '/governance', code: '06', label: '任务治理', tag: '治理', description: '作业状态与执行回填' }
     ]
   },
   {
-    key: 'platform-admin',
-    title: '平台管理',
-    note: '统一承接平台配置、账号权限与系统运维入口',
+    key: 'lake-storage',
+    title: '湖存储',
+    note: '接入、上传与存储配置',
     items: [
-      { path: '/logs', code: '08', label: '系统日志', tag: '日志', description: '查看运行日志、诊断线索、系统告警与巡检状态' },
-      { path: '/settings/access', code: '09', label: '接入配置', tag: '配置', description: '统一管理平台连接、接入模板和组件状态卡' },
-      { path: '/settings/users', code: '10', label: '用户管理', tag: '用户', description: '维护账号、角色和后续用户隔离能力底座', requiresAdmin: true },
-      { path: '/settings/permissions', code: '11', label: '权限管理', tag: '权限', description: '整理角色权限、资源范围和审批规则', requiresAdmin: true }
+      { path: '/workbench', code: '07', label: '接入工作台', tag: '工作台', description: '来源连接、扫描与入湖' },
+      { path: '/upload', code: '08', label: '手动上传', tag: '上传', description: '单次文件上传入湖' },
+      { path: '/settings/access', code: '09', label: '接入配置', tag: '配置', description: '连接参数与默认模板' }
     ]
   }
 ]
+
+const adminGroup = {
+  key: 'admin-tools',
+  title: '管理入口',
+  note: '账号、角色与权限控制',
+  items: [
+    { path: '/settings/users', code: '10', label: '用户管理', tag: '用户', description: '账号与启停状态', requiresAdmin: true },
+    { path: '/settings/permissions', code: '11', label: '权限管理', tag: '权限', description: '角色与授权范围', requiresAdmin: true }
+  ]
+}
 
 const navItems = navGroups.flatMap((group) =>
   group.items.map((item) => ({
@@ -58,6 +66,22 @@ const navItems = navGroups.flatMap((group) =>
     groupNote: group.note
   }))
 )
+
+const adminNavItems = adminGroup.items.map((item) => ({
+  ...item,
+  groupKey: adminGroup.key,
+  groupTitle: adminGroup.title,
+  groupNote: adminGroup.note
+}))
+
+const allNavItems = [...navItems, ...adminNavItems]
+
+const navGroupsByKey = [...navGroups, adminGroup].reduce((acc, group) => {
+  acc[group.key] = group
+  return acc
+}, {})
+
+const primaryNavItems = navItems
 
 function buildIntentPath(location) {
   return `${location.pathname}${location.search || ''}`
@@ -126,10 +150,10 @@ function RequireAdmin({ user, children }) {
 function AppShell({ authSession, onLogout }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const currentNav = navItems.find(
+  const currentNav = allNavItems.find(
     (item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
-  ) || navItems[0]
-  const currentGroup = navGroups.find((group) => group.key === currentNav.groupKey) || navGroups[0]
+  ) || primaryNavItems[0]
+  const currentGroup = navGroupsByKey[currentNav.groupKey] || navGroups[0]
   const checkedDate = new Intl.DateTimeFormat('zh-CN', {
     month: '2-digit',
     day: '2-digit',
@@ -143,6 +167,8 @@ function AppShell({ authSession, onLogout }) {
   const highlightedModules = currentGroup.items.slice(0, 4)
   const currentUser = authSession.user
   const roleLabel = currentUser?.is_admin ? '系统管理员' : '平台用户'
+  const showAdminLinks = Boolean(currentUser?.is_admin)
+  const visibleItemCount = currentGroup.items.length
 
   const handleLogoutClick = () => {
     onLogout()
@@ -157,7 +183,7 @@ function AppShell({ authSession, onLogout }) {
           <div className="brand-copy">
             <div className="shell-eyebrow">多模态数据湖</div>
             <div className="brand-title">湖仓控制台</div>
-            <div className="brand-subtitle">数据湖 · 任务中心 · 平台管理</div>
+            <div className="brand-subtitle">湖总览 · 湖计算 · 湖存储</div>
           </div>
         </div>
 
@@ -178,7 +204,6 @@ function AppShell({ authSession, onLogout }) {
                       to={item.path}
                       className={({ isActive }) => `nav-item${isActive ? ' is-active' : ''}${isGuarded ? ' is-guarded' : ''}`}
                     >
-                      <span className="nav-index" aria-hidden="true">{item.code}</span>
                       <span className="nav-copy">
                         <span className="nav-label">{item.label}</span>
                         <span className="nav-hint">{item.description}</span>
@@ -194,18 +219,37 @@ function AppShell({ authSession, onLogout }) {
           ))}
         </nav>
 
+        {showAdminLinks ? (
+          <div className="sidebar-admin-card">
+            <div className="sidebar-section-label">{adminGroup.title}</div>
+            <div className="sidebar-note">{adminGroup.note}</div>
+            <div className="sidebar-admin-links">
+              {adminGroup.items.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) => `sidebar-admin-link${isActive ? ' is-active' : ''}`}
+                >
+                  <span className="sidebar-admin-link-title">{item.label}</span>
+                  <span className="sidebar-admin-link-note">{item.description}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="sidebar-runtime-card">
           <div className="sidebar-section-label">控制室</div>
           <div className="sidebar-runtime-grid">
             <div className="runtime-metric">
-              <div className="runtime-metric-label">当前模块</div>
-              <div className="runtime-metric-value">{currentNav.code}</div>
-              <div className="runtime-metric-note">{currentNav.label}</div>
+              <div className="runtime-metric-label">当前页面</div>
+              <div className="runtime-metric-value">{currentNav.label}</div>
+              <div className="runtime-metric-note">{currentNav.description}</div>
             </div>
             <div className="runtime-metric">
-              <div className="runtime-metric-label">模块总数</div>
-              <div className="runtime-metric-value">{String(navItems.length).padStart(2, '0')}</div>
-              <div className="runtime-metric-note">控制台导航矩阵</div>
+              <div className="runtime-metric-label">当前分组</div>
+              <div className="runtime-metric-value">{currentGroup.title}</div>
+              <div className="runtime-metric-note">{currentGroup.note}</div>
             </div>
             <div className="runtime-metric is-wide">
               <div className="runtime-metric-label">当前路径</div>
@@ -252,7 +296,7 @@ function AppShell({ authSession, onLogout }) {
             <span className="sidebar-pill">FastAPI</span>
           </div>
           <div className="sidebar-note">
-            当前控制台已启用登录门禁，管理页将根据当前会话身份显示或拦截。
+            菜单已按湖总览、湖计算、湖存储三条主线重排，管理员入口单独收口，避免和业务导航混在一起。
           </div>
         </div>
       </aside>
@@ -264,22 +308,22 @@ function AppShell({ authSession, onLogout }) {
             <div className="shell-toolbar-title">湖仓运行控制台</div>
             <div className="shell-toolbar-meta">
               <span className="toolbar-token is-primary">{currentGroup.title}</span>
-              <span className="toolbar-token">模块 {currentNav.code}</span>
-              <span className="toolbar-token">{currentNav.path}</span>
+              <span className="toolbar-token">{currentNav.label}</span>
+              <span className="toolbar-token">可见入口 {String(visibleItemCount).padStart(2, '0')}</span>
               <span className="toolbar-token">{currentUser?.is_admin ? '管理员会话' : '用户会话'}</span>
               <span className="toolbar-token">@{currentUser?.username}</span>
             </div>
           </div>
           <div className="shell-toolbar-rail">
             <div className="toolbar-pulse-card">
-              <div className="toolbar-pulse-label">控制面</div>
-              <div className="toolbar-pulse-value">{String(navItems.length).padStart(2, '0')}</div>
-              <div className="toolbar-pulse-note">功能模块已编入控制台</div>
+              <div className="toolbar-pulse-label">主导航</div>
+              <div className="toolbar-pulse-value">{String(navGroups.length).padStart(2, '0')}</div>
+              <div className="toolbar-pulse-note">按湖总览、湖计算、湖存储组织</div>
             </div>
             <div className="toolbar-pulse-card">
-              <div className="toolbar-pulse-label">当前分组</div>
-              <div className="toolbar-pulse-value">{currentGroup.title}</div>
-              <div className="toolbar-pulse-note">企业控制台主分区</div>
+              <div className="toolbar-pulse-label">当前页面</div>
+              <div className="toolbar-pulse-value">{currentNav.label}</div>
+              <div className="toolbar-pulse-note">{currentNav.description}</div>
             </div>
             <div className="toolbar-pulse-card">
               <div className="toolbar-pulse-label">巡检日期</div>
@@ -327,18 +371,18 @@ function AppShell({ authSession, onLogout }) {
           <div className="shell-side-panel">
             <div className="shell-brief-card">
               <div className="shell-stat-label">控制台简报</div>
-              <div className="shell-brief-title">统一接入、任务协同与平台治理</div>
+              <div className="shell-brief-title">主导航按总览、计算、存储三条主线组织</div>
               <div className="shell-brief-copy">
-                以平台控制面的方式组织导航、状态卡和子路由，让业务操作、任务执行与系统管理各归其位。
+                业务入口只保留主任务路径，账号与权限从主菜单剥离到管理员入口，减少“同层混放”的导航噪音。
               </div>
               <div className="shell-brief-metrics">
                 <div className="shell-brief-metric">
-                  <div className="shell-brief-metric-label">当前路由</div>
-                  <div className="shell-brief-metric-value">{currentNav.path}</div>
+                  <div className="shell-brief-metric-label">当前页面</div>
+                  <div className="shell-brief-metric-value">{currentNav.label}</div>
                 </div>
                 <div className="shell-brief-metric">
-                  <div className="shell-brief-metric-label">巡检时间</div>
-                  <div className="shell-brief-metric-value">{checkedDate}</div>
+                  <div className="shell-brief-metric-label">页面归属</div>
+                  <div className="shell-brief-metric-value">{currentGroup.title}</div>
                 </div>
               </div>
             </div>
@@ -350,7 +394,7 @@ function AppShell({ authSession, onLogout }) {
               </div>
               <div className="shell-stat-card">
                 <div className="shell-stat-label">二级模块</div>
-                <div className="shell-stat-value">{String(currentGroup.items.length).padStart(2, '0')}</div>
+                <div className="shell-stat-value">{String(visibleItemCount).padStart(2, '0')}</div>
                 <div className="shell-stat-note">当前分组下可切换的功能模块</div>
               </div>
               <div className="shell-stat-card">
