@@ -2,11 +2,6 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import api, { getErrorMessage } from '@/api'
 
-const DEFAULT_ADMIN_CREDENTIALS = {
-  username: 'admin',
-  password: 'admin123'
-}
-
 function resolveRedirectTarget(location) {
   const candidate = location.state?.from
   if (typeof candidate !== 'string') {
@@ -34,11 +29,6 @@ export default function LoginPage({ onLoginSuccess }) {
     if (error) {
       setError('')
     }
-  }
-
-  const fillDefaultAdmin = () => {
-    setForm(DEFAULT_ADMIN_CREDENTIALS)
-    setError('')
   }
 
   const handleSubmit = async (event) => {
@@ -163,26 +153,6 @@ export default function LoginPage({ onLoginSuccess }) {
               {submitting ? '登录中...' : '登录并进入控制台'}
             </button>
           </form>
-
-          <div className="login-credential-card">
-            <div className="login-credential-head">
-              <div className="sidebar-section-label">开发环境默认管理员</div>
-              <button type="button" className="button button-secondary button-small" onClick={fillDefaultAdmin}>
-                填入默认账号
-              </button>
-            </div>
-            <div className="login-credential-row">
-              <span>用户名</span>
-              <code className="mono">admin</code>
-            </div>
-            <div className="login-credential-row">
-              <span>密码</span>
-              <code className="mono">admin123</code>
-            </div>
-            <p className="login-support-note">
-              当前后端初始化逻辑会自动创建默认管理员。若后续接入真实身份源，应删除该默认账号并切换到正式认证流程。
-            </p>
-          </div>
         </section>
       </div>
     </div>

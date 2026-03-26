@@ -2769,41 +2769,6 @@ pre {
   margin-top: 2px;
 }
 
-.login-credential-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 20px;
-  background: #f7f8fa;
-  border: 1px solid var(--panel-border);
-}
-
-.login-credential-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.login-credential-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 42px;
-  padding: 0 12px;
-  border-radius: 14px;
-  background: #ffffff;
-  border: 1px solid #eef0f3;
-}
-
-.login-support-note {
-  margin: 0;
-  color: var(--text-secondary);
-  line-height: 1.68;
-}
-
 .auth-guard-card {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
@@ -2882,15 +2847,9 @@ pre {
     grid-template-columns: 1fr;
   }
 
-  .login-credential-head,
-  .login-credential-row,
   .sidebar-account-top {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .login-credential-row {
-    padding: 12px;
   }
 }
 
