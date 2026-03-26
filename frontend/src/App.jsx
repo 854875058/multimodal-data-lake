@@ -22,8 +22,7 @@ const navGroups = [
     note: '概览、目录与运行态势',
     items: [
       { path: '/dashboard', code: '01', label: '湖总览', tag: '总览', description: '指标总览与运行态势' },
-      { path: '/files', code: '02', label: '资产目录', tag: '目录', description: '分层浏览入湖资产' },
-      { path: '/logs', code: '03', label: '系统日志', tag: '日志', description: '日志诊断与巡检视图' }
+      { path: '/files', code: '02', label: '资产目录', tag: '目录', description: '分层浏览入湖资产' }
     ]
   },
   {
@@ -31,9 +30,9 @@ const navGroups = [
     title: '湖计算',
     note: '查询、编排与任务治理',
     items: [
-      { path: '/search', code: '04', label: '查询分析', tag: '查询', description: 'SQL 与语义检索' },
-      { path: '/workflow', code: '05', label: '工作流编排', tag: '编排', description: '流程模板与资源编排' },
-      { path: '/governance', code: '06', label: '任务治理', tag: '治理', description: '作业状态与执行回填' }
+      { path: '/search', code: '03', label: '查询分析', tag: '查询', description: 'SQL 与语义检索' },
+      { path: '/workflow', code: '04', label: '工作流编排', tag: '编排', description: '流程模板与资源编排' },
+      { path: '/governance', code: '05', label: '任务治理', tag: '治理', description: '作业状态与执行回填' }
     ]
   },
   {
@@ -41,12 +40,21 @@ const navGroups = [
     title: '湖存储',
     note: '接入、上传与存储配置',
     items: [
-      { path: '/workbench', code: '07', label: '接入工作台', tag: '工作台', description: 'S3、SFTP 与批量入湖' },
-      { path: '/upload', code: '08', label: '本地上传', tag: '上传', description: '本地文件与压缩包上传' },
-      { path: '/settings/access', code: '09', label: '接入配置', tag: '配置', description: '连接参数与默认模板' }
+      { path: '/workbench', code: '06', label: '接入工作台', tag: '工作台', description: 'S3、SFTP 与批量入湖' },
+      { path: '/upload', code: '07', label: '本地上传', tag: '上传', description: '本地文件与压缩包上传' },
+      { path: '/settings/access', code: '08', label: '接入配置', tag: '配置', description: '连接参数与默认模板' }
     ]
   }
 ]
+
+const opsGroup = {
+  key: 'ops-tools',
+  title: '运维入口',
+  note: '系统日志与巡检诊断',
+  items: [
+    { path: '/logs', code: '09', label: '系统日志', tag: '日志', description: '日志诊断与巡检视图' }
+  ]
+}
 
 const adminGroup = {
   key: 'admin-tools',
@@ -67,6 +75,13 @@ const navItems = navGroups.flatMap((group) =>
   }))
 )
 
+const opsNavItems = opsGroup.items.map((item) => ({
+  ...item,
+  groupKey: opsGroup.key,
+  groupTitle: opsGroup.title,
+  groupNote: opsGroup.note
+}))
+
 const adminNavItems = adminGroup.items.map((item) => ({
   ...item,
   groupKey: adminGroup.key,
@@ -74,9 +89,9 @@ const adminNavItems = adminGroup.items.map((item) => ({
   groupNote: adminGroup.note
 }))
 
-const allNavItems = [...navItems, ...adminNavItems]
+const allNavItems = [...navItems, ...opsNavItems, ...adminNavItems]
 
-const navGroupsByKey = [...navGroups, adminGroup].reduce((acc, group) => {
+const navGroupsByKey = [...navGroups, opsGroup, adminGroup].reduce((acc, group) => {
   acc[group.key] = group
   return acc
 }, {})
@@ -219,6 +234,23 @@ function AppShell({ authSession, onLogout }) {
           ))}
         </nav>
 
+        <div className="sidebar-admin-card">
+          <div className="sidebar-section-label">{opsGroup.title}</div>
+          <div className="sidebar-note">{opsGroup.note}</div>
+          <div className="sidebar-admin-links">
+            {opsGroup.items.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) => `sidebar-admin-link${isActive ? ' is-active' : ''}`}
+              >
+                <span className="sidebar-admin-link-title">{item.label}</span>
+                <span className="sidebar-admin-link-note">{item.description}</span>
+              </NavLink>
+            ))}
+          </div>
+        </div>
+
         {showAdminLinks ? (
           <div className="sidebar-admin-card">
             <div className="sidebar-section-label">{adminGroup.title}</div>
@@ -296,7 +328,7 @@ function AppShell({ authSession, onLogout }) {
             <span className="sidebar-pill">FastAPI</span>
           </div>
           <div className="sidebar-note">
-            菜单已按湖总览、湖计算、湖存储三条主线重排，管理员入口单独收口，避免和业务导航混在一起。
+            主业务导航只保留湖总览、湖计算、湖存储三条主线；日志和权限入口单独收口，避免打断业务路径。
           </div>
         </div>
       </aside>
@@ -373,7 +405,7 @@ function AppShell({ authSession, onLogout }) {
               <div className="shell-stat-label">控制台简报</div>
               <div className="shell-brief-title">主导航按总览、计算、存储三条主线组织</div>
               <div className="shell-brief-copy">
-                业务入口只保留主任务路径，账号与权限从主菜单剥离到管理员入口，减少“同层混放”的导航噪音。
+                业务入口只保留主任务路径，系统日志与账号权限从主菜单剥离到独立入口，减少“同层混放”的导航噪音。
               </div>
               <div className="shell-brief-metrics">
                 <div className="shell-brief-metric">
