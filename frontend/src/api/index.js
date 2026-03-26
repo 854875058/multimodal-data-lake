@@ -1,5 +1,7 @@
 ﻿import axios from 'axios'
 
+import { clearAuthSession, getAccessToken } from '@/auth/session'
+
 export const apiClient = axios.create({
   baseURL: '/api',
   timeout: 60000
@@ -28,9 +30,27 @@ function normalizeErrorPayload(value) {
   return String(value || '').trim()
 }
 
+apiClient.interceptors.request.use((config) => {
+  const token = getAccessToken()
+
+  if (token) {
+    config.headers = config.headers || {}
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
+  return config
+})
+
 apiClient.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    const status = error?.response?.status
+    const requestUrl = String(error?.config?.url || '')
+
+    if (status === 401 && getAccessToken() && !requestUrl.endsWith('/users/login')) {
+      clearAuthSession()
+    }
+
     const detail = error?.response?.data?.detail
     const rawMessage = error?.response?.data?.message || detail || error.message || '请求失败'
     error.message = normalizeErrorPayload(rawMessage) || '请求失败'

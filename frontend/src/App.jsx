@@ -1,9 +1,12 @@
-import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import DashboardPage from './pages/DashboardPage.jsx'
+import { useEffect, useState } from 'react'
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { clearAuthSession, loadAuthSession, saveAuthSession, subscribeAuthSession } from '@/auth/session'
 import ConfigCenterPage from './pages/ConfigCenterPage.jsx'
+import DashboardPage from './pages/DashboardPage.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import FilesPage from './pages/FilesPage.jsx'
 import IngestionWorkbenchPage from './pages/IngestionWorkbenchPage.jsx'
+import LoginPage from './pages/LoginPage.jsx'
 import LogsPage from './pages/LogsPage.jsx'
 import PermissionManagementPage from './pages/PermissionManagementPage.jsx'
 import SearchPage from './pages/SearchPage.jsx'
@@ -41,8 +44,8 @@ const navGroups = [
     items: [
       { path: '/logs', code: '08', label: '系统日志', tag: '日志', description: '查看运行日志、诊断线索、系统告警与巡检状态' },
       { path: '/settings/access', code: '09', label: '接入配置', tag: '配置', description: '统一管理平台连接、接入模板和组件状态卡' },
-      { path: '/settings/users', code: '10', label: '用户管理', tag: '用户', description: '维护账号、角色和后续用户隔离能力底座' },
-      { path: '/settings/permissions', code: '11', label: '权限管理', tag: '权限', description: '整理角色权限、资源范围和审批规则' }
+      { path: '/settings/users', code: '10', label: '用户管理', tag: '用户', description: '维护账号、角色和后续用户隔离能力底座', requiresAdmin: true },
+      { path: '/settings/permissions', code: '11', label: '权限管理', tag: '权限', description: '整理角色权限、资源范围和审批规则', requiresAdmin: true }
     ]
   }
 ]
@@ -56,8 +59,73 @@ const navItems = navGroups.flatMap((group) =>
   }))
 )
 
-function AppShell() {
+function buildIntentPath(location) {
+  return `${location.pathname}${location.search || ''}`
+}
+
+function getDisplayName(user) {
+  if (!user) {
+    return '未登录用户'
+  }
+
+  return user.full_name || user.username
+}
+
+function getUserInitials(user) {
+  const source = getDisplayName(user).replace(/\s+/g, '')
+  if (!source) {
+    return 'U'
+  }
+
+  return source.slice(0, 2).toUpperCase()
+}
+
+function RequireAuth({ isAuthenticated, children }) {
   const location = useLocation()
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: buildIntentPath(location) }} />
+  }
+
+  return children
+}
+
+function AccessDeniedPage({ user }) {
+  const roleLabel = user?.is_admin ? '系统管理员' : '普通用户'
+
+  return (
+    <div className="content-wrap">
+      <section className="auth-guard-card glass-card">
+        <div className="auth-guard-icon">!</div>
+        <div className="auth-guard-copy">
+          <div className="shell-eyebrow">Admin Only</div>
+          <h1 className="auth-guard-title">当前账号没有该管理入口权限</h1>
+          <p className="auth-guard-text">
+            用户管理和权限管理已经挂到登录会话之后，但当前账号身份为 <strong>{roleLabel}</strong>，
+            只能查看普通业务模块。若需要访问该页面，请使用管理员账号登录。
+          </p>
+          <div className="page-actions">
+            <NavLink to="/dashboard" className="button button-primary">
+              返回控制台
+            </NavLink>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function RequireAdmin({ user, children }) {
+  if (user?.is_admin) {
+    return children
+  }
+
+  return <AccessDeniedPage user={user} />
+}
+
+function AppShell({ authSession, onLogout }) {
+  const location = useLocation()
+  const navigate = useNavigate()
   const currentNav = navItems.find(
     (item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
   ) || navItems[0]
@@ -73,6 +141,13 @@ function AppShell() {
     day: '2-digit'
   }).format(new Date())
   const highlightedModules = currentGroup.items.slice(0, 4)
+  const currentUser = authSession.user
+  const roleLabel = currentUser?.is_admin ? '系统管理员' : '平台用户'
+
+  const handleLogoutClick = () => {
+    onLogout()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className="app-shell">
@@ -94,20 +169,26 @@ function AppShell() {
               <div className="sidebar-section-label">{group.title}</div>
               <div className="nav-group-note">{group.note}</div>
               <div className="nav-group-list">
-                {group.items.map((item) => (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    className={({ isActive }) => `nav-item${isActive ? ' is-active' : ''}`}
-                  >
-                    <span className="nav-index" aria-hidden="true">{item.code}</span>
-                    <span className="nav-copy">
-                      <span className="nav-label">{item.label}</span>
-                      <span className="nav-hint">{item.description}</span>
-                    </span>
-                    <span className="nav-tag">{item.tag}</span>
-                  </NavLink>
-                ))}
+                {group.items.map((item) => {
+                  const isGuarded = Boolean(item.requiresAdmin && !currentUser?.is_admin)
+
+                  return (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      className={({ isActive }) => `nav-item${isActive ? ' is-active' : ''}${isGuarded ? ' is-guarded' : ''}`}
+                    >
+                      <span className="nav-index" aria-hidden="true">{item.code}</span>
+                      <span className="nav-copy">
+                        <span className="nav-label">{item.label}</span>
+                        <span className="nav-hint">{item.description}</span>
+                      </span>
+                      <span className={`nav-tag${isGuarded ? ' is-guarded' : ''}`}>
+                        {isGuarded ? '管理员' : item.tag}
+                      </span>
+                    </NavLink>
+                  )
+                })}
               </div>
             </section>
           ))}
@@ -134,6 +215,29 @@ function AppShell() {
           </div>
         </div>
 
+        <div className="sidebar-account-card">
+          <div className="sidebar-section-label">当前登录</div>
+          <div className="sidebar-account-top">
+            <div className={`sidebar-account-avatar${currentUser?.is_admin ? ' is-admin' : ''}`}>
+              {getUserInitials(currentUser)}
+            </div>
+            <div className="sidebar-account-copy">
+              <div className="sidebar-account-name">{getDisplayName(currentUser)}</div>
+              <div className="sidebar-account-meta">@{currentUser?.username}</div>
+            </div>
+          </div>
+          <div className="sidebar-pill-row">
+            <span className="sidebar-pill">{roleLabel}</span>
+            <span className="sidebar-pill">{currentUser?.email ? '已绑定邮箱' : '未绑定邮箱'}</span>
+          </div>
+          <div className="sidebar-note">
+            {currentUser?.email || '当前账号尚未配置邮箱信息，可在用户管理中补充。'}
+          </div>
+          <button type="button" className="button button-secondary button-small sidebar-account-action" onClick={handleLogoutClick}>
+            退出登录
+          </button>
+        </div>
+
         <div className="sidebar-foot">
           <div className="sidebar-section-label">平台基座</div>
           <div className="sidebar-pill-row">
@@ -148,7 +252,7 @@ function AppShell() {
             <span className="sidebar-pill">FastAPI</span>
           </div>
           <div className="sidebar-note">
-            当前界面按数据湖、任务中心、平台管理三组重排，突出控制台主路径、状态信息与模块切换关系。
+            当前控制台已启用登录门禁，管理页将根据当前会话身份显示或拦截。
           </div>
         </div>
       </aside>
@@ -162,6 +266,8 @@ function AppShell() {
               <span className="toolbar-token is-primary">{currentGroup.title}</span>
               <span className="toolbar-token">模块 {currentNav.code}</span>
               <span className="toolbar-token">{currentNav.path}</span>
+              <span className="toolbar-token">{currentUser?.is_admin ? '管理员会话' : '用户会话'}</span>
+              <span className="toolbar-token">@{currentUser?.username}</span>
             </div>
           </div>
           <div className="shell-toolbar-rail">
@@ -202,15 +308,19 @@ function AppShell() {
             </div>
 
             <div className="shell-subnav">
-              {currentGroup.items.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) => `subnav-item${isActive ? ' is-active' : ''}`}
-                >
-                  {item.label}
-                </NavLink>
-              ))}
+              {currentGroup.items.map((item) => {
+                const isGuarded = Boolean(item.requiresAdmin && !currentUser?.is_admin)
+
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) => `subnav-item${isActive ? ' is-active' : ''}${isGuarded ? ' is-guarded' : ''}`}
+                  >
+                    {item.label}
+                  </NavLink>
+                )
+              })}
             </div>
           </div>
 
@@ -244,9 +354,9 @@ function AppShell() {
                 <div className="shell-stat-note">当前分组下可切换的功能模块</div>
               </div>
               <div className="shell-stat-card">
-                <div className="shell-stat-label">技术底座</div>
-                <div className="shell-stat-value">R / F</div>
-                <div className="shell-stat-note">React / FastAPI / Gravitino / Lance</div>
+                <div className="shell-stat-label">当前身份</div>
+                <div className="shell-stat-value">{currentUser?.is_admin ? 'Admin' : 'User'}</div>
+                <div className="shell-stat-note">{roleLabel} · @{currentUser?.username}</div>
               </div>
             </div>
           </div>
@@ -261,8 +371,8 @@ function AppShell() {
             <Route path="/governance" element={<TaskGovernancePage />} />
             <Route path="/settings" element={<Navigate to="/settings/access" replace />} />
             <Route path="/settings/access" element={<ConfigCenterPage />} />
-            <Route path="/settings/users" element={<UserManagementPage />} />
-            <Route path="/settings/permissions" element={<PermissionManagementPage />} />
+            <Route path="/settings/users" element={<RequireAdmin user={currentUser}><UserManagementPage /></RequireAdmin>} />
+            <Route path="/settings/permissions" element={<RequireAdmin user={currentUser}><PermissionManagementPage /></RequireAdmin>} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/files" element={<FilesPage />} />
@@ -276,5 +386,34 @@ function AppShell() {
 }
 
 export default function App() {
-  return <AppShell />
+  const [authSession, setAuthSession] = useState(() => loadAuthSession())
+
+  useEffect(() => subscribeAuthSession(setAuthSession), [])
+
+  const handleLoginSuccess = (payload) => {
+    setAuthSession(saveAuthSession(payload))
+  }
+
+  const handleLogout = () => {
+    setAuthSession(clearAuthSession())
+  }
+
+  const isAuthenticated = Boolean(authSession.accessToken && authSession.user)
+
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage onLoginSuccess={handleLoginSuccess} />}
+      />
+      <Route
+        path="*"
+        element={
+          <RequireAuth isAuthenticated={isAuthenticated}>
+            <AppShell authSession={authSession} onLogout={handleLogout} />
+          </RequireAuth>
+        }
+      />
+    </Routes>
+  )
 }
