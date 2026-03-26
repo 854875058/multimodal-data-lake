@@ -31,6 +31,7 @@ This file stores project-level rules that should be read first in new sessions.
 ## Git Workflow
 
 - After a completed, user-requested implementation round that has passed the relevant lightweight validation, automatically create a git commit unless the user explicitly says not to commit.
+- After creating that commit, automatically push the current branch to its GitHub upstream unless the user explicitly says not to push.
 - If the user explicitly asks to commit all current changes, include the full current worktree instead of splitting only agent-authored files.
 
 ## Known Environment Pitfalls
