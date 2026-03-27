@@ -97,6 +97,7 @@ const navGroupsByKey = [...navGroups, systemGroup, adminGroup].reduce((acc, grou
 }, {})
 
 const primaryNavItems = navItems
+const primaryGroupKeys = navGroups.map((group) => group.key)
 
 function buildIntentPath(location) {
   return `${location.pathname}${location.search || ''}`
@@ -184,6 +185,34 @@ function AppShell({ authSession, onLogout }) {
   const roleLabel = currentUser?.is_admin ? '系统管理员' : '平台用户'
   const showAdminLinks = Boolean(currentUser?.is_admin)
   const visibleItemCount = currentGroup.items.length
+  const [openPrimaryGroupKey, setOpenPrimaryGroupKey] = useState(() => (
+    primaryGroupKeys.includes(currentNav.groupKey) ? currentNav.groupKey : navGroups[0].key
+  ))
+  const [openToolGroupKey, setOpenToolGroupKey] = useState(() => (
+    currentNav.groupKey === adminGroup.key && showAdminLinks ? adminGroup.key : systemGroup.key
+  ))
+
+  useEffect(() => {
+    if (primaryGroupKeys.includes(currentNav.groupKey)) {
+      setOpenPrimaryGroupKey(currentNav.groupKey)
+    }
+  }, [currentNav.groupKey])
+
+  useEffect(() => {
+    if (currentNav.groupKey === systemGroup.key) {
+      setOpenToolGroupKey(systemGroup.key)
+      return
+    }
+
+    if (currentNav.groupKey === adminGroup.key && showAdminLinks) {
+      setOpenToolGroupKey(adminGroup.key)
+      return
+    }
+
+    if (!showAdminLinks && openToolGroupKey === adminGroup.key) {
+      setOpenToolGroupKey(systemGroup.key)
+    }
+  }, [currentNav.groupKey, openToolGroupKey, showAdminLinks])
 
   const handleLogoutClick = () => {
     onLogout()
@@ -207,68 +236,108 @@ function AppShell({ authSession, onLogout }) {
         <nav className="nav-list">
           {navGroups.map((group) => (
             <section className="nav-group" key={group.key}>
-              <div className="sidebar-section-label">{group.title}</div>
-              <div className="nav-group-note">{group.note}</div>
-              <div className="nav-group-list">
-                {group.items.map((item) => {
-                  const isGuarded = Boolean(item.requiresAdmin && !currentUser?.is_admin)
+              <button
+                type="button"
+                className={`nav-group-trigger${openPrimaryGroupKey === group.key ? ' is-open' : ''}${currentGroup.key === group.key ? ' is-current' : ''}`}
+                onClick={() => setOpenPrimaryGroupKey((current) => (current === group.key ? '' : group.key))}
+              >
+                <span className="nav-group-trigger-copy">
+                  <span className="nav-group-title">{group.title}</span>
+                  <span className="nav-group-note">{group.note}</span>
+                </span>
+                <span className="nav-group-chevron" aria-hidden="true">⌄</span>
+              </button>
+              {openPrimaryGroupKey === group.key ? (
+                <div className="nav-group-list">
+                  {group.items.map((item) => {
+                    const isGuarded = Boolean(item.requiresAdmin && !currentUser?.is_admin)
 
-                  return (
-                    <NavLink
-                      key={item.path}
-                      to={item.path}
-                      className={({ isActive }) => `nav-item${isActive ? ' is-active' : ''}${isGuarded ? ' is-guarded' : ''}`}
-                    >
-                      <span className="nav-copy">
-                        <span className="nav-label">{item.label}</span>
-                        <span className="nav-hint">{item.description}</span>
-                      </span>
-                      <span className={`nav-tag${isGuarded ? ' is-guarded' : ''}`}>
-                        {isGuarded ? '管理员' : item.tag}
-                      </span>
-                    </NavLink>
-                  )
-                })}
-              </div>
+                    return (
+                      <NavLink
+                        key={item.path}
+                        to={item.path}
+                        className={({ isActive }) => `nav-item${isActive ? ' is-active' : ''}${isGuarded ? ' is-guarded' : ''}`}
+                      >
+                        <span className="nav-copy">
+                          <span className="nav-label">{item.label}</span>
+                          <span className="nav-hint">{item.description}</span>
+                        </span>
+                        <span className={`nav-tag${isGuarded ? ' is-guarded' : ''}`}>
+                          {isGuarded ? '管理员' : item.tag}
+                        </span>
+                      </NavLink>
+                    )
+                  })}
+                </div>
+              ) : null}
             </section>
           ))}
         </nav>
 
-        <div className="sidebar-admin-card">
-          <div className="sidebar-section-label">{systemGroup.title}</div>
-          <div className="sidebar-note">{systemGroup.note}</div>
-          <div className="sidebar-admin-links">
-            {systemGroup.items.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={({ isActive }) => `sidebar-admin-link${isActive ? ' is-active' : ''}`}
-              >
-                <span className="sidebar-admin-link-title">{item.label}</span>
-                <span className="sidebar-admin-link-note">{item.description}</span>
-              </NavLink>
-            ))}
+        <div className="sidebar-tools-card">
+          <div className="sidebar-tools-head">
+            <div className="sidebar-section-label">平台工具</div>
+            <div className="sidebar-note">系统配置与权限入口单独收口，不与主业务导航混放。</div>
           </div>
-        </div>
 
-        {showAdminLinks ? (
-          <div className="sidebar-admin-card">
-            <div className="sidebar-section-label">{adminGroup.title}</div>
-            <div className="sidebar-note">{adminGroup.note}</div>
-            <div className="sidebar-admin-links">
-              {adminGroup.items.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className={({ isActive }) => `sidebar-admin-link${isActive ? ' is-active' : ''}`}
-                >
-                  <span className="sidebar-admin-link-title">{item.label}</span>
-                  <span className="sidebar-admin-link-note">{item.description}</span>
-                </NavLink>
-              ))}
-            </div>
+          <div className="sidebar-tool-section">
+            <button
+              type="button"
+              className={`sidebar-tool-trigger${openToolGroupKey === systemGroup.key ? ' is-open' : ''}${currentGroup.key === systemGroup.key ? ' is-current' : ''}`}
+              onClick={() => setOpenToolGroupKey((current) => (current === systemGroup.key ? '' : systemGroup.key))}
+            >
+              <span className="sidebar-tool-trigger-copy">
+                <span className="sidebar-tool-section-title">{systemGroup.title}</span>
+                <span className="sidebar-tool-section-note">{systemGroup.note}</span>
+              </span>
+              <span className="nav-group-chevron" aria-hidden="true">⌄</span>
+            </button>
+            {openToolGroupKey === systemGroup.key ? (
+              <div className="sidebar-admin-links">
+                {systemGroup.items.map((item) => (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={({ isActive }) => `sidebar-admin-link${isActive ? ' is-active' : ''}`}
+                  >
+                    <span className="sidebar-admin-link-title">{item.label}</span>
+                    <span className="sidebar-admin-link-note">{item.description}</span>
+                  </NavLink>
+                ))}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+
+          {showAdminLinks ? (
+            <div className="sidebar-tool-section">
+              <button
+                type="button"
+                className={`sidebar-tool-trigger${openToolGroupKey === adminGroup.key ? ' is-open' : ''}${currentGroup.key === adminGroup.key ? ' is-current' : ''}`}
+                onClick={() => setOpenToolGroupKey((current) => (current === adminGroup.key ? '' : adminGroup.key))}
+              >
+                <span className="sidebar-tool-trigger-copy">
+                  <span className="sidebar-tool-section-title">{adminGroup.title}</span>
+                  <span className="sidebar-tool-section-note">{adminGroup.note}</span>
+                </span>
+                <span className="nav-group-chevron" aria-hidden="true">⌄</span>
+              </button>
+              {openToolGroupKey === adminGroup.key ? (
+                <div className="sidebar-admin-links">
+                  {adminGroup.items.map((item) => (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      className={({ isActive }) => `sidebar-admin-link${isActive ? ' is-active' : ''}`}
+                    >
+                      <span className="sidebar-admin-link-title">{item.label}</span>
+                      <span className="sidebar-admin-link-note">{item.description}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
 
         <div className="sidebar-runtime-card">
           <div className="sidebar-section-label">控制室</div>
