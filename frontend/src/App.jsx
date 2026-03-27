@@ -38,20 +38,20 @@ const navGroups = [
   {
     key: 'lake-storage',
     title: '湖存储',
-    note: '接入、上传与存储配置',
+    note: '接入与本地上传',
     items: [
       { path: '/workbench', code: '06', label: '接入工作台', tag: '工作台', description: 'S3、SFTP 与批量入湖' },
-      { path: '/upload', code: '07', label: '本地上传', tag: '上传', description: '本地文件与压缩包上传' },
-      { path: '/settings/access', code: '08', label: '接入配置', tag: '配置', description: '连接参数与默认模板' }
+      { path: '/upload', code: '07', label: '本地上传', tag: '上传', description: '本地文件与压缩包上传' }
     ]
   }
 ]
 
-const opsGroup = {
-  key: 'ops-tools',
-  title: '运维入口',
-  note: '系统日志与巡检诊断',
+const systemGroup = {
+  key: 'system-config',
+  title: '系统配置',
+  note: '连接配置、日志与巡检诊断',
   items: [
+    { path: '/settings/access', code: '08', label: '接入配置', tag: '配置', description: '连接参数与默认模板' },
     { path: '/logs', code: '09', label: '系统日志', tag: '日志', description: '日志诊断与巡检视图' }
   ]
 }
@@ -75,11 +75,11 @@ const navItems = navGroups.flatMap((group) =>
   }))
 )
 
-const opsNavItems = opsGroup.items.map((item) => ({
+const systemNavItems = systemGroup.items.map((item) => ({
   ...item,
-  groupKey: opsGroup.key,
-  groupTitle: opsGroup.title,
-  groupNote: opsGroup.note
+  groupKey: systemGroup.key,
+  groupTitle: systemGroup.title,
+  groupNote: systemGroup.note
 }))
 
 const adminNavItems = adminGroup.items.map((item) => ({
@@ -89,9 +89,9 @@ const adminNavItems = adminGroup.items.map((item) => ({
   groupNote: adminGroup.note
 }))
 
-const allNavItems = [...navItems, ...opsNavItems, ...adminNavItems]
+const allNavItems = [...navItems, ...systemNavItems, ...adminNavItems]
 
-const navGroupsByKey = [...navGroups, opsGroup, adminGroup].reduce((acc, group) => {
+const navGroupsByKey = [...navGroups, systemGroup, adminGroup].reduce((acc, group) => {
   acc[group.key] = group
   return acc
 }, {})
@@ -235,10 +235,10 @@ function AppShell({ authSession, onLogout }) {
         </nav>
 
         <div className="sidebar-admin-card">
-          <div className="sidebar-section-label">{opsGroup.title}</div>
-          <div className="sidebar-note">{opsGroup.note}</div>
+          <div className="sidebar-section-label">{systemGroup.title}</div>
+          <div className="sidebar-note">{systemGroup.note}</div>
           <div className="sidebar-admin-links">
-            {opsGroup.items.map((item) => (
+            {systemGroup.items.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}
@@ -328,7 +328,7 @@ function AppShell({ authSession, onLogout }) {
             <span className="sidebar-pill">FastAPI</span>
           </div>
           <div className="sidebar-note">
-            主业务导航只保留湖总览、湖计算、湖存储三条主线；日志和权限入口单独收口，避免打断业务路径。
+            主业务导航只保留湖总览、湖计算、湖存储三条主线；接入配置、系统日志与权限入口单独收口，避免打断业务路径。
           </div>
         </div>
       </aside>
@@ -405,7 +405,7 @@ function AppShell({ authSession, onLogout }) {
               <div className="shell-stat-label">控制台简报</div>
               <div className="shell-brief-title">主导航按总览、计算、存储三条主线组织</div>
               <div className="shell-brief-copy">
-                业务入口只保留主任务路径，系统日志与账号权限从主菜单剥离到独立入口，减少“同层混放”的导航噪音。
+                业务入口只保留主任务路径，接入配置、系统日志与账号权限从主菜单剥离到独立入口，减少“同层混放”的导航噪音。
               </div>
               <div className="shell-brief-metrics">
                 <div className="shell-brief-metric">
