@@ -2338,6 +2338,88 @@ pre {
   gap: 12px;
 }
 
+.workbench-console-panel {
+  gap: 16px;
+}
+
+.workbench-guide-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f7f8fa;
+  border: 1px solid #eef0f3;
+}
+
+.workbench-guide-copy {
+  color: var(--text-secondary);
+  line-height: 1.68;
+}
+
+.workbench-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.workbench-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 168px;
+  padding: 16px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid var(--panel-border);
+}
+
+.workbench-summary-value {
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.workbench-summary-note {
+  color: var(--text-secondary);
+  line-height: 1.62;
+  word-break: break-word;
+}
+
+.workbench-summary-card .button {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+.workbench-actionbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.workbench-results-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.75fr);
+  gap: 14px;
+}
+
+.workbench-main-panel,
+.workbench-side-stack {
+  min-width: 0;
+}
+
+.workbench-side-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.workbench-side-kpis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .workbench-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.95fr);
@@ -3127,6 +3209,7 @@ pre {
   .chart-grid,
   .workbench-strategy-grid,
   .workbench-command-deck,
+  .workbench-results-shell,
   .workflow-studio-layout,
   .status-grid,
   .workbench-grid,
@@ -3144,6 +3227,7 @@ pre {
   .governance-summary-grid,
   .dashboard-pulse-row,
   .ingest-entry-grid,
+  .workbench-summary-grid,
   .catalog-selectors,
   .query-settings-grid,
   .catalog-preview-actions,
@@ -3153,6 +3237,7 @@ pre {
   .mini-kpi-grid,
   .workbench-form-grid,
   .detail-grid,
+  .workbench-side-kpis,
   .stats-grid,
   .status-grid {
     grid-template-columns: 1fr;

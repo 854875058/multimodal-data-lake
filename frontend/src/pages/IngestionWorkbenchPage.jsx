@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react'
 import api, { getErrorMessage } from '@/api'
+import WorkbenchConsole from '@/components/WorkbenchConsole'
 import { useNavigate } from 'react-router-dom'
 import { formatBytes, formatDateTime, formatNumber } from '@/utils/format'
 
@@ -428,6 +429,10 @@ export default function IngestionWorkbenchPage() {
   const [scanSupportedOnly, setScanSupportedOnly] = useState(false)
   const [scanPage, setScanPage] = useState(1)
   const [scanPageSize, setScanPageSize] = useState(20)
+  const [sourceModalOpen, setSourceModalOpen] = useState(false)
+  const [scanModalOpen, setScanModalOpen] = useState(false)
+  const [indexModalOpen, setIndexModalOpen] = useState(false)
+  const [startConfirmOpen, setStartConfirmOpen] = useState(false)
 
   const activeJobs = useMemo(
     () => jobs.filter((job) => ['pending', 'running', 'cancelling'].includes(job.status)).length,
@@ -841,8 +846,10 @@ export default function IngestionWorkbenchPage() {
         setSelectedJobId(job.job_id)
         await loadJobDetail(job.job_id, true)
       }
+      return true
     } catch (requestError) {
       setError(getErrorMessage(requestError, '启动批量导入任务失败。'))
+      return false
     } finally {
       setStarting(false)
     }
@@ -959,9 +966,169 @@ export default function IngestionWorkbenchPage() {
     }
   }
 
+  const completedJobs = jobs.filter((job) => job.status === 'completed').length
+  const failedJobs = jobs.filter((job) => job.status === 'failed').length
+  const currentIndexMode = getIndexModeValue(form)
+  const currentIndexModeLabel = indexModeOptions.find((option) => option.value === currentIndexMode)?.label || currentIndexMode
+  const totalIndexCount = (indexStatus.text?.indices?.length || 0) + (indexStatus.image?.indices?.length || 0)
+  const selectedJobProgress = jobDetail ? getJobProgress(jobDetail) : 0
+  const sourceModeText = getSourceTypeText(form.source_type)
+  const sourceLocationText = `${getSourcePrimaryValue(form)} / ${getSourceSecondaryValue(form)}`
+  const scanStatusText = scanResult.objects.length
+    ? `已返回 ${formatNumber(scanResult.returned_count)} 条，支持 ${formatNumber(scanResult.eligible_count)} 条`
+    : '尚未生成扫描结果'
+  const selectionStatusText = selectedScanKeys.length
+    ? `当前已勾选 ${formatNumber(selectedScanKeys.length)} 条，启动任务时优先导入勾选项`
+    : `当前未勾选对象，启动任务时按扫描结果与上限 ${formatNumber(form.max_files)} 自动选取`
+  const handleConfirmStart = async () => {
+    const success = await handleStartJob()
+    if (success) {
+      setStartConfirmOpen(false)
+    }
+  }
+
+  const handleSelectJob = async (jobId) => {
+    if (!jobId) {
+      return
+    }
+    setSelectedJobId(jobId)
+    await loadJobDetail(jobId, true)
+  }
+
   if (loading) {
     return <div className="loading-state">工作台加载中...</div>
   }
+
+  return (
+    <WorkbenchConsole
+      vm={{
+        banner,
+        error,
+        form,
+        scanResult,
+        indexStatus,
+        connectionData,
+        filteredJobs,
+        jobDetail,
+        selectedJobId,
+        selectedScanKeys,
+        pagedScanObjects,
+        filteredScanObjects,
+        filteredSupportedScanObjects,
+        scanPage,
+        scanPageCount,
+        scanPageSize,
+        scanCategories,
+        scanCategoryFilter,
+        scanKeyword,
+        scanSupportedOnly,
+        jobStatusFilter,
+        jobKeyword,
+        jobSort,
+        refreshing,
+        saving,
+        testing,
+        scanning,
+        starting,
+        buildingIndex,
+        sourceModalOpen,
+        scanModalOpen,
+        indexModalOpen,
+        startConfirmOpen,
+        jobModalOpen,
+        activeJobs,
+        completedJobs,
+        failedJobs,
+        currentIndexMode,
+        currentIndexModeLabel,
+        selectionStatusText,
+        sourceModeText,
+        sourceLocationText,
+        scanStatusText,
+        totalIndexCount,
+        selectedJobProgress
+      }}
+      actions={{
+        onNavigateUpload: () => navigate('/upload'),
+        onRefresh: () => refreshAll(true),
+        onOpenSourceModal: () => setSourceModalOpen(true),
+        onCloseSourceModal: () => setSourceModalOpen(false),
+        onOpenScanModal: () => setScanModalOpen(true),
+        onCloseScanModal: () => setScanModalOpen(false),
+        onOpenIndexModal: () => setIndexModalOpen(true),
+        onCloseIndexModal: () => setIndexModalOpen(false),
+        onOpenStartConfirm: () => setStartConfirmOpen(true),
+        onCloseStartConfirm: () => setStartConfirmOpen(false),
+        onCloseJobModal: closeJobModal,
+        onInputChange: handleInputChange,
+        onSourceTypeChange: handleSourceTypeChange,
+        onSave: handleSave,
+        onTestConnection: handleTestConnection,
+        onScan: handleScan,
+        onBuildIndex: handleBuildIndex,
+        onConfirmStart: handleConfirmStart,
+        onSelectAllScanObjects: selectAllScanObjects,
+        onClearSelectedScanObjects: clearSelectedScanObjects,
+        onToggleScanSelection: toggleScanSelection,
+        onSetScanCategoryFilter: (value) => {
+          setScanCategoryFilter(value)
+          setScanPage(1)
+        },
+        onSetScanPageSize: (value) => {
+          setScanPageSize(value)
+          setScanPage(1)
+        },
+        onSetScanKeyword: (value) => {
+          setScanKeyword(value)
+          setScanPage(1)
+        },
+        onSetScanSupportedOnly: (value) => {
+          setScanSupportedOnly(value)
+          setScanPage(1)
+        },
+        onSetScanPage: setScanPage,
+        onSetJobStatusFilter: setJobStatusFilter,
+        onSetJobKeyword: setJobKeyword,
+        onSetJobSort: setJobSort,
+        onSelectJob: handleSelectJob,
+        onOpenJobDetail: async (jobId) => {
+          if (jobId) {
+            await handleViewJobDetail(jobId)
+            return
+          }
+          setJobModalOpen(true)
+        },
+        onReuseJobConfig: handleReuseJobConfig,
+        onCancelJob: handleCancelJob,
+        onCopyLogs: handleCopyLogs,
+        onExportLogs: handleExportLogs
+      }}
+      helpers={{
+        formatNumber,
+        formatBytes,
+        formatDateTime,
+        getSourceTypeText,
+        getSourcePrimaryLabel,
+        getSourcePrimaryValue,
+        getSourceSecondaryLabel,
+        getSourceSecondaryValue,
+        getJobBadgeClass,
+        getJobStatusText,
+        getJobCompactStats,
+        getJobProgress,
+        getJobResultSummary,
+        getConnectionSummary,
+        getIndicesText,
+        sourceTypeOptions,
+        indexModeOptions,
+        showPartitionField,
+        showSubVectorField,
+        scanPageSizeOptions,
+        jobStatusOptions,
+        jobSortOptions
+      }}
+    />
+  )
 
   return (
     <div className="content-wrap">
