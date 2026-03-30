@@ -243,7 +243,6 @@ function AppShell({ authSession, onLogout }) {
               >
                 <span className="nav-group-trigger-copy">
                   <span className="nav-group-title">{group.title}</span>
-                  <span className="nav-group-note">{group.note}</span>
                 </span>
                 <span className="nav-group-chevron" aria-hidden="true">⌄</span>
               </button>
@@ -260,10 +259,6 @@ function AppShell({ authSession, onLogout }) {
                       >
                         <span className="nav-copy">
                           <span className="nav-label">{item.label}</span>
-                          <span className="nav-hint">{item.description}</span>
-                        </span>
-                        <span className={`nav-tag${isGuarded ? ' is-guarded' : ''}`}>
-                          {isGuarded ? '管理员' : item.tag}
                         </span>
                       </NavLink>
                     )
@@ -277,7 +272,6 @@ function AppShell({ authSession, onLogout }) {
         <div className="sidebar-tools-card">
           <div className="sidebar-tools-head">
             <div className="sidebar-section-label">平台工具</div>
-            <div className="sidebar-note">系统配置与权限入口单独收口，不与主业务导航混放。</div>
           </div>
 
           <div className="sidebar-tool-section">
@@ -288,7 +282,6 @@ function AppShell({ authSession, onLogout }) {
             >
               <span className="sidebar-tool-trigger-copy">
                 <span className="sidebar-tool-section-title">{systemGroup.title}</span>
-                <span className="sidebar-tool-section-note">{systemGroup.note}</span>
               </span>
               <span className="nav-group-chevron" aria-hidden="true">⌄</span>
             </button>
@@ -299,12 +292,11 @@ function AppShell({ authSession, onLogout }) {
                     key={item.path}
                     to={item.path}
                     className={({ isActive }) => `sidebar-admin-link${isActive ? ' is-active' : ''}`}
-                  >
-                    <span className="sidebar-admin-link-title">{item.label}</span>
-                    <span className="sidebar-admin-link-note">{item.description}</span>
-                  </NavLink>
-                ))}
-              </div>
+                >
+                  <span className="sidebar-admin-link-title">{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
             ) : null}
           </div>
 
@@ -317,7 +309,6 @@ function AppShell({ authSession, onLogout }) {
               >
                 <span className="sidebar-tool-trigger-copy">
                   <span className="sidebar-tool-section-title">{adminGroup.title}</span>
-                  <span className="sidebar-tool-section-note">{adminGroup.note}</span>
                 </span>
                 <span className="nav-group-chevron" aria-hidden="true">⌄</span>
               </button>
@@ -328,12 +319,11 @@ function AppShell({ authSession, onLogout }) {
                       key={item.path}
                       to={item.path}
                       className={({ isActive }) => `sidebar-admin-link${isActive ? ' is-active' : ''}`}
-                    >
-                      <span className="sidebar-admin-link-title">{item.label}</span>
-                      <span className="sidebar-admin-link-note">{item.description}</span>
-                    </NavLink>
-                  ))}
-                </div>
+                  >
+                    <span className="sidebar-admin-link-title">{item.label}</span>
+                  </NavLink>
+                ))}
+              </div>
               ) : null}
             </div>
           ) : null}
