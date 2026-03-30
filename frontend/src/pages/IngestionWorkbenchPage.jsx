@@ -1163,7 +1163,7 @@ export default function IngestionWorkbenchPage() {
           <div className="ingest-entry-list">
             <div className="ingest-entry-item">适合：远程来源连接、目录扫描、批量入湖、索引构建与配置复用。</div>
             <div className="ingest-entry-item">流程：先连来源，再扫描，再决定批量执行与索引策略。</div>
-            <div className="ingest-entry-item">优势：接入配置可保存，后续重复执行不用每次重新填参数。</div>
+            <div className="ingest-entry-item">优势：来源配置可保存，后续重复执行不用每次重新填参数。</div>
           </div>
         </section>
 

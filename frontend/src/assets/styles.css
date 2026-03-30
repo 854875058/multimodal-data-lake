@@ -1660,6 +1660,41 @@ pre {
   gap: 12px;
 }
 
+.local-upload-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 14px;
+}
+
+.local-upload-dropzone {
+  min-height: 260px;
+}
+
+.local-upload-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.local-upload-side-card {
+  min-height: 100%;
+}
+
+.local-upload-note-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.local-upload-note-item {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f7f8fa;
+  border: 1px solid #eef0f3;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
 .ingest-entry-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3207,6 +3242,7 @@ pre {
   .query-top-grid,
   .query-studio-grid,
   .chart-grid,
+  .local-upload-shell,
   .workbench-strategy-grid,
   .workbench-command-deck,
   .workbench-results-shell,

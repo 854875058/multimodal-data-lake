@@ -51,7 +51,7 @@ const systemGroup = {
   title: '系统配置',
   note: '连接配置、日志与巡检诊断',
   items: [
-    { path: '/settings/access', code: '08', label: '接入配置', tag: '配置', description: '连接参数与默认模板' },
+    { path: '/settings/access', code: '08', label: '来源配置', tag: '配置', description: '连接参数与默认模板' },
     { path: '/logs', code: '09', label: '系统日志', tag: '日志', description: '日志诊断与巡检视图' }
   ]
 }
@@ -397,7 +397,7 @@ function AppShell({ authSession, onLogout }) {
             <span className="sidebar-pill">FastAPI</span>
           </div>
           <div className="sidebar-note">
-            主业务导航只保留湖总览、湖计算、湖存储三条主线；接入配置、系统日志与权限入口单独收口，避免打断业务路径。
+            主业务导航只保留湖总览、湖计算、湖存储三条主线；来源配置、系统日志与权限入口单独收口，避免打断业务路径。
           </div>
         </div>
       </aside>
@@ -474,7 +474,7 @@ function AppShell({ authSession, onLogout }) {
               <div className="shell-stat-label">控制台简报</div>
               <div className="shell-brief-title">主导航按总览、计算、存储三条主线组织</div>
               <div className="shell-brief-copy">
-                业务入口只保留主任务路径，接入配置、系统日志与账号权限从主菜单剥离到独立入口，减少“同层混放”的导航噪音。
+                业务入口只保留主任务路径，来源配置、系统日志与账号权限从主菜单剥离到独立入口，减少“同层混放”的导航噪音。
               </div>
               <div className="shell-brief-metrics">
                 <div className="shell-brief-metric">

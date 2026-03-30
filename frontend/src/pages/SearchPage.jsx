@@ -266,7 +266,7 @@ export default function SearchPage() {
           <div className="card-header">
             <div>
               <h2>Doris 连接状态</h2>
-              <p>Doris 连接参数已统一收口到“接入配置”，查询台只消费已保存配置并负责联邦查询执行。</p>
+              <p>Doris 连接参数已统一收口到“来源配置”，查询台只消费已保存配置并负责联邦查询执行。</p>
             </div>
             {dorisStatus ? <span className={`badge ${dorisStatus.connected ? 'is-success' : 'is-warning'}`}>{dorisStatus.status || dorisStatus.mode}</span> : null}
           </div>
@@ -274,7 +274,7 @@ export default function SearchPage() {
           <div className="detail-grid">
             <div className="detail-item">
               <div className="kpi-label">配置归口</div>
-              <div className="detail-value">接入配置</div>
+              <div className="detail-value">来源配置</div>
             </div>
             <div className="detail-item">
               <div className="kpi-label">Doris HTTP</div>
@@ -312,7 +312,7 @@ export default function SearchPage() {
 
           <div className="toolbar-group">
             <button type="button" className="button button-primary" onClick={() => navigate('/settings/access')}>
-              前往接入配置
+              前往来源配置
             </button>
             <button type="button" className="button button-secondary" onClick={loadPageData}>
               刷新配置

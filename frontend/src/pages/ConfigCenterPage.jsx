@@ -207,9 +207,9 @@ export default function ConfigCenterPage() {
     try {
       const response = await api.saveWorkbenchSettings(buildWorkbenchPayload(workbenchSettings))
       setWorkbenchSettings(normalizeWorkbenchSettings(response?.data || workbenchSettings))
-      setBanner({ type: 'success', message: response?.message || '默认接入配置已保存。' })
+      setBanner({ type: 'success', message: response?.message || '默认来源模板已保存。' })
     } catch (requestError) {
-      setError(getErrorMessage(requestError, '保存默认接入配置失败。'))
+      setError(getErrorMessage(requestError, '保存默认来源模板失败。'))
     } finally {
       setSavingWorkbench(false)
     }
@@ -237,16 +237,26 @@ export default function ConfigCenterPage() {
     return <div className="loading-state">配置中心加载中...</div>
   }
 
+  const defaultSourceLabel = workbenchSettings.source_type === 'sftp' ? 'SFTP' : 'S3 / SeaweedFS'
+  const defaultSourceLocation = workbenchSettings.source_type === 'sftp'
+    ? `${workbenchSettings.sftp_host || '--'} / ${workbenchSettings.sftp_path || '/'}`
+    : `${workbenchSettings.bucket_name || '--'} / ${workbenchSettings.prefix || '/'}`
+  const currentIndexModeLabel = indexModeOptions.find((option) => option.value === getIndexModeValue(workbenchSettings))?.label || getIndexModeValue(workbenchSettings)
+  const onlineCount = componentStatus.filter((item) => item.online).length
+
   return (
     <div className="content-wrap">
       <div className="page-header">
         <div>
-          <h1 className="page-title">接入配置</h1>
-          <p className="page-subtitle">把平台连接配置和默认接入模板收口到系统配置下的接入配置模块，其他页面只消费配置，不再各自承担配置入口。</p>
+          <h1 className="page-title">来源配置</h1>
+          <p className="page-subtitle">统一维护平台连接和默认来源模板。接入与扫描、查询分析等页面只消费这里的保存结果，不再各自承担配置入口。</p>
         </div>
         <div className="page-actions">
           <button type="button" className="button button-secondary" onClick={loadData}>
             刷新配置
+          </button>
+          <button type="button" className="button button-primary" onClick={() => navigate('/workbench')}>
+            前往接入与扫描
           </button>
         </div>
       </div>
@@ -254,12 +264,42 @@ export default function ConfigCenterPage() {
       {banner.message ? <div className={`${banner.type}-banner`}>{banner.message}</div> : null}
       {error ? <div className="error-banner">{error}</div> : null}
 
+      <section className="glass-card workbench-console-panel">
+        <div className="workbench-guide-strip">
+          <span className="badge">Source Config</span>
+          <span className="workbench-guide-copy">这里维护的是全局来源配置和平台连接，不直接执行扫描或导入任务。真正的扫描、筛选和批量入湖请去“接入与扫描”。</span>
+        </div>
+
+        <div className="workbench-summary-grid">
+          <div className="workbench-summary-card">
+            <div className="kpi-label">默认来源</div>
+            <div className="workbench-summary-value">{defaultSourceLabel}</div>
+            <div className="workbench-summary-note mono">{defaultSourceLocation}</div>
+          </div>
+          <div className="workbench-summary-card">
+            <div className="kpi-label">默认索引策略</div>
+            <div className="workbench-summary-value">{currentIndexModeLabel}</div>
+            <div className="workbench-summary-note">文本索引 {workbenchSettings.build_text_index ? '开启' : '关闭'} / 图像索引 {workbenchSettings.build_image_index ? '开启' : '关闭'}</div>
+          </div>
+          <div className="workbench-summary-card">
+            <div className="kpi-label">SeaweedFS S3</div>
+            <div className="workbench-summary-value">{platformSettings.seaweedfs_s3_url ? '已配置' : '未配置'}</div>
+            <div className="workbench-summary-note mono">{platformSettings.seaweedfs_s3_url || '--'}</div>
+          </div>
+          <div className="workbench-summary-card">
+            <div className="kpi-label">组件在线数</div>
+            <div className="workbench-summary-value">{formatNumber(onlineCount)}</div>
+            <div className="workbench-summary-note">共 {formatNumber(componentStatus.length)} 个组件已纳入巡检视图</div>
+          </div>
+        </div>
+      </section>
+
       <div className="query-top-grid">
         <section className="glass-card">
           <div className="card-header">
             <div>
-              <h2>平台连接配置</h2>
-              <p>统一管理 Gravitino、Ray、SeaweedFS 和 Doris 地址，避免散落在各个功能页里。</p>
+              <h2>平台连接</h2>
+              <p>统一管理 Gravitino、Ray、SeaweedFS 和 Doris 的地址与连接参数，避免散落在各个功能页里。</p>
             </div>
           </div>
 
@@ -323,8 +363,8 @@ export default function ConfigCenterPage() {
         <section className="glass-card">
           <div className="card-header">
             <div>
-              <h2>默认接入模板</h2>
-              <p>统一管理 AI 工作台默认来源、扫描和索引策略，避免每次接入都手工重填。</p>
+              <h2>默认来源模板</h2>
+              <p>统一管理接入与扫描页面默认来源、扫描和索引策略，避免每次进入工作台都手工重填。</p>
             </div>
           </div>
 
@@ -440,7 +480,7 @@ export default function ConfigCenterPage() {
 
           <div className="toolbar-group">
             <button type="button" className="button button-primary" onClick={handleSaveWorkbench} disabled={savingWorkbench}>
-              {savingWorkbench ? '保存中...' : '保存默认接入模板'}
+              {savingWorkbench ? '保存中...' : '保存默认来源模板'}
             </button>
           </div>
         </section>
