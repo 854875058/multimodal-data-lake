@@ -220,8 +220,8 @@ function AppShell({ authSession, onLogout }) {
   }
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar shell-panel">
+    <div className="app-shell shell-frame">
+      <aside className="sidebar shell-panel shell-sidebar">
         <div className="brand-block">
           <div className="brand-logo">ML</div>
           <div className="brand-copy">
@@ -392,8 +392,8 @@ function AppShell({ authSession, onLogout }) {
         </div>
       </aside>
 
-      <main className="app-main">
-        <section className="shell-toolbar shell-panel">
+      <main className="app-main shell-main">
+        <section className="shell-toolbar shell-panel shell-hero">
           <div className="shell-toolbar-main">
             <div className="shell-toolbar-kicker">多模态数据湖统一控制面</div>
             <div className="shell-toolbar-title">湖仓运行控制台</div>
@@ -424,7 +424,7 @@ function AppShell({ authSession, onLogout }) {
           </div>
         </section>
 
-        <section className="shell-header">
+        <section className="shell-header shell-overview">
           <div className="shell-header-main">
             <div className="shell-eyebrow">{currentGroup.title}</div>
             <div className="shell-title-row">
@@ -497,7 +497,7 @@ function AppShell({ authSession, onLogout }) {
           </div>
         </section>
 
-        <div className="page-stage">
+        <div className="page-stage shell-content-stage">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
