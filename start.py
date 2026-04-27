@@ -29,7 +29,8 @@ def _ensure_conda_env():
         print(f"  pip install -r requirements.txt")
         sys.exit(1)
     print(f"自动切换到 conda 环境: {_CONDA_ENV}")
-    os.execv(str(target_python), [str(target_python)] + sys.argv)
+    result = subprocess.run([str(target_python)] + sys.argv, env={**os.environ, "CONDA_DEFAULT_ENV": _CONDA_ENV})
+    sys.exit(result.returncode)
 
 _ensure_conda_env()
 
