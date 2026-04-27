@@ -172,8 +172,8 @@ def start_backend():
 
     check_python_packages()
 
-    print("\n后端地址: http://localhost:8090")
-    print("API 文档: http://localhost:8090/docs")
+    print("\n后端地址: http://localhost:27843")
+    print("API 文档: http://localhost:27843/docs")
     print("\n按 Ctrl+C 停止服务\n")
 
     # 启动后端（开发模式默认开启热重载）
@@ -198,8 +198,8 @@ def start_frontend():
     if not install_frontend_deps():
         return
 
-    print("\n前端地址: http://localhost:3000")
-    print("后端代理: http://localhost:8090")
+    print("\n前端地址: http://localhost:27844")
+    print("后端代理: http://localhost:27843")
     print("\n按 Ctrl+C 停止服务\n")
 
     # 启动前端
@@ -238,8 +238,8 @@ def start_both():
     if not install_frontend_deps():
         return
 
-    print("\n后端地址: http://localhost:8090")
-    print("前端地址: http://localhost:3000")
+    print("\n后端地址: http://localhost:27843")
+    print("前端地址: http://localhost:27844")
     print("\n按 Ctrl+C 停止所有服务\n")
 
     # 启动后端（开发模式默认开启热重载）
@@ -267,7 +267,7 @@ def start_both():
     processes.append(frontend_proc)
 
     print("\n所有服务已启动！")
-    print("访问 http://localhost:3000 开始使用\n")
+    print("访问 http://localhost:27844 开始使用\n")
 
     # 等待进程
     try:
@@ -298,8 +298,8 @@ def start_production():
 
     # 启动后端
     print("\n[2/2] 启动后端...")
-    print("\n服务地址: http://localhost:8090")
-    print("API 文档: http://localhost:8090/docs")
+    print("\n服务地址: http://localhost:27843")
+    print("API 文档: http://localhost:27843/docs")
     print("\n前端已构建并集成到后端")
     print("按 Ctrl+C 停止服务\n")
 

@@ -40,7 +40,7 @@ CORS_ALLOW_ORIGINS = [
     item.strip()
     for item in os.getenv(
         "CORS_ALLOW_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000",
+        "http://localhost:27844,http://127.0.0.1:27844",
     ).split(",")
     if item.strip()
 ]

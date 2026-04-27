@@ -150,7 +150,7 @@ if __name__ == '__main__':
     import os
     import uvicorn
 
-    port = int(os.getenv('BACKEND_PORT', '8090'))
+    port = int(os.getenv('BACKEND_PORT', '27843'))
     app_target = 'backend.main:app' if BACKEND_RELOAD else app
     uvicorn.run(
         app_target,

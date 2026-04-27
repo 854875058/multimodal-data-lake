@@ -45,8 +45,8 @@ BACKEND_DIR = ROOT_DIR / "backend"
 FRONTEND_DIR = ROOT_DIR / "frontend"
 PIDFILE_DIR = ROOT_DIR / ".pids"
 
-BACKEND_PORT = 8090
-FRONTEND_PORT = 3000
+BACKEND_PORT = 27843
+FRONTEND_PORT = 27844
 
 IS_WINDOWS = platform.system() == "Windows"
 
@@ -375,7 +375,7 @@ def cmd_status(args):
     elif _port_in_use(FRONTEND_PORT):
         warn(f"前端:     端口 {FRONTEND_PORT} 已占用（非本脚本启动）")
     else:
-        info("前端:     未运行  (生产模式由后端 :8090 提供静态文件)")
+        info("前端:     未运行  (生产模式由后端 :27843 提供静态文件)")
 
     # 前端构建产物
     dist_index = FRONTEND_DIR / "dist" / "index.html"
