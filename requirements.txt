@@ -39,7 +39,7 @@ paramiko>=3.4.0
 psutil>=5.9.0
 
 # --- 数值计算 ---
-numpy>=1.24.0
+numpy>=1.24.0,<2.0
 
 # --- 用户认证 ---
 passlib[bcrypt]>=1.7.4
