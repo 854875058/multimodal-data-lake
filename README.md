@@ -80,7 +80,7 @@ DeepSeek (Knowledge Graph)        pandas (Tabular)
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └───┬───┘  │
 │       └─────────────┴────────────┴─────────────┴───────────┘      │
 ├──────────────────────────────────────────────────────────────────┤
-│                      FastAPI Backend (:8090)                       │
+│                      FastAPI Backend (:27843)                      │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────┐  │
 │  │ ETL      │ │ Hybrid   │ │ KG       │ │ Dashboard│ │ Auth  │  │
 │  │ Pipeline │ │ Search   │ │ Extract  │ │ Stats    │ │ RBAC  │  │
@@ -109,8 +109,8 @@ cd frontend && npm install && npm run build && cd ..
 
 # 4. Start
 python start.py
-# Backend + Frontend → http://localhost:8090
-# API Docs → http://localhost:8090/docs
+# Backend + Frontend → http://localhost:27843
+# API Docs → http://localhost:27843/docs
 ```
 
 ## Project Structure
