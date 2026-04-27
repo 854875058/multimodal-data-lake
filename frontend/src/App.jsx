@@ -170,21 +170,9 @@ function AppShell({ authSession, onLogout }) {
     (item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
   ) || primaryNavItems[0]
   const currentGroup = navGroupsByKey[currentNav.groupKey] || navGroups[0]
-  const checkedDate = new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    weekday: 'short'
-  }).format(new Date())
-  const absoluteDate = new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(new Date())
-  const highlightedModules = currentGroup.items.slice(0, 4)
   const currentUser = authSession.user
   const roleLabel = currentUser?.is_admin ? '系统管理员' : '平台用户'
   const showAdminLinks = Boolean(currentUser?.is_admin)
-  const visibleItemCount = currentGroup.items.length
   const [openPrimaryGroupKey, setOpenPrimaryGroupKey] = useState(() => (
     primaryGroupKeys.includes(currentNav.groupKey) ? currentNav.groupKey : navGroups[0].key
   ))
@@ -329,27 +317,6 @@ function AppShell({ authSession, onLogout }) {
           ) : null}
         </div>
 
-        <div className="sidebar-runtime-card">
-          <div className="sidebar-section-label">控制室</div>
-          <div className="sidebar-runtime-grid">
-            <div className="runtime-metric">
-              <div className="runtime-metric-label">当前页面</div>
-              <div className="runtime-metric-value">{currentNav.label}</div>
-              <div className="runtime-metric-note">{currentNav.description}</div>
-            </div>
-            <div className="runtime-metric">
-              <div className="runtime-metric-label">当前分组</div>
-              <div className="runtime-metric-value">{currentGroup.title}</div>
-              <div className="runtime-metric-note">{currentGroup.note}</div>
-            </div>
-            <div className="runtime-metric is-wide">
-              <div className="runtime-metric-label">当前路径</div>
-              <div className="runtime-metric-path">{currentNav.path}</div>
-              <div className="runtime-metric-note">控制台路由定位</div>
-            </div>
-          </div>
-        </div>
-
         <div className="sidebar-account-card">
           <div className="sidebar-section-label">当前登录</div>
           <div className="sidebar-account-top">
@@ -363,10 +330,6 @@ function AppShell({ authSession, onLogout }) {
           </div>
           <div className="sidebar-pill-row">
             <span className="sidebar-pill">{roleLabel}</span>
-            <span className="sidebar-pill">{currentUser?.email ? '已绑定邮箱' : '未绑定邮箱'}</span>
-          </div>
-          <div className="sidebar-note">
-            {currentUser?.email || '当前账号尚未配置邮箱信息，可在用户管理中补充。'}
           </div>
           <button type="button" className="button button-secondary button-small sidebar-account-action" onClick={handleLogoutClick}>
             退出登录
@@ -374,130 +337,30 @@ function AppShell({ authSession, onLogout }) {
         </div>
 
         <div className="sidebar-foot">
-          <div className="sidebar-section-label">平台基座</div>
           <div className="sidebar-pill-row">
             <span className="sidebar-pill">Gravitino</span>
             <span className="sidebar-pill">SeaweedFS</span>
             <span className="sidebar-pill">Lance</span>
-          </div>
-          <div className="sidebar-pill-row">
             <span className="sidebar-pill">Ray</span>
-            <span className="sidebar-pill">Doris</span>
-            <span className="sidebar-pill">React</span>
             <span className="sidebar-pill">FastAPI</span>
-          </div>
-          <div className="sidebar-note">
-            主业务导航只保留湖总览、湖计算、湖存储三条主线；来源配置、系统日志与权限入口单独收口，避免打断业务路径。
           </div>
         </div>
       </aside>
 
-      <main className="app-main shell-main">
-        <section className="shell-toolbar shell-panel shell-hero">
-          <div className="shell-toolbar-main">
-            <div className="shell-toolbar-kicker">多模态数据湖统一控制面</div>
-            <div className="shell-toolbar-title">湖仓运行控制台</div>
-            <div className="shell-toolbar-meta">
-              <span className="toolbar-token is-primary">{currentGroup.title}</span>
-              <span className="toolbar-token">{currentNav.label}</span>
-              <span className="toolbar-token">可见入口 {String(visibleItemCount).padStart(2, '0')}</span>
-              <span className="toolbar-token">{currentUser?.is_admin ? '管理员会话' : '用户会话'}</span>
-              <span className="toolbar-token">@{currentUser?.username}</span>
-            </div>
+      <main className=”app-main”>
+        <div className=”app-topbar”>
+          <div className=”topbar-breadcrumb”>
+            <span className=”topbar-breadcrumb-group”>{currentGroup.title}</span>
+            <span className=”topbar-breadcrumb-sep”> / </span>
+            <span className=”topbar-breadcrumb-page”>{currentNav.label}</span>
           </div>
-          <div className="shell-toolbar-rail">
-            <div className="toolbar-pulse-card">
-              <div className="toolbar-pulse-label">主导航</div>
-              <div className="toolbar-pulse-value">{String(navGroups.length).padStart(2, '0')}</div>
-              <div className="toolbar-pulse-note">按湖总览、湖计算、湖存储组织</div>
-            </div>
-            <div className="toolbar-pulse-card">
-              <div className="toolbar-pulse-label">当前页面</div>
-              <div className="toolbar-pulse-value">{currentNav.label}</div>
-              <div className="toolbar-pulse-note">{currentNav.description}</div>
-            </div>
-            <div className="toolbar-pulse-card">
-              <div className="toolbar-pulse-label">巡检日期</div>
-              <div className="toolbar-pulse-value">{absoluteDate}</div>
-              <div className="toolbar-pulse-note">控制面最近核验日期</div>
-            </div>
+          <div className=”topbar-user”>
+            <span className=”topbar-user-name”>@{currentUser?.username}</span>
+            <span className=”topbar-user-role”>{roleLabel}</span>
           </div>
-        </section>
+        </div>
 
-        <section className="shell-header shell-overview">
-          <div className="shell-header-main">
-            <div className="shell-eyebrow">{currentGroup.title}</div>
-            <div className="shell-title-row">
-              <h1 className="shell-title">{currentNav.label}</h1>
-              <span className="shell-badge">{currentNav.tag}</span>
-            </div>
-            <p className="shell-subtitle">{currentNav.description}</p>
-
-            <div className="shell-command-row">
-              {highlightedModules.map((item) => (
-                <div key={item.path} className={`command-pill${item.path === currentNav.path ? ' is-active' : ''}`}>
-                  <span className="command-pill-code">{item.code}</span>
-                  <span className="command-pill-label">{item.label}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="shell-subnav">
-              {currentGroup.items.map((item) => {
-                const isGuarded = Boolean(item.requiresAdmin && !currentUser?.is_admin)
-
-                return (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    className={({ isActive }) => `subnav-item${isActive ? ' is-active' : ''}${isGuarded ? ' is-guarded' : ''}`}
-                  >
-                    {item.label}
-                  </NavLink>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="shell-side-panel">
-            <div className="shell-brief-card">
-              <div className="shell-stat-label">控制台简报</div>
-              <div className="shell-brief-title">主导航按总览、计算、存储三条主线组织</div>
-              <div className="shell-brief-copy">
-                业务入口只保留主任务路径，来源配置、系统日志与账号权限从主菜单剥离到独立入口，减少“同层混放”的导航噪音。
-              </div>
-              <div className="shell-brief-metrics">
-                <div className="shell-brief-metric">
-                  <div className="shell-brief-metric-label">当前页面</div>
-                  <div className="shell-brief-metric-value">{currentNav.label}</div>
-                </div>
-                <div className="shell-brief-metric">
-                  <div className="shell-brief-metric-label">页面归属</div>
-                  <div className="shell-brief-metric-value">{currentGroup.title}</div>
-                </div>
-              </div>
-            </div>
-            <div className="shell-stat-grid">
-              <div className="shell-stat-card">
-                <div className="shell-stat-label">当前分组</div>
-                <div className="shell-stat-value">{currentGroup.title}</div>
-                <div className="shell-stat-note">{currentGroup.note}</div>
-              </div>
-              <div className="shell-stat-card">
-                <div className="shell-stat-label">二级模块</div>
-                <div className="shell-stat-value">{String(visibleItemCount).padStart(2, '0')}</div>
-                <div className="shell-stat-note">当前分组下可切换的功能模块</div>
-              </div>
-              <div className="shell-stat-card">
-                <div className="shell-stat-label">当前身份</div>
-                <div className="shell-stat-value">{currentUser?.is_admin ? 'Admin' : 'User'}</div>
-                <div className="shell-stat-note">{roleLabel} · @{currentUser?.username}</div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="page-stage shell-content-stage">
+        <div className=”page-stage shell-content-stage”>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
