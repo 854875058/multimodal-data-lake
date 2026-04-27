@@ -151,21 +151,17 @@ pre {
   gap: 10px;
 }
 
-.brand-logo {
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
-  border-radius: 10px;
-  display: grid;
-  place-items: center;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  color: var(--accent-strong);
-  background: #f2f7ff;
-  border: 1px solid rgba(22, 93, 255, 0.12);
-  box-shadow: none;
+.brand-logo-img {
+  width: 80px;
+  height: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.lp-logo-img {
+  height: 36px;
+  width: auto;
+  object-fit: contain;
 }
 
 .brand-copy {

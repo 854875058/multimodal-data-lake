@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import api, { getErrorMessage } from '@/api'
+import boncLogo from '@/assets/bonc.jpg'
 
 function resolveRedirectTarget(location) {
   const candidate = location.state?.from
@@ -53,8 +54,7 @@ export default function LoginPage({ onLoginSuccess }) {
     <div className="lp-shell">
       <div className="lp-left">
         <div className="lp-logo">
-          <div className="lp-logo-mark">ML</div>
-          <span className="lp-logo-name">多模态数据湖</span>
+          <img src={boncLogo} alt="东方国信 BONC" className="lp-logo-img" />
         </div>
         <div className="lp-hero">
           <h1 className="lp-hero-title">多模态数据湖仓</h1>

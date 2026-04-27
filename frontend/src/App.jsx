@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { clearAuthSession, loadAuthSession, saveAuthSession, subscribeAuthSession } from '@/auth/session'
+import boncLogo from '@/assets/bonc.jpg'
 import ConfigCenterPage from './pages/ConfigCenterPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
@@ -211,9 +212,8 @@ function AppShell({ authSession, onLogout }) {
     <div className="app-shell shell-frame">
       <aside className="sidebar shell-panel shell-sidebar">
         <div className="brand-block">
-          <div className="brand-logo">ML</div>
+          <img src={boncLogo} alt="东方国信 BONC" className="brand-logo-img" />
           <div className="brand-copy">
-            <div className="shell-eyebrow">多模态数据湖</div>
             <div className="brand-title">湖仓控制台</div>
             <div className="brand-subtitle">湖总览 · 湖计算 · 湖存储</div>
           </div>
