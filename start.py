@@ -13,6 +13,36 @@ import time
 import signal
 from pathlib import Path
 
+# --- conda 环境自检 ---
+_CONDA_ENV = "multimodal-lake"
+
+def _ensure_conda_env():
+    current = os.environ.get("CONDA_DEFAULT_ENV", "")
+    if current == _CONDA_ENV:
+        return
+    # 找 conda 环境下的 python
+    conda_root = os.environ.get("CONDA_EXE", "")
+    if conda_root:
+        envs_dir = Path(conda_root).parent.parent / "envs"
+    else:
+        envs_dir = Path(sys.executable).parent.parent.parent / "envs"
+    if sys.platform == "win32":
+        target_python = envs_dir / _CONDA_ENV / "python.exe"
+    else:
+        target_python = envs_dir / _CONDA_ENV / "bin" / "python"
+    if not target_python.exists():
+        print(f"未找到 conda 环境 '{_CONDA_ENV}'，请先运行：")
+        print(f"  conda create -n {_CONDA_ENV} python=3.11 -y")
+        print(f"  conda activate {_CONDA_ENV}")
+        print(f"  pip install \"numpy<2.0\"")
+        print(f"  pip install -r requirements.txt")
+        sys.exit(1)
+    print(f"自动切换到 conda 环境: {_CONDA_ENV}")
+    os.execv(str(target_python), [str(target_python)] + sys.argv)
+
+_ensure_conda_env()
+# --- end conda 环境自检 ---
+
 # 项目根目录
 ROOT_DIR = Path(__file__).parent.absolute()
 BACKEND_DIR = ROOT_DIR / "backend"
