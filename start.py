@@ -1,14 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-DataVerse Pro 跨平台启动脚本
-支持 Windows 和 Linux 系统
-"""
+"""多模态数据湖启动脚本 - 用法: python start.py start|stop|status|restart"""
 
 import os
 import sys
 import subprocess
-import argparse
 import time
 import signal
 from pathlib import Path
@@ -17,19 +13,14 @@ from pathlib import Path
 _CONDA_ENV = "multimodal-lake"
 
 def _ensure_conda_env():
-    current = os.environ.get("CONDA_DEFAULT_ENV", "")
-    if current == _CONDA_ENV:
+    if os.environ.get("CONDA_DEFAULT_ENV", "") == _CONDA_ENV:
         return
-    # 找 conda 环境下的 python
     conda_root = os.environ.get("CONDA_EXE", "")
     if conda_root:
         envs_dir = Path(conda_root).parent.parent / "envs"
     else:
         envs_dir = Path(sys.executable).parent.parent.parent / "envs"
-    if sys.platform == "win32":
-        target_python = envs_dir / _CONDA_ENV / "python.exe"
-    else:
-        target_python = envs_dir / _CONDA_ENV / "bin" / "python"
+    target_python = envs_dir / _CONDA_ENV / ("python.exe" if sys.platform == "win32" else "bin/python")
     if not target_python.exists():
         print(f"未找到 conda 环境 '{_CONDA_ENV}'，请先运行：")
         print(f"  conda create -n {_CONDA_ENV} python=3.11 -y")
@@ -41,310 +32,195 @@ def _ensure_conda_env():
     os.execv(str(target_python), [str(target_python)] + sys.argv)
 
 _ensure_conda_env()
-# --- end conda 环境自检 ---
 
-# 项目根目录
 ROOT_DIR = Path(__file__).parent.absolute()
-BACKEND_DIR = ROOT_DIR / "backend"
 FRONTEND_DIR = ROOT_DIR / "frontend"
 BACKEND_ENTRY = Path("backend") / "main.py"
+PID_DIR = ROOT_DIR / ".pids"
+PID_BACKEND = PID_DIR / "backend.pid"
+PID_FRONTEND = PID_DIR / "frontend.pid"
+LOG_DIR = ROOT_DIR / "logs"
 
-# 进程列表（用于清理）
-processes = []
+BACKEND_PORT = 27843
+FRONTEND_PORT = 27844
 
-def signal_handler(sig, frame):
-    """处理 Ctrl+C 信号"""
-    print("\n\n正在停止所有服务...")
-    for proc in processes:
-        try:
-            if sys.platform == "win32":
-                proc.terminate()
-            else:
-                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-        except Exception as e:
-            print(f"停止进程失败: {e}")
-    sys.exit(0)
 
-signal.signal(signal.SIGINT, signal_handler)
+def _ensure_dirs():
+    PID_DIR.mkdir(exist_ok=True)
+    LOG_DIR.mkdir(exist_ok=True)
 
-def check_python_packages():
-    """检查并安装 Python 依赖"""
-    print("检查 Python 依赖...")
-    required = ["fastapi", "uvicorn"]
-    missing = []
+def _write_pid(pid_file, pid):
+    pid_file.write_text(str(pid))
 
-    for pkg in required:
-        try:
-            __import__(pkg)
-        except ImportError:
-            missing.append(pkg)
-
-    if missing:
-        print(f"安装缺失的依赖: {', '.join(missing)}")
-        subprocess.check_call([
-            sys.executable, "-m", "pip", "install",
-            "fastapi", "uvicorn[standard]", "python-multipart"
-        ])
-        print("依赖安装完成")
-    else:
-        print("Python 依赖已满足")
-
-def check_node():
-    """检查 Node.js 是否安装"""
+def _read_pid(pid_file):
     try:
-        result = subprocess.run(
-            ["node", "--version"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        print(f"Node.js 版本: {result.stdout.strip()}")
+        return int(pid_file.read_text().strip())
+    except Exception:
+        return None
+
+def _is_running(pid):
+    if pid is None:
+        return False
+    try:
+        if sys.platform == "win32":
+            result = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}"],
+                capture_output=True, text=True
+            )
+            return str(pid) in result.stdout
+        else:
+            os.kill(pid, 0)
+            return True
+    except (ProcessLookupError, PermissionError, OSError):
+        return False
+
+def _kill_pid(pid):
+    if pid is None:
+        return
+    try:
+        if sys.platform == "win32":
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+        else:
+            os.kill(pid, signal.SIGTERM)
+    except Exception:
+        pass
+
+def _check_node():
+    try:
+        subprocess.run(["node", "--version"], capture_output=True, check=True)
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("错误: 未检测到 Node.js，请先安装 Node.js")
-        print("下载地址: https://nodejs.org/")
+        print("错误: 未检测到 Node.js")
         return False
 
-def install_frontend_deps():
-    """安装前端依赖"""
-    node_modules = FRONTEND_DIR / "node_modules"
-
-    if node_modules.exists():
-        print("前端依赖已安装")
+def _install_frontend_deps():
+    if (FRONTEND_DIR / "node_modules").exists():
         return True
-
-    print("首次运行，安装前端依赖...")
-    print("这可能需要几分钟，请耐心等待...")
-
+    print("安装前端依赖...")
     try:
         subprocess.check_call(
-            ["npm", "install"],
-            cwd=str(FRONTEND_DIR),
+            ["npm", "install"], cwd=str(FRONTEND_DIR),
             shell=(sys.platform == "win32")
         )
-        print("前端依赖安装完成")
         return True
-    except subprocess.CalledProcessError as e:
-        print(f"前端依赖安装失败: {e}")
+    except subprocess.CalledProcessError:
+        print("前端依赖安装失败")
         return False
 
-def build_frontend():
-    """构建前端"""
-    print("构建前端...")
-
-    try:
-        subprocess.check_call(
-            ["npm", "run", "build"],
-            cwd=str(FRONTEND_DIR),
-            shell=(sys.platform == "win32")
-        )
-        print("前端构建完成")
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"前端构建失败: {e}")
-        return False
-
-
-def start_backend_process(reload=False):
-    """从仓库根目录启动后端进程，并通过环境变量控制是否热重载。"""
+def _start_backend():
     env = os.environ.copy()
-    env["BACKEND_RELOAD"] = "1" if reload else "0"
-
+    env["BACKEND_RELOAD"] = "0"
+    log_out = open(LOG_DIR / "backend.out.log", "a")
+    log_err = open(LOG_DIR / "backend.err.log", "a")
     if sys.platform == "win32":
-        return subprocess.Popen(
+        proc = subprocess.Popen(
             [sys.executable, str(BACKEND_ENTRY)],
-            cwd=str(ROOT_DIR),
-            env=env,
-        )
-
-    return subprocess.Popen(
-        [sys.executable, str(BACKEND_ENTRY)],
-        cwd=str(ROOT_DIR),
-        env=env,
-        preexec_fn=os.setsid,
-    )
-
-def start_backend():
-    """启动后端服务"""
-    print("\n" + "="*50)
-    print("启动后端服务 (FastAPI)")
-    print("="*50)
-
-    check_python_packages()
-
-    print("\n后端地址: http://localhost:27843")
-    print("API 文档: http://localhost:27843/docs")
-    print("\n按 Ctrl+C 停止服务\n")
-
-    # 启动后端（开发模式默认开启热重载）
-    proc = start_backend_process(reload=True)
-
-    processes.append(proc)
-
-    try:
-        proc.wait()
-    except KeyboardInterrupt:
-        pass
-
-def start_frontend():
-    """启动前端开发服务"""
-    print("\n" + "="*50)
-    print("启动前端开发服务 (Vite)")
-    print("="*50)
-
-    if not check_node():
-        return
-
-    if not install_frontend_deps():
-        return
-
-    print("\n前端地址: http://localhost:27844")
-    print("后端代理: http://localhost:27843")
-    print("\n按 Ctrl+C 停止服务\n")
-
-    # 启动前端
-    if sys.platform == "win32":
-        proc = subprocess.Popen(
-            ["npm", "run", "dev"],
-            cwd=str(FRONTEND_DIR),
-            shell=True
+            cwd=str(ROOT_DIR), env=env,
+            stdout=log_out, stderr=log_err,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
         )
     else:
         proc = subprocess.Popen(
-            ["npm", "run", "dev"],
-            cwd=str(FRONTEND_DIR),
-            preexec_fn=os.setsid
+            [sys.executable, str(BACKEND_ENTRY)],
+            cwd=str(ROOT_DIR), env=env,
+            stdout=log_out, stderr=log_err,
+            preexec_fn=os.setsid,
         )
+    return proc.pid
 
-    processes.append(proc)
-
-    try:
-        proc.wait()
-    except KeyboardInterrupt:
-        pass
-
-def start_both():
-    """同时启动前后端"""
-    print("\n" + "="*50)
-    print("启动前后端服务 (开发模式)")
-    print("="*50)
-
-    # 检查依赖
-    check_python_packages()
-
-    if not check_node():
-        return
-
-    if not install_frontend_deps():
-        return
-
-    print("\n后端地址: http://localhost:27843")
-    print("前端地址: http://localhost:27844")
-    print("\n按 Ctrl+C 停止所有服务\n")
-
-    # 启动后端（开发模式默认开启热重载）
-    print("[1/2] 启动后端...")
-    backend_proc = start_backend_process(reload=True)
-    processes.append(backend_proc)
-
-    # 等待后端启动
-    time.sleep(3)
-
-    # 启动前端
-    print("[2/2] 启动前端...")
+def _start_frontend():
+    log_out = open(LOG_DIR / "frontend.out.log", "a")
+    log_err = open(LOG_DIR / "frontend.err.log", "a")
     if sys.platform == "win32":
-        frontend_proc = subprocess.Popen(
-            ["npm", "run", "dev"],
-            cwd=str(FRONTEND_DIR),
-            shell=True
+        proc = subprocess.Popen(
+            ["npm", "run", "dev"], cwd=str(FRONTEND_DIR),
+            shell=True, stdout=log_out, stderr=log_err,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
         )
     else:
-        frontend_proc = subprocess.Popen(
-            ["npm", "run", "dev"],
-            cwd=str(FRONTEND_DIR),
-            preexec_fn=os.setsid
+        proc = subprocess.Popen(
+            ["npm", "run", "dev"], cwd=str(FRONTEND_DIR),
+            stdout=log_out, stderr=log_err,
+            preexec_fn=os.setsid,
         )
-    processes.append(frontend_proc)
+    return proc.pid
 
-    print("\n所有服务已启动！")
-    print("访问 http://localhost:27844 开始使用\n")
 
-    # 等待进程
-    try:
-        backend_proc.wait()
-        frontend_proc.wait()
-    except KeyboardInterrupt:
-        pass
+def cmd_start():
+    _ensure_dirs()
+    if not _check_node():
+        sys.exit(1)
+    if not _install_frontend_deps():
+        sys.exit(1)
 
-def start_production():
-    """生产模式启动"""
-    print("\n" + "="*50)
-    print("生产环境部署")
-    print("="*50)
+    backend_pid = _read_pid(PID_BACKEND)
+    if _is_running(backend_pid):
+        print(f"后端已在运行 (PID {backend_pid})")
+    else:
+        pid = _start_backend()
+        _write_pid(PID_BACKEND, pid)
+        print(f"后端已启动 (PID {pid})  http://localhost:{BACKEND_PORT}")
 
-    # 检查依赖
-    check_python_packages()
+    time.sleep(2)
 
-    if not check_node():
-        return
+    frontend_pid = _read_pid(PID_FRONTEND)
+    if _is_running(frontend_pid):
+        print(f"前端已在运行 (PID {frontend_pid})")
+    else:
+        pid = _start_frontend()
+        _write_pid(PID_FRONTEND, pid)
+        print(f"前端已启动 (PID {pid})  http://localhost:{FRONTEND_PORT}")
 
-    if not install_frontend_deps():
-        return
+    print(f"\n日志目录: {LOG_DIR}")
 
-    # 构建前端
-    print("\n[1/2] 构建前端...")
-    if not build_frontend():
-        return
 
-    # 启动后端
-    print("\n[2/2] 启动后端...")
-    print("\n服务地址: http://localhost:27843")
-    print("API 文档: http://localhost:27843/docs")
-    print("\n前端已构建并集成到后端")
-    print("按 Ctrl+C 停止服务\n")
+def cmd_stop():
+    backend_pid = _read_pid(PID_BACKEND)
+    frontend_pid = _read_pid(PID_FRONTEND)
 
-    proc = start_backend_process(reload=False)
+    if _is_running(backend_pid):
+        _kill_pid(backend_pid)
+        print(f"后端已停止 (PID {backend_pid})")
+    else:
+        print("后端未在运行")
+    PID_BACKEND.unlink(missing_ok=True)
 
-    processes.append(proc)
+    if _is_running(frontend_pid):
+        _kill_pid(frontend_pid)
+        print(f"前端已停止 (PID {frontend_pid})")
+    else:
+        print("前端未在运行")
+    PID_FRONTEND.unlink(missing_ok=True)
 
-    try:
-        proc.wait()
-    except KeyboardInterrupt:
-        pass
+
+def cmd_status():
+    backend_pid = _read_pid(PID_BACKEND)
+    frontend_pid = _read_pid(PID_FRONTEND)
+
+    if _is_running(backend_pid):
+        print(f"后端  运行中  PID {backend_pid}  http://localhost:{BACKEND_PORT}")
+    else:
+        print("后端  已停止")
+
+    if _is_running(frontend_pid):
+        print(f"前端  运行中  PID {frontend_pid}  http://localhost:{FRONTEND_PORT}")
+    else:
+        print("前端  已停止")
+
+
+def cmd_restart():
+    cmd_stop()
+    time.sleep(1)
+    cmd_start()
+
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="DataVerse Pro 启动脚本",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-示例:
-  python start.py --backend          # 仅启动后端
-  python start.py --frontend         # 仅启动前端
-  python start.py --dev              # 同时启动前后端（开发模式）
-  python start.py --production       # 生产模式（构建前端并启动）
-        """
-    )
-
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--backend", "-b", action="store_true", help="仅启动后端服务")
-    group.add_argument("--frontend", "-f", action="store_true", help="仅启动前端服务")
-    group.add_argument("--dev", "-d", action="store_true", help="同时启动前后端（开发模式）")
-    group.add_argument("--production", "-p", action="store_true", help="生产模式（构建前端并启动）")
-
-    args = parser.parse_args()
-
-    try:
-        if args.backend:
-            start_backend()
-        elif args.frontend:
-            start_frontend()
-        elif args.dev:
-            start_both()
-        elif args.production:
-            start_production()
-    except Exception as e:
-        print(f"\n错误: {e}")
+    cmds = {"start": cmd_start, "stop": cmd_stop, "status": cmd_status, "restart": cmd_restart}
+    if len(sys.argv) < 2 or sys.argv[1] not in cmds:
+        print("用法: python start.py start|stop|status|restart")
         sys.exit(1)
+    cmds[sys.argv[1]]()
+
 
 if __name__ == "__main__":
     main()
