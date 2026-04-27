@@ -31,7 +31,9 @@ LANCE_DB_URI = None  # 运行时由下方根据 S3_CONFIG 自动生成
 TEMP_DIR = os.path.join(BASE_DIR, "temp_uploads")
 EXTRACT_DIR = os.path.join(BASE_DIR, "temp_extracted")
 DB_PATH = os.path.join(BASE_DIR, "user_data.db")
-LOG_PATH = os.path.join(BASE_DIR, "app.log")
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_PATH = os.path.join(LOG_DIR, "app.log")
 
 # --- Web 服务 ---
 CORS_ALLOW_ORIGINS = [

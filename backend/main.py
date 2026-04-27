@@ -18,11 +18,13 @@ sys.path.insert(0, str(ROOT_DIR))
 from backend.api import agents, dashboard, files, platform, search, system, upload, workbench, users, permissions, ray_compute
 from config import BACKEND_RELOAD, CORS_ALLOW_CREDENTIALS, CORS_ALLOW_ORIGINS
 
+_log_dir = ROOT_DIR / 'logs'
+_log_dir.mkdir(exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(ROOT_DIR / 'app.log', encoding='utf-8'),
+        logging.FileHandler(_log_dir / 'app.log', encoding='utf-8'),
         logging.StreamHandler(),
     ],
 )

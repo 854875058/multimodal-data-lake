@@ -12,11 +12,13 @@ sys.path.insert(0, str(ROOT_DIR))
 
 from agents import AgentCoordinator
 
+_log_dir = ROOT_DIR / 'logs'
+_log_dir.mkdir(exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(ROOT_DIR / 'agent_team.log', encoding='utf-8'),
+        logging.FileHandler(_log_dir / 'agent_team.log', encoding='utf-8'),
         logging.StreamHandler(),
     ],
 )

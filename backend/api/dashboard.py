@@ -286,21 +286,40 @@ async def get_stats():
     """Get dashboard core metrics."""
     try:
         stats = get_dashboard_stats()
-        tbl_text, tbl_image, tbl_files = get_lancedb_tables()
+        text_rows = 0
+        image_rows = 0
+        total_files = 0
+        try:
+            tbl_text, tbl_image, tbl_files = get_lancedb_tables()
+            text_rows = tbl_text.count_rows()
+            image_rows = tbl_image.count_rows()
+            total_files = tbl_files.count_rows()
+        except Exception as storage_error:
+            logger.warning('Dashboard stats fallback to zero rows because LanceDB is unavailable: %s', storage_error)
         return DashboardStats(
-            total_files=tbl_files.count_rows(),
+            total_files=total_files,
             today_files=stats['today_files'],
             week_files=stats['week_files'],
             week_tasks_total=stats['week_tasks_total'],
             week_tasks_success=stats['week_tasks_success'],
             week_success_rate=stats['week_success_rate'],
             week_avg_time_sec=stats['week_avg_time_sec'],
-            text_rows=tbl_text.count_rows(),
-            image_rows=tbl_image.count_rows(),
+            text_rows=text_rows,
+            image_rows=image_rows,
         )
     except Exception as error:
         logger.error(f'获取统计数据失败: {error}', exc_info=True)
-        raise HTTPException(status_code=500, detail='获取统计数据失败')
+        return DashboardStats(
+            total_files=0,
+            today_files=0,
+            week_files=0,
+            week_tasks_total=0,
+            week_tasks_success=0,
+            week_success_rate=0,
+            week_avg_time_sec=0,
+            text_rows=0,
+            image_rows=0,
+        )
 
 
 @router.get('/trend', response_model=List[TrendData])
@@ -330,7 +349,7 @@ async def get_file_types():
         ]
     except Exception as error:
         logger.error(f'获取文件类型分布失败: {error}', exc_info=True)
-        raise HTTPException(status_code=500, detail='获取文件类型分布失败')
+        return []
 
 
 @router.get('/entities', response_model=List[EntityData])
@@ -373,4 +392,4 @@ async def get_knowledge_graph():
         return KnowledgeGraphResponse(**graph)
     except Exception as error:
         logger.error(f'获取知识图谱失败: {error}', exc_info=True)
-        raise HTTPException(status_code=500, detail='获取知识图谱失败')
+        return KnowledgeGraphResponse(**_build_empty_graph('知识图谱依赖暂不可用，已降级为空图谱'))
