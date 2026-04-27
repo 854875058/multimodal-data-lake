@@ -1136,7 +1136,7 @@ export default function IngestionWorkbenchPage() {
         <div>
           <h1 className="page-title">接入工作台</h1>
           <p className="page-subtitle">
-            配置 SeaweedFS / S3 或 SFTP 来源，扫描待处理文件，并围绕 Lance 向量化与批量任务执行组织接入流程。本地文件或压缩包上传请前往“本地上传”。
+            配置 SeaweedFS / S3 或 SFTP 来源，扫描待处理文件，并围绕 Lance 向量化与批量任务执行组织接入流程。本地文件或压缩包上传请前往"本地上传"。
           </p>
         </div>
         <div className="page-actions">
@@ -1183,7 +1183,7 @@ export default function IngestionWorkbenchPage() {
           <div className="ingest-entry-list">
             <div className="ingest-entry-item">适合：本地文件、离线材料、压缩包一次性上传。</div>
             <div className="ingest-entry-item">本地上传页同样支持批量文件与压缩包，不需要先建远程来源。</div>
-            <div className="ingest-entry-item">如果只是把本机文件拖进去，直接去“本地上传”会更短更清楚。</div>
+            <div className="ingest-entry-item">如果只是把本机文件拖进去，直接去"本地上传"会更短更清楚。</div>
           </div>
           <div className="ingest-entry-actions">
             <button type="button" className="button button-secondary" onClick={() => navigate('/upload')}>

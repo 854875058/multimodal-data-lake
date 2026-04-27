@@ -267,7 +267,7 @@ export default function ConfigCenterPage() {
       <section className="glass-card workbench-console-panel">
         <div className="workbench-guide-strip">
           <span className="badge">Source Config</span>
-          <span className="workbench-guide-copy">这里维护的是全局来源配置和平台连接，不直接执行扫描或导入任务。真正的扫描、筛选和批量入湖请去“接入与扫描”。</span>
+          <span className="workbench-guide-copy">这里维护的是全局来源配置和平台连接，不直接执行扫描或导入任务。真正的扫描、筛选和批量入湖请去"接入与扫描"。</span>
         </div>
 
         <div className="workbench-summary-grid">

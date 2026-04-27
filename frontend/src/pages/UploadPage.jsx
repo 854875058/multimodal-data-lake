@@ -113,7 +113,7 @@ export default function UploadPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">本地上传</h1>
-          <p className="page-subtitle">处理本机文件、离线交付件和压缩包的快速入湖。远程来源接入、扫描预览和批量任务请使用“接入与扫描”。</p>
+          <p className="page-subtitle">处理本机文件、离线交付件和压缩包的快速入湖。远程来源接入、扫描预览和批量任务请使用"接入与扫描"。</p>
         </div>
         <div className="page-actions">
           <NavLink to="/workbench" className="button button-secondary">

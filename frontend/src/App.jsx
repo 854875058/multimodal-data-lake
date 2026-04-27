@@ -347,20 +347,20 @@ function AppShell({ authSession, onLogout }) {
         </div>
       </aside>
 
-      <main className=”app-main”>
-        <div className=”app-topbar”>
-          <div className=”topbar-breadcrumb”>
-            <span className=”topbar-breadcrumb-group”>{currentGroup.title}</span>
-            <span className=”topbar-breadcrumb-sep”> / </span>
-            <span className=”topbar-breadcrumb-page”>{currentNav.label}</span>
+      <main className="app-main">
+        <div className="app-topbar">
+          <div className="topbar-breadcrumb">
+            <span className="topbar-breadcrumb-group">{currentGroup.title}</span>
+            <span className="topbar-breadcrumb-sep"> / </span>
+            <span className="topbar-breadcrumb-page">{currentNav.label}</span>
           </div>
-          <div className=”topbar-user”>
-            <span className=”topbar-user-name”>@{currentUser?.username}</span>
-            <span className=”topbar-user-role”>{roleLabel}</span>
+          <div className="topbar-user">
+            <span className="topbar-user-name">@{currentUser?.username}</span>
+            <span className="topbar-user-role">{roleLabel}</span>
           </div>
         </div>
 
-        <div className=”page-stage shell-content-stage”>
+        <div className="page-stage shell-content-stage">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />

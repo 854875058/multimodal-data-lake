@@ -200,7 +200,7 @@ export default function FilesPage() {
   }
 
   const handleDelete = async (file) => {
-    const confirmed = window.confirm(`确认删除资产“${file.doc_name || '未命名文件'}”吗？该操作不可撤销。`)
+    const confirmed = window.confirm(`确认删除资产"${file.doc_name || '未命名文件'}"吗？该操作不可撤销。`)
     if (!confirmed) {
       return
     }

@@ -266,7 +266,7 @@ export default function SearchPage() {
           <div className="card-header">
             <div>
               <h2>Doris 连接状态</h2>
-              <p>Doris 连接参数已统一收口到“来源配置”，查询台只消费已保存配置并负责联邦查询执行。</p>
+              <p>Doris 连接参数已统一收口到"来源配置"，查询台只消费已保存配置并负责联邦查询执行。</p>
             </div>
             {dorisStatus ? <span className={`badge ${dorisStatus.connected ? 'is-success' : 'is-warning'}`}>{dorisStatus.status || dorisStatus.mode}</span> : null}
           </div>
