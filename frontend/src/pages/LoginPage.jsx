@@ -4,16 +4,17 @@ import api, { getErrorMessage } from '@/api'
 
 function resolveRedirectTarget(location) {
   const candidate = location.state?.from
-  if (typeof candidate !== 'string') {
-    return '/dashboard'
-  }
-
-  if (!candidate.startsWith('/') || candidate.startsWith('/login')) {
-    return '/dashboard'
-  }
-
+  if (typeof candidate !== 'string') return '/dashboard'
+  if (!candidate.startsWith('/') || candidate.startsWith('/login')) return '/dashboard'
   return candidate
 }
+
+const FEATURES = [
+  { icon: '🗄️', title: '多模态存储', desc: '图文音视频统一入湖，向量化索引' },
+  { icon: '🔍', title: '语义检索', desc: 'SQL + 向量双引擎，精准召回' },
+  { icon: '🔒', title: '权限管控', desc: 'RBAC 角色体系，细粒度授权' },
+  { icon: '⚡', title: '高性能计算', desc: 'Ray 分布式编排，弹性扩缩' },
+]
 
 export default function LoginPage({ onLoginSuccess }) {
   const location = useLocation()
@@ -26,134 +27,85 @@ export default function LoginPage({ onLoginSuccess }) {
   const handleInputChange = (field) => (event) => {
     const nextValue = event.target.value
     setForm((current) => ({ ...current, [field]: nextValue }))
-    if (error) {
-      setError('')
-    }
+    if (error) setError('')
   }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-
     if (!form.username.trim() || !form.password) {
       setError('请输入用户名和密码')
       return
     }
-
     setSubmitting(true)
     setError('')
-
     try {
       const payload = await api.login(form.username.trim(), form.password)
-      if (typeof onLoginSuccess === 'function') {
-        onLoginSuccess(payload)
-      }
+      if (typeof onLoginSuccess === 'function') onLoginSuccess(payload)
       navigate(redirectTarget, { replace: true })
     } catch (e) {
-      setError(getErrorMessage(e, '登录失败'))
+      setError(getErrorMessage(e, '登录失败，请检查用户名和密码'))
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div className="login-shell">
-      <div className="login-grid">
-        <section className="login-story glass-card">
-          <div className="login-story-kicker">Authenticated Entry</div>
-          <h1 className="login-story-title">湖仓控制台登录</h1>
-          <p className="login-story-copy">
-            现在控制台会先校验登录态，再开放数据湖、任务中心和平台管理入口。用户、角色和权限页不再只是配置摆设，而是挂到真实会话入口之后。
-          </p>
-
-          <div className="login-kpi-grid">
-            <div className="login-kpi-card">
-              <div className="login-kpi-label">访问域</div>
-              <div className="login-kpi-value">11</div>
-              <div className="login-kpi-note">模块接入统一登录门禁</div>
-            </div>
-            <div className="login-kpi-card">
-              <div className="login-kpi-label">权限模型</div>
-              <div className="login-kpi-value">RBAC</div>
-              <div className="login-kpi-note">普通用户与管理员分层访问</div>
-            </div>
-            <div className="login-kpi-card">
-              <div className="login-kpi-label">会话形态</div>
-              <div className="login-kpi-value">Token</div>
-              <div className="login-kpi-note">登录态写入本地并注入 API 请求</div>
-            </div>
-          </div>
-
-          <div className="login-track-list">
-            <div className="login-track-item">
-              <span className="login-track-index">01</span>
+    <div className="lp-shell">
+      <div className="lp-left">
+        <div className="lp-logo">
+          <div className="lp-logo-mark">ML</div>
+          <span className="lp-logo-name">多模态数据湖</span>
+        </div>
+        <div className="lp-hero">
+          <h1 className="lp-hero-title">多模态数据湖仓</h1>
+          <p className="lp-hero-sub">AI 数据集管理与多模态检索平台</p>
+        </div>
+        <div className="lp-features">
+          {FEATURES.map((f) => (
+            <div className="lp-feature-card" key={f.title}>
+              <span className="lp-feature-icon">{f.icon}</span>
               <div>
-                <div className="login-track-title">统一登录入口</div>
-                <div className="login-track-note">未登录访问任意页面会被拦截并回跳登录页。</div>
+                <div className="lp-feature-title">{f.title}</div>
+                <div className="lp-feature-desc">{f.desc}</div>
               </div>
             </div>
-            <div className="login-track-item">
-              <span className="login-track-index">02</span>
-              <div>
-                <div className="login-track-title">登录后恢复目标路径</div>
-                <div className="login-track-note">通过守卫记录原始访问地址，登录成功后回到目标页面。</div>
-              </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="lp-right">
+        <div className="lp-card">
+          <h2 className="lp-card-title">欢迎登录</h2>
+          <p className="lp-card-sub">多模态数据湖管理平台</p>
+
+          {error && <div className="error-banner lp-error">{error}</div>}
+          {redirectTarget !== '/dashboard' && (
+            <div className="warning-banner lp-error">
+              登录后将返回 <span className="mono">{redirectTarget}</span>
             </div>
-            <div className="login-track-item">
-              <span className="login-track-index">03</span>
-              <div>
-                <div className="login-track-title">管理员能力隔离</div>
-                <div className="login-track-note">用户管理和权限管理页面仅向管理员开放。</div>
-              </div>
-            </div>
-          </div>
-        </section>
+          )}
 
-        <section className="login-panel shell-panel">
-          <div className="login-form-head">
-            <div className="shell-eyebrow">Access Checkpoint</div>
-            <h2 className="login-form-title">进入平台控制面</h2>
-            <p className="login-form-subtitle">
-              使用已有平台账号登录，前端会保存当前会话，并在后续请求中自动带上访问令牌。
-            </p>
-          </div>
-
-          {redirectTarget !== '/dashboard' ? (
-            <div className="warning-banner">
-              登录成功后将返回 <span className="mono">{redirectTarget}</span>
-            </div>
-          ) : null}
-
-          {error ? <div className="error-banner">{error}</div> : null}
-
-          <form className="login-form" onSubmit={handleSubmit}>
-            <label className="field-group login-field">
-              <span className="field-label">用户名</span>
-              <input
-                className="field-input"
-                autoComplete="username"
-                value={form.username}
-                onChange={handleInputChange('username')}
-                placeholder="请输入平台用户名"
-              />
-            </label>
-
-            <label className="field-group login-field">
-              <span className="field-label">密码</span>
-              <input
-                className="field-input"
-                type="password"
-                autoComplete="current-password"
-                value={form.password}
-                onChange={handleInputChange('password')}
-                placeholder="请输入登录密码"
-              />
-            </label>
-
-            <button type="submit" className="button button-primary login-submit" disabled={submitting}>
-              {submitting ? '登录中...' : '登录并进入控制台'}
+          <form className="lp-form" onSubmit={handleSubmit}>
+            <input
+              className="lp-input"
+              autoComplete="username"
+              value={form.username}
+              onChange={handleInputChange('username')}
+              placeholder="请输入用户名"
+            />
+            <input
+              className="lp-input"
+              type="password"
+              autoComplete="current-password"
+              value={form.password}
+              onChange={handleInputChange('password')}
+              placeholder="请输入密码"
+            />
+            <button type="submit" className="lp-btn" disabled={submitting}>
+              {submitting ? '登录中...' : '登录'}
             </button>
           </form>
-        </section>
+        </div>
       </div>
     </div>
   )
