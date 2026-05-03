@@ -52,31 +52,46 @@ export default function LoginPage({ onLoginSuccess }) {
 
   return (
     <div className="lp-shell">
+      {/* 左侧品牌区 */}
       <div className="lp-left">
-        <div className="lp-logo">
+        <div className="lp-left-header">
           <img src={boncLogo} alt="东方国信 BONC" className="lp-logo-img" />
+          <span className="lp-brand-name">多模态数据湖</span>
         </div>
+
         <div className="lp-hero">
           <h1 className="lp-hero-title">多模态数据湖仓</h1>
           <p className="lp-hero-sub">AI 数据集管理与多模态检索平台</p>
         </div>
-        <div className="lp-features">
+
+        <div className="lp-features-grid">
           {FEATURES.map((f) => (
             <div className="lp-feature-card" key={f.title}>
               <span className="lp-feature-icon">{f.icon}</span>
-              <div>
+              <div className="lp-feature-body">
                 <div className="lp-feature-title">{f.title}</div>
                 <div className="lp-feature-desc">{f.desc}</div>
               </div>
             </div>
           ))}
         </div>
+
+        <div className="lp-left-footer">
+          <span className="lp-pill">Doris MPP</span>
+          <span className="lp-pill">SeaweedFS</span>
+          <span className="lp-pill">Lance</span>
+          <span className="lp-pill">Ray</span>
+          <span className="lp-pill">Gravitino</span>
+        </div>
       </div>
 
+      {/* 右侧登录区 */}
       <div className="lp-right">
         <div className="lp-card">
-          <h2 className="lp-card-title">欢迎登录</h2>
-          <p className="lp-card-sub">多模态数据湖管理平台</p>
+          <div className="lp-card-header">
+            <h2 className="lp-card-title">欢迎登录</h2>
+            <p className="lp-card-sub">多模态数据湖管理平台</p>
+          </div>
 
           {error && <div className="error-banner lp-error">{error}</div>}
           {redirectTarget !== '/dashboard' && (
@@ -86,25 +101,31 @@ export default function LoginPage({ onLoginSuccess }) {
           )}
 
           <form className="lp-form" onSubmit={handleSubmit}>
-            <input
-              className="lp-input"
-              autoComplete="username"
-              value={form.username}
-              onChange={handleInputChange('username')}
-              placeholder="请输入用户名"
-            />
-            <input
-              className="lp-input"
-              type="password"
-              autoComplete="current-password"
-              value={form.password}
-              onChange={handleInputChange('password')}
-              placeholder="请输入密码"
-            />
+            <div className="lp-field">
+              <input
+                className="lp-input"
+                autoComplete="username"
+                value={form.username}
+                onChange={handleInputChange('username')}
+                placeholder="请输入用户名"
+              />
+            </div>
+            <div className="lp-field">
+              <input
+                className="lp-input"
+                type="password"
+                autoComplete="current-password"
+                value={form.password}
+                onChange={handleInputChange('password')}
+                placeholder="请输入密码"
+              />
+            </div>
             <button type="submit" className="lp-btn" disabled={submitting}>
               {submitting ? '登录中...' : '登录'}
             </button>
           </form>
+
+          <p className="lp-footer-note">© 2025 东方国信 BONC · 多模态数据湖仓平台</p>
         </div>
       </div>
     </div>

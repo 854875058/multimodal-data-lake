@@ -48,9 +48,9 @@
   --text-primary: #212529;
   --text-secondary: #495057;
   --text-muted: #868e96;
-  --accent: #4c6ef5;
-  --accent-strong: #4c6ef5;
-  --accent-soft: rgba(76, 110, 245, 0.08);
+  --accent: #1664FF;
+  --accent-strong: #1664FF;
+  --accent-soft: rgba(22, 100, 255, 0.06);
   --accent-cool: #12b886;
   --accent-cool-soft: rgba(18, 184, 134, 0.12);
   --success: #12b886;
@@ -3640,5 +3640,238 @@ pre {
   .lp-left {
     padding: 32px 24px;
   }
+}
+
+/* ── LOGIN PAGE V2 补充样式 ── */
+.lp-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.lp-left {
+  flex: 0 0 55%;
+  background: linear-gradient(135deg, #e8eeff 0%, #eee8ff 50%, #e8f4ff 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 40px 48px;
+  gap: 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.lp-left::before {
+  content: '';
+  position: absolute;
+  top: -80px;
+  right: -80px;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(22,100,255,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.lp-left-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lp-brand-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1d2129;
+  letter-spacing: 0.02em;
+}
+
+.lp-hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+
+.lp-hero-title {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: #1d2129;
+  line-height: 1.2;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.lp-hero-sub {
+  font-size: 1rem;
+  color: #4e5969;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.lp-features-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.lp-feature-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+}
+
+.lp-feature-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.lp-feature-body {
+  min-width: 0;
+}
+
+.lp-feature-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #1d2129;
+  margin-bottom: 4px;
+}
+
+.lp-feature-desc {
+  font-size: 0.78rem;
+  color: #4e5969;
+  line-height: 1.5;
+}
+
+.lp-left-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lp-pill {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(22, 100, 255, 0.1);
+  color: #1664FF;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.lp-right {
+  flex: 0 0 45%;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 48px;
+}
+
+.lp-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.lp-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.lp-card-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #1d2129;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.lp-card-sub {
+  font-size: 0.88rem;
+  color: #86909c;
+  margin: 0;
+}
+
+.lp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lp-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.lp-input {
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1d2129;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.lp-input::placeholder {
+  color: #c9cdd4;
+}
+
+.lp-input:hover {
+  border-color: #1664FF;
+}
+
+.lp-input:focus {
+  border-color: #1664FF;
+  box-shadow: 0 0 0 3px rgba(22, 100, 255, 0.12);
+}
+
+.lp-btn {
+  height: 44px;
+  background: #1664FF;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.lp-btn:hover:not(:disabled) {
+  background: #1554d6;
+  box-shadow: 0 4px 12px rgba(22, 100, 255, 0.3);
+}
+
+.lp-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.lp-error {
+  margin: 0;
+}
+
+.lp-footer-note {
+  font-size: 0.75rem;
+  color: #c9cdd4;
+  text-align: center;
+  margin: 4px 0 0;
 }
 
