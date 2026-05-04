@@ -98,6 +98,7 @@ app.include_router(users.router, prefix='/api/users', tags=['用户管理'])
 app.include_router(permissions.router, prefix='/api/permissions', tags=['权限管理'])
 app.include_router(ray_compute.router, prefix='/api/ray', tags=['Ray 计算编排'])
 app.include_router(mpp_proxy.router, prefix='/api/mpp', tags=['MPP 集群管理'])
+app.include_router(doris.router, prefix='/api/doris', tags=['Doris 集群管理'])
 
 
 @app.get('/api/health')
