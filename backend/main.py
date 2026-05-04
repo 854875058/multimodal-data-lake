@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from backend.api import agents, dashboard, files, platform, search, system, upload, workbench, users, permissions, ray_compute, mpp_proxy
+from backend.api import agents, dashboard, files, platform, search, system, upload, workbench, users, permissions, ray_compute, mpp_proxy, versions
 from config import BACKEND_RELOAD, CORS_ALLOW_CREDENTIALS, CORS_ALLOW_ORIGINS
 
 _log_dir = ROOT_DIR / 'logs'
