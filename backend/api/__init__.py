@@ -2,5 +2,9 @@
 """API 路由模块。"""
 
 from . import agents, dashboard, files, platform, search, system, upload, workbench
+from . import users, permissions, ray_compute, mpp_proxy, versions, doris
 
-__all__ = ["upload", "search", "files", "dashboard", "system", "workbench", "platform", "agents"]
+__all__ = [
+    "upload", "search", "files", "dashboard", "system", "workbench", "platform", "agents",
+    "users", "permissions", "ray_compute", "mpp_proxy", "versions", "doris",
+]

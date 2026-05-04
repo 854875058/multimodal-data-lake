@@ -12,8 +12,6 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 
-from config import settings
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
