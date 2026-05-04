@@ -3875,3 +3875,693 @@ pre {
   margin: 4px 0 0;
 }
 
+
+/* =============================================
+   MPP 数据库管理 - 集群管理 / SQL编辑器 / 告警 / 巡检
+   ============================================= */
+
+/* 通用 MPP 页面布局 */
+.mpp-cluster-page,
+.mpp-sql-editor-page,
+.mpp-alert-page,
+.mpp-inspection-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Tab 导航 */
+.mpp-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 0;
+}
+
+.mpp-tab {
+  padding: 8px 16px;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid transparent;
+  border-bottom: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+  position: relative;
+  bottom: -1px;
+}
+
+.mpp-tab:hover {
+  color: var(--accent);
+  background: var(--accent-soft, rgba(22,100,255,0.04));
+}
+
+.mpp-tab.is-active {
+  color: var(--accent);
+  background: #ffffff;
+  border-color: var(--panel-border);
+  border-bottom-color: #ffffff;
+}
+
+/* Tab 内容区 */
+.mpp-tab-content {
+  padding: 20px;
+}
+
+/* 统计卡片行 */
+.mpp-stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.mpp-stat-card {
+  padding: 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
+}
+
+.mpp-stat-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.mpp-stat-value {
+  margin-top: 6px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.mpp-stat-sub {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* 信息网格 */
+.mpp-info-card {
+  padding: 20px;
+}
+
+.mpp-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.mpp-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mpp-info-key {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mpp-info-val {
+  font-size: 0.9rem;
+  color: var(--ink-strong);
+}
+
+/* 节点操作按钮行 */
+.mpp-action-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* 集群选择器 */
+.mpp-cluster-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mpp-selector-label {
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.mpp-cluster-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.mpp-cluster-tab {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--panel-border);
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mpp-cluster-tab.is-active {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+
+.mpp-cluster-select {
+  min-width: 160px;
+}
+
+/* 扩缩容操作 */
+.mpp-scaling-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.mpp-scaling-card {
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: #ffffff;
+  text-align: center;
+}
+
+.mpp-scaling-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.mpp-scaling-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink-strong);
+  margin-bottom: 6px;
+}
+
+.mpp-scaling-desc {
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+/* SQL 编辑器布局 */
+.mpp-sql-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 12px;
+  min-height: calc(100vh - 200px);
+}
+
+.mpp-sql-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.mpp-sql-sidebar-head {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.mpp-db-tree {
+  flex: 1;
+  overflow: auto;
+}
+
+.mpp-db-node {
+  margin-bottom: 4px;
+}
+
+.mpp-db-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  font-size: 0.86rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.mpp-db-label:hover,
+.mpp-db-label.is-open {
+  background: var(--accent-soft, rgba(22,100,255,0.06));
+  color: var(--accent);
+}
+
+.mpp-db-icon {
+  font-size: 0.9rem;
+}
+
+.mpp-db-chevron {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.mpp-table-list {
+  padding-left: 20px;
+  margin-top: 2px;
+}
+
+.mpp-table-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mpp-table-item:hover {
+  background: var(--accent-soft, rgba(22,100,255,0.06));
+  color: var(--accent);
+}
+
+.mpp-table-icon {
+  font-size: 0.8rem;
+}
+
+.mpp-table-empty {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 4px 8px;
+}
+
+/* SQL 编辑器主区 */
+.mpp-sql-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.mpp-editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.mpp-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px 10px 0 0;
+  border-bottom: none;
+}
+
+.mpp-db-select {
+  min-width: 140px;
+}
+
+.mpp-sql-textarea {
+  flex: 1;
+  min-height: 280px;
+  padding: 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 0 0 10px 10px;
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+  font-size: 0.88rem;
+  line-height: 1.7;
+  color: var(--ink-strong);
+  background: #fafbfc;
+  resize: vertical;
+  tab-size: 2;
+}
+
+.mpp-sql-textarea:focus {
+  outline: none;
+  border-color: rgba(22, 100, 255, 0.42);
+  box-shadow: 0 0 0 3px rgba(22, 100, 255, 0.08);
+}
+
+.mpp-result-panel {
+  background: #ffffff;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.mpp-result-meta {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 14px;
+  background: #f8f9fa;
+  border-bottom: 1px solid var(--panel-border);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.mpp-result-scroll {
+  overflow: auto;
+  max-height: 320px;
+}
+
+.mpp-result-table {
+  min-width: 100%;
+}
+
+.mpp-null {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 0.8rem;
+}
+
+.mpp-sql-cell {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 慢 SQL */
+.mpp-slow-sql {
+  background: #ffffff;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+/* 告警页面 */
+.mpp-alert-page {
+  gap: 16px;
+}
+
+.mpp-alert-panel {
+  padding: 20px;
+}
+
+.mpp-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.mpp-alert-msg {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+/* 告警规则新建表单 */
+.mpp-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.mpp-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mpp-form-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mpp-form-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+/* Cron 快捷按钮 */
+.mpp-cron-presets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+/* Toggle 开关 */
+.mpp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mpp-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.mpp-toggle-slider {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: #ddd;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.mpp-toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.mpp-toggle input:checked + .mpp-toggle-slider {
+  background: var(--accent);
+}
+
+.mpp-toggle input:checked + .mpp-toggle-slider::after {
+  transform: translateX(18px);
+}
+
+/* 巡检页面 */
+.mpp-section-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--ink-strong);
+  margin-bottom: 10px;
+}
+
+.mpp-desc {
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+
+/* 评分显示 */
+.mpp-score {
+  font-weight: 700;
+  font-size: 1rem;
+  font-family: var(--font-display, monospace);
+}
+
+.mpp-score.score-good { color: #12b886; }
+.mpp-score.score-warn { color: #f59f00; }
+.mpp-score.score-bad  { color: #fa5252; }
+.mpp-score-na { color: var(--text-muted); font-size: 0.84rem; }
+
+/* 巡检详情弹窗 */
+.mpp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.mpp-modal {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  max-width: 800px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mpp-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.mpp-modal-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.mpp-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.mpp-modal-close:hover {
+  background: #f5f6f8;
+}
+
+.mpp-modal-body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 20px;
+}
+
+.mpp-result-meta {
+  display: flex;
+  gap: 20px;
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.mpp-result-raw {
+  font-size: 0.8rem;
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 8px;
+  overflow: auto;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* 通用空状态 */
+.mpp-empty-state {
+  text-align: center;
+  padding: 60px 24px;
+}
+
+.mpp-empty-icon {
+  font-size: 3rem;
+  margin-bottom: 14px;
+}
+
+.mpp-empty-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink-strong);
+  margin-bottom: 8px;
+}
+
+.mpp-empty-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.mpp-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.mpp-loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+/* 分页 */
+.mpp-pagination {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--panel-border);
+  margin-top: 10px;
+}
+
+.mpp-page-info {
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+}
+
+/* 节点表格 */
+.mpp-node-table {
+  width: 100%;
+}
+
+/* 面板 header */
+.mpp-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+/* mono 等宽字体 */
+.mono {
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.85em;
+}
+

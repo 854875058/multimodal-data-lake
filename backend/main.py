@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from backend.api import agents, dashboard, files, platform, search, system, upload, workbench, users, permissions, ray_compute
+from backend.api import agents, dashboard, files, platform, search, system, upload, workbench, users, permissions, ray_compute, mpp_proxy
 from config import BACKEND_RELOAD, CORS_ALLOW_CREDENTIALS, CORS_ALLOW_ORIGINS
 
 _log_dir = ROOT_DIR / 'logs'
@@ -97,6 +97,7 @@ app.include_router(platform.router, prefix='/api/platform', tags=['平台能力'
 app.include_router(users.router, prefix='/api/users', tags=['用户管理'])
 app.include_router(permissions.router, prefix='/api/permissions', tags=['权限管理'])
 app.include_router(ray_compute.router, prefix='/api/ray', tags=['Ray 计算编排'])
+app.include_router(mpp_proxy.router, prefix='/api/mpp', tags=['MPP 集群管理'])
 
 
 @app.get('/api/health')

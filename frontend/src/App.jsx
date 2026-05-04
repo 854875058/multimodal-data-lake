@@ -15,6 +15,10 @@ import TaskGovernancePage from './pages/TaskGovernancePage.jsx'
 import UploadPage from './pages/UploadPage.jsx'
 import UserManagementPage from './pages/UserManagementPage.jsx'
 import WorkflowCenterPage from './pages/WorkflowCenterPage.jsx'
+import ClusterPage from './pages/mpp/ClusterPage.jsx'
+import SqlEditorPage from './pages/mpp/SqlEditorPage.jsx'
+import AlertPage from './pages/mpp/AlertPage.jsx'
+import InspectionPage from './pages/mpp/InspectionPage.jsx'
 
 const navGroups = [
   {
@@ -43,6 +47,17 @@ const navGroups = [
     items: [
       { path: '/workbench', code: '06', label: '接入工作台', tag: '工作台', description: 'S3、SFTP 与批量入湖' },
       { path: '/upload', code: '07', label: '本地上传', tag: '上传', description: '本地文件与压缩包上传' }
+    ]
+  },
+  {
+    key: 'mpp-database',
+    title: 'MPP 数据库',
+    note: 'Doris 集群管理与运维',
+    items: [
+      { path: '/mpp/cluster', code: '12', label: '集群管理', tag: '集群', description: 'Doris 集群运维与监控' },
+      { path: '/mpp/sql', code: '13', label: 'SQL 编辑器', tag: 'SQL', description: '多标签 SQL 查询工具' },
+      { path: '/mpp/alert', code: '14', label: '告警监控', tag: '告警', description: '告警规则与记录管理' },
+      { path: '/mpp/inspection', code: '15', label: '自动巡检', tag: '巡检', description: '集群健康定时巡检' }
     ]
   }
 ]
@@ -375,6 +390,10 @@ function AppShell({ authSession, onLogout }) {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/files" element={<FilesPage />} />
             <Route path="/logs" element={<LogsPage />} />
+            <Route path="/mpp/cluster" element={<ClusterPage />} />
+            <Route path="/mpp/sql" element={<SqlEditorPage />} />
+            <Route path="/mpp/alert" element={<AlertPage />} />
+            <Route path="/mpp/inspection" element={<InspectionPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
