@@ -19,6 +19,7 @@ import ClusterPage from './pages/mpp/ClusterPage.jsx'
 import SqlEditorPage from './pages/mpp/SqlEditorPage.jsx'
 import AlertPage from './pages/mpp/AlertPage.jsx'
 import InspectionPage from './pages/mpp/InspectionPage.jsx'
+import RayJobsPage from './pages/RayJobsPage.jsx'
 
 const navGroups = [
   {
@@ -37,7 +38,8 @@ const navGroups = [
     items: [
       { path: '/search', code: '03', label: '查询分析', tag: '查询', description: 'SQL 与语义检索' },
       { path: '/workflow', code: '04', label: '工作流编排', tag: '编排', description: '流程模板与资源编排' },
-      { path: '/governance', code: '05', label: '任务治理', tag: '治理', description: '作业状态与执行回填' }
+      { path: '/governance', code: '05', label: '任务治理', tag: '治理', description: '作业状态与执行回填' },
+      { path: '/ray/jobs', code: '16', label: 'Ray 作业监控', tag: 'Ray', description: 'Ray 分布式计算作业管理' }
     ]
   },
   {
@@ -394,6 +396,7 @@ function AppShell({ authSession, onLogout }) {
             <Route path="/mpp/sql" element={<SqlEditorPage />} />
             <Route path="/mpp/alert" element={<AlertPage />} />
             <Route path="/mpp/inspection" element={<InspectionPage />} />
+            <Route path="/ray/jobs" element={<RayJobsPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
