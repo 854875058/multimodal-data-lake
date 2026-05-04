@@ -1,36 +1,38 @@
 import { useEffect, useState } from 'react'
-import api from '@/api'
 
-const MPP_BASE = '/api/mpp'
+const API = '/api/doris'
 
-async function mppGet(path, params = {}) {
-  const url = new URL(MPP_BASE + path, window.location.origin)
+async function dorisGet(path, params = {}) {
+  const url = new URL(API + path, window.location.origin)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
   const res = await fetch(url.toString(), { credentials: 'include' })
-  if (!res.ok) throw new Error(`MPP 请求失败: ${res.status}`)
+  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
   return res.json()
 }
 
-async function mppPost(path, body = {}) {
-  const res = await fetch(MPP_BASE + path, {
+async function dorisPost(path, body = {}) {
+  const res = await fetch(API + path, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`MPP 请求失败: ${res.status}`)
+  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
   return res.json()
 }
 
-function StatusBadge({ status }) {
-  const map = {
-    RUNNING: { label: '运行中', cls: 'badge-success' },
-    STOPPED: { label: '已停止', cls: 'badge-error' },
-    UNKNOWN: { label: '未知', cls: 'badge-warn' },
-    STARTING: { label: '启动中', cls: 'badge-warn' },
-  }
-  const { label, cls } = map[status] || { label: status || '—', cls: 'badge-neutral' }
-  return <span className={`status-badge ${cls}`}>{label}</span>
+async function dorisDelete(path) {
+  const res = await fetch(API + path, { method: 'DELETE', credentials: 'include' })
+  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
+  return res.json()
+}
+
+function StatusBadge({ alive }) {
+  if (alive === true || alive === 'true')
+    return <span className="status-badge badge-success">存活</span>
+  if (alive === false || alive === 'false')
+    return <span className="status-badge badge-error">离线</span>
+  return <span className="status-badge badge-neutral">—</span>
 }
 
 function StatCard({ label, value, sub }) {
@@ -43,107 +45,166 @@ function StatCard({ label, value, sub }) {
   )
 }
 
-function NodeTable({ nodes, type, onAction }) {
-  if (!nodes || nodes.length === 0) return <p className="mpp-empty">暂无 {type} 节点数据</p>
+function AddClusterModal({ onClose, onSave }) {
+  const [form, setForm] = useState({
+    name: '', fe_host: '', fe_query_port: 9030, fe_http_port: 8030,
+    username: 'root', password: '', description: ''
+  })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  const handleChange = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const handleSubmit = async () => {
+    if (!form.name || !form.fe_host) { setErr('集群名称和 FE 地址不能为空'); return }
+    setSaving(true)
+    setErr('')
+    try {
+      const data = await dorisPost('/clusters', {
+        ...form,
+        fe_query_port: Number(form.fe_query_port),
+        fe_http_port: Number(form.fe_http_port),
+      })
+      if (data.success) { onSave(); onClose() }
+      else setErr(data.detail || '创建失败')
+    } catch (e) {
+      setErr(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
-    <table className="data-table mpp-node-table">
-      <thead>
-        <tr>
-          <th>节点 IP</th>
-          <th>端口</th>
-          <th>状态</th>
-          <th>心跳时间</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        {nodes.map((node, i) => (
-          <tr key={i}>
-            <td className="mono">{node.ip || node.host || '—'}</td>
-            <td className="mono">{node.port || '—'}</td>
-            <td><StatusBadge status={node.alive === false ? 'STOPPED' : (node.status || 'RUNNING')} /></td>
-            <td>{node.lastHeartbeat || node.lastStartupTime || '—'}</td>
-            <td>
-              <div className="mpp-action-row">
-                <button className="button button-small" onClick={() => onAction(node, 'open')}>启动</button>
-                <button className="button button-small button-danger" onClick={() => onAction(node, 'close')}>停止</button>
-                <button className="button button-small" onClick={() => onAction(node, 'restart')}>重启</button>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">注册 Doris 集群</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          {err && <div className="error-banner">{err}</div>}
+          <div className="form-grid-2">
+            {[
+              { label: '集群名称 *', key: 'name', placeholder: '如：生产集群' },
+              { label: 'FE 地址 *', key: 'fe_host', placeholder: '如：192.168.1.10' },
+              { label: 'Query 端口', key: 'fe_query_port', placeholder: '9030' },
+              { label: 'HTTP 端口', key: 'fe_http_port', placeholder: '8030' },
+              { label: '用户名', key: 'username', placeholder: 'root' },
+              { label: '密码', key: 'password', placeholder: '留空则无密码', type: 'password' },
+            ].map(({ label, key, placeholder, type }) => (
+              <div key={key} className="form-field">
+                <label className="form-label">{label}</label>
+                <input
+                  className="field-input"
+                  type={type || 'text'}
+                  placeholder={placeholder}
+                  value={form[key]}
+                  onChange={e => handleChange(key, e.target.value)}
+                />
               </div>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+            ))}
+            <div className="form-field" style={{ gridColumn: '1/-1' }}>
+              <label className="form-label">备注</label>
+              <input
+                className="field-input"
+                placeholder="可选"
+                value={form.description}
+                onChange={e => handleChange('description', e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="button button-secondary" onClick={onClose}>取消</button>
+          <button className="button button-primary" onClick={handleSubmit} disabled={saving}>
+            {saving ? '保存中...' : '保存'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
 export default function ClusterPage() {
   const [clusters, setClusters] = useState([])
   const [currentCluster, setCurrentCluster] = useState(null)
-  const [clusterDetail, setClusterDetail] = useState(null)
-  const [feNodes, setFeNodes] = useState([])
-  const [beNodes, setBeNodes] = useState([])
+  const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [statusLoading, setStatusLoading] = useState(false)
   const [error, setError] = useState('')
-  const [activeTab, setActiveTab] = useState('overview')
   const [actionMsg, setActionMsg] = useState('')
+  const [activeTab, setActiveTab] = useState('overview')
+  const [showAdd, setShowAdd] = useState(false)
 
   const loadClusters = async () => {
     setLoading(true)
     setError('')
     try {
-      const data = await mppGet('/new/cluster/list')
-      const list = data.data || data || []
+      const data = await dorisGet('/clusters')
+      const list = data.clusters || []
       setClusters(list)
       if (list.length > 0 && !currentCluster) {
         setCurrentCluster(list[0])
       }
     } catch (e) {
-      setError('获取集群列表失败：' + e.message + '（请确认 MPP 后端服务已启动）')
+      setError('获取集群列表失败：' + e.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const loadClusterDetail = async (clusterId) => {
+  const loadStatus = async (clusterId) => {
     if (!clusterId) return
+    setStatusLoading(true)
     try {
-      const data = await mppGet(`/new/cluster/detail`, { clusterId })
-      setClusterDetail(data.data || data)
-      const nodes = await mppGet(`/new/cluster/nodes`, { clusterId })
-      const nodeList = nodes.data || nodes || []
-      setFeNodes(nodeList.filter(n => n.type === 'FE' || n.nodeType === 'FE'))
-      setBeNodes(nodeList.filter(n => n.type === 'BE' || n.nodeType === 'BE'))
+      const data = await dorisGet(`/clusters/${clusterId}/status`)
+      setStatus(data)
     } catch (e) {
-      console.warn('集群详情加载失败:', e.message)
+      console.warn('集群状态加载失败:', e.message)
+    } finally {
+      setStatusLoading(false)
     }
   }
 
-  useEffect(() => {
-    loadClusters()
-  }, [])
-
-  useEffect(() => {
-    if (currentCluster?.clusterId || currentCluster?.id) {
-      loadClusterDetail(currentCluster.clusterId || currentCluster.id)
-    }
-  }, [currentCluster])
-
-  const handleNodeAction = async (node, action) => {
+  const handleTestConnection = async () => {
+    if (!currentCluster) return
     setActionMsg('')
     try {
-      await mppPost(`/node/${action}`, { url: node.ip || node.host, type: node.type || 'BE' })
-      setActionMsg(`节点 ${action} 操作已提交`)
-      setTimeout(() => loadClusterDetail(currentCluster?.clusterId || currentCluster?.id), 2000)
+      const data = await dorisPost(`/clusters/${currentCluster.id}/test`)
+      setActionMsg(data.success ? `✅ 连接成功，版本：${data.version}` : `❌ 连接失败：${data.message}`)
     } catch (e) {
-      setActionMsg('操作失败：' + e.message)
+      setActionMsg('❌ 连接测试失败：' + e.message)
     }
   }
 
-  const detail = clusterDetail || currentCluster
+  const handleDeleteCluster = async () => {
+    if (!currentCluster) return
+    if (!window.confirm(`确认删除集群「${currentCluster.name}」？`)) return
+    try {
+      await dorisDelete(`/clusters/${currentCluster.id}`)
+      setCurrentCluster(null)
+      setStatus(null)
+      loadClusters()
+    } catch (e) {
+      setError('删除失败：' + e.message)
+    }
+  }
+
+  useEffect(() => { loadClusters() }, [])
+
+  useEffect(() => {
+    if (currentCluster?.id) {
+      loadStatus(currentCluster.id)
+    }
+  }, [currentCluster?.id])
+
+  const feNodes = status?.fe_nodes || []
+  const beNodes = status?.be_nodes || []
 
   return (
     <div className="content-wrap mpp-cluster-page">
+      {showAdd && <AddClusterModal onClose={() => setShowAdd(false)} onSave={loadClusters} />}
+
       <div className="page-header">
         <div>
           <h1 className="page-title">Doris 集群管理</h1>
@@ -153,6 +214,7 @@ export default function ClusterPage() {
           <button className="button button-secondary" onClick={loadClusters} disabled={loading}>
             {loading ? '刷新中...' : '刷新'}
           </button>
+          <button className="button button-primary" onClick={() => setShowAdd(true)}>+ 注册集群</button>
         </div>
       </div>
 
@@ -160,17 +222,17 @@ export default function ClusterPage() {
       {actionMsg && <div className="info-banner">{actionMsg}</div>}
 
       {/* 集群选择器 */}
-      {clusters.length > 1 && (
+      {clusters.length > 0 && (
         <div className="mpp-cluster-selector">
-          <span className="mpp-selector-label">切换集群：</span>
+          <span className="mpp-selector-label">选择集群：</span>
           <div className="mpp-cluster-tabs">
-            {clusters.map((c, i) => (
+            {clusters.map((c) => (
               <button
-                key={i}
-                className={`mpp-cluster-tab${(currentCluster?.clusterId || currentCluster?.id) === (c.clusterId || c.id) ? ' is-active' : ''}`}
+                key={c.id}
+                className={`mpp-cluster-tab${currentCluster?.id === c.id ? ' is-active' : ''}`}
                 onClick={() => setCurrentCluster(c)}
               >
-                {c.clusterName || c.name || `集群 ${i + 1}`}
+                {c.name}
               </button>
             ))}
           </div>
@@ -181,28 +243,28 @@ export default function ClusterPage() {
         <div className="mpp-empty-state">
           <div className="mpp-empty-icon">🗄️</div>
           <div className="mpp-empty-title">暂无集群</div>
-          <p className="mpp-empty-desc">MPP 后端服务未返回集群数据，请先在 MPP 后端接管或新建集群</p>
+          <p className="mpp-empty-desc">请点击「注册集群」添加 Doris FE 节点的连接信息</p>
+          <button className="button button-primary" onClick={() => setShowAdd(true)}>注册第一个集群</button>
         </div>
       )}
 
-      {detail && (
+      {currentCluster && (
         <>
           {/* 统计卡片 */}
           <div className="mpp-stats-row">
-            <StatCard label="集群名称" value={detail.clusterName || detail.name} />
-            <StatCard label="集群状态" value={<StatusBadge status={detail.status || 'RUNNING'} />} />
-            <StatCard label="FE 节点数" value={feNodes.length || detail.feNodeCount || '—'} />
-            <StatCard label="BE 节点数" value={beNodes.length || detail.beNodeCount || '—'} />
-            <StatCard label="Doris 版本" value={detail.version || detail.dorisVersion || '—'} />
+            <StatCard label="集群名称" value={currentCluster.name} />
+            <StatCard label="FE 地址" value={currentCluster.fe_host} sub={`:${currentCluster.fe_query_port}`} />
+            <StatCard label="连接状态" value={statusLoading ? '检测中...' : (status?.connected ? '✅ 已连接' : '❌ 未连接')} />
+            <StatCard label="FE 节点数" value={statusLoading ? '—' : feNodes.length} />
+            <StatCard label="BE 节点数" value={statusLoading ? '—' : beNodes.length} />
           </div>
 
           {/* Tab 切换 */}
           <div className="mpp-tabs">
             {[
               { key: 'overview', label: '集群概览' },
-              { key: 'fe', label: 'FE 节点' },
-              { key: 'be', label: 'BE 节点' },
-              { key: 'scaling', label: '扩缩容' },
+              { key: 'fe', label: `FE 节点 (${feNodes.length})` },
+              { key: 'be', label: `BE 节点 (${beNodes.length})` },
             ].map(tab => (
               <button
                 key={tab.key}
@@ -215,24 +277,29 @@ export default function ClusterPage() {
           </div>
 
           {activeTab === 'overview' && (
-            <div className="mpp-tab-content">
-              <div className="glass-card mpp-info-card">
-                <h3 className="mpp-section-title">集群基本信息</h3>
-                <div className="mpp-info-grid">
-                  {[
-                    ['集群 ID', detail.clusterId || detail.id],
-                    ['集群名称', detail.clusterName || detail.name],
-                    ['状态', detail.status || '运行中'],
-                    ['FE Master', detail.feLeader || detail.masterHost || '—'],
-                    ['创建时间', detail.createTime || detail.gmtCreate || '—'],
-                    ['版本', detail.version || '—'],
-                  ].map(([k, v]) => (
-                    <div key={k} className="mpp-info-item">
-                      <span className="mpp-info-key">{k}</span>
-                      <span className="mpp-info-val mono">{v || '—'}</span>
-                    </div>
-                  ))}
-                </div>
+            <div className="mpp-tab-content glass-card">
+              <h3 className="mpp-section-title">集群基本信息</h3>
+              <div className="mpp-info-grid">
+                {[
+                  ['集群 ID', currentCluster.id],
+                  ['集群名称', currentCluster.name],
+                  ['FE 主机', currentCluster.fe_host],
+                  ['Query 端口', currentCluster.fe_query_port],
+                  ['HTTP 端口', currentCluster.fe_http_port],
+                  ['用户名', currentCluster.username],
+                  ['备注', currentCluster.description || '—'],
+                  ['注册时间', currentCluster.created_at || '—'],
+                ].map(([k, v]) => (
+                  <div key={k} className="mpp-info-item">
+                    <span className="mpp-info-key">{k}</span>
+                    <span className="mpp-info-val mono">{v || '—'}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mpp-action-row" style={{ marginTop: 16 }}>
+                <button className="button button-primary" onClick={handleTestConnection}>测试连接</button>
+                <button className="button button-secondary" onClick={() => loadStatus(currentCluster.id)}>刷新状态</button>
+                <button className="button button-danger" onClick={handleDeleteCluster}>删除集群</button>
               </div>
             </div>
           )}
@@ -240,47 +307,74 @@ export default function ClusterPage() {
           {activeTab === 'fe' && (
             <div className="mpp-tab-content glass-card">
               <h3 className="mpp-section-title">FE 节点列表</h3>
-              <NodeTable nodes={feNodes} type="FE" onAction={handleNodeAction} />
+              {feNodes.length === 0
+                ? <p className="mpp-empty">{statusLoading ? '加载中...' : '暂无 FE 节点数据（请确认 Doris 连接正常）'}</p>
+                : (
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>主机</th>
+                        <th>Query 端口</th>
+                        <th>HTTP 端口</th>
+                        <th>角色</th>
+                        <th>是否 Master</th>
+                        <th>存活状态</th>
+                        <th>最后心跳</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {feNodes.map((node, i) => (
+                        <tr key={i}>
+                          <td className="mono">{node.host || '—'}</td>
+                          <td className="mono">{node.port || '—'}</td>
+                          <td className="mono">{node.http_port || '—'}</td>
+                          <td>{node.role || '—'}</td>
+                          <td>{node.is_master ? '✅ 是' : '否'}</td>
+                          <td><StatusBadge alive={node.alive} /></td>
+                          <td>{node.last_heartbeat || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              }
             </div>
           )}
 
           {activeTab === 'be' && (
             <div className="mpp-tab-content glass-card">
               <h3 className="mpp-section-title">BE 节点列表</h3>
-              <NodeTable nodes={beNodes} type="BE" onAction={handleNodeAction} />
-            </div>
-          )}
-
-          {activeTab === 'scaling' && (
-            <div className="mpp-tab-content glass-card">
-              <h3 className="mpp-section-title">集群扩缩容</h3>
-              <p className="mpp-desc">通过以下操作对集群进行在线扩容或缩容，扩容完成后数据自动均衡迁移。</p>
-              <div className="mpp-scaling-actions">
-                <div className="mpp-scaling-card">
-                  <div className="mpp-scaling-icon">➕</div>
-                  <div className="mpp-scaling-title">FE 扩容</div>
-                  <p className="mpp-scaling-desc">向集群添加新的 FE 节点，提升元数据处理能力</p>
-                  <button className="button button-primary">扩容 FE 节点</button>
-                </div>
-                <div className="mpp-scaling-card">
-                  <div className="mpp-scaling-icon">➕</div>
-                  <div className="mpp-scaling-title">BE 扩容</div>
-                  <p className="mpp-scaling-desc">向集群添加新的 BE 节点，提升存储与计算能力</p>
-                  <button className="button button-primary">扩容 BE 节点</button>
-                </div>
-                <div className="mpp-scaling-card">
-                  <div className="mpp-scaling-icon">➖</div>
-                  <div className="mpp-scaling-title">FE 缩容</div>
-                  <p className="mpp-scaling-desc">下线指定 FE 节点，数据自动迁移后安全退出</p>
-                  <button className="button button-danger">缩容 FE 节点</button>
-                </div>
-                <div className="mpp-scaling-card">
-                  <div className="mpp-scaling-icon">➖</div>
-                  <div className="mpp-scaling-title">BE 缩容</div>
-                  <p className="mpp-scaling-desc">下线指定 BE 节点，Tablet 自动迁移后安全退出</p>
-                  <button className="button button-danger">缩容 BE 节点</button>
-                </div>
-              </div>
+              {beNodes.length === 0
+                ? <p className="mpp-empty">{statusLoading ? '加载中...' : '暂无 BE 节点数据（请确认 Doris 连接正常）'}</p>
+                : (
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>主机</th>
+                        <th>心跳端口</th>
+                        <th>BE 端口</th>
+                        <th>存活状态</th>
+                        <th>总容量</th>
+                        <th>已用容量</th>
+                        <th>最后心跳</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {beNodes.map((node, i) => (
+                        <tr key={i}>
+                          <td className="mono">{node.host || '—'}</td>
+                          <td className="mono">{node.port || '—'}</td>
+                          <td className="mono">{node.be_port || '—'}</td>
+                          <td><StatusBadge alive={node.alive} /></td>
+                          <td>{node.total_capacity || '—'}</td>
+                          <td>{node.used_capacity || '—'}</td>
+                          <td>{node.last_heartbeat || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              }
             </div>
           )}
         </>
