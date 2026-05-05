@@ -53,7 +53,7 @@ const navGroups = [
   },
   {
     key: 'mpp-database',
-    title: 'MPP 数据库',
+    title: 'Doris 集群',
     note: 'Doris 集群管理与运维',
     items: [
       { path: '/mpp/cluster', code: '12', label: '集群管理', tag: '集群', description: 'Doris 集群运维与监控' },
