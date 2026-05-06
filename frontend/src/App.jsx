@@ -30,6 +30,7 @@ import AlertPage from './pages/mpp/AlertPage.jsx'
 import InspectionPage from './pages/mpp/InspectionPage.jsx'
 import RayJobsPage from './pages/RayJobsPage.jsx'
 import TaskCenterPage from './pages/TaskCenterPage.jsx'
+import LakeQueryPage from './pages/LakeQueryPage.jsx'
 
 const { Sider, Header, Content } = Layout
 const { SubMenu, Item: MenuItem } = Menu
@@ -50,7 +51,7 @@ const navGroups = [
     title: '湖计算',
     icon: <IconCommand />,
     items: [
-      { path: '/search', label: '查询分析', icon: <IconSearch /> },
+      { path: '/lake-query', label: '湖查询', icon: <IconSearch /> },
       { path: '/workflow', label: '工作流编排', icon: <IconLayout /> },
       { path: '/task-center', label: '任务中心', icon: <IconCalendarClock /> },
     ],
@@ -283,7 +284,8 @@ function AppShell({ authSession, onLogout }) {
             <Route path="/settings/users" element={<RequireAdmin user={currentUser}><UserManagementPage /></RequireAdmin>} />
             <Route path="/settings/permissions" element={<RequireAdmin user={currentUser}><PermissionManagementPage /></RequireAdmin>} />
             <Route path="/upload" element={<UploadPage />} />
-            <Route path="/search" element={<SearchPage />} />
+            <Route path="/lake-query" element={<LakeQueryPage />} />
+            <Route path="/search" element={<Navigate to="/lake-query" replace />} />
             <Route path="/files" element={<FilesPage />} />
             <Route path="/logs" element={<LogsPage />} />
             <Route path="/mpp/cluster" element={<ClusterPage />} />
