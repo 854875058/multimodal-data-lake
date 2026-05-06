@@ -1,7 +1,17 @@
 import { useMemo, useRef, useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import {
+  Card, Button, Space, Typography, Table, Progress, Tag, Empty,
+  Message, Grid, Statistic
+} from '@arco-design/web-react'
+import {
+  IconUpload, IconFolder, IconDelete, IconCloudDownload, IconPlus
+} from '@arco-design/web-react/icon'
 import api, { getErrorMessage } from '@/api'
 import { formatBytes } from '@/utils/format'
+
+const { Title, Text, Paragraph } = Typography
+const { Row, Col } = Grid
 
 function buildKey(file) {
   return `${file.name}-${file.size}-${file.lastModified}`
@@ -15,286 +25,180 @@ export default function UploadPage() {
   const [dragging, setDragging] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState('success')
 
   const totalSize = useMemo(
-    () => selectedFiles.reduce((sum, file) => sum + (file.size || 0), 0),
+    () => selectedFiles.reduce((sum, f) => sum + (f.size || 0), 0),
     [selectedFiles]
   )
 
-  const formatSummary = useMemo(
-    () => acceptedFormats.slice(0, 8).join(' / '),
-    []
-  )
-
-  const addFiles = (incomingFiles) => {
-    const nextFiles = Array.from(incomingFiles || [])
-    if (!nextFiles.length) {
-      return
-    }
-
-    setSelectedFiles((currentFiles) => {
-      const exists = new Set(currentFiles.map(buildKey))
-      const merged = [...currentFiles]
-      nextFiles.forEach((file) => {
-        const key = buildKey(file)
-        if (!exists.has(key)) {
-          merged.push(file)
-          exists.add(key)
-        }
+  const addFiles = (incoming) => {
+    const next = Array.from(incoming || [])
+    if (!next.length) return
+    setSelectedFiles(curr => {
+      const exists = new Set(curr.map(buildKey))
+      const merged = [...curr]
+      next.forEach(f => {
+        const k = buildKey(f)
+        if (!exists.has(k)) { merged.push(f); exists.add(k) }
       })
       return merged
     })
   }
 
-  const handleInputChange = (event) => {
-    addFiles(event.target.files)
-    event.target.value = ''
-  }
-
-  const handleDrop = (event) => {
-    event.preventDefault()
-    setDragging(false)
-    addFiles(event.dataTransfer.files)
-  }
-
-  const removeFile = (fileKey) => {
-    setSelectedFiles((currentFiles) => currentFiles.filter((file) => buildKey(file) !== fileKey))
-  }
-
-  const clearFiles = () => {
-    setSelectedFiles([])
-    setProgress(0)
-    setMessage('')
-  }
-
-  const openPicker = () => {
-    inputRef.current?.click()
-  }
+  const openPicker = () => inputRef.current?.click()
 
   const submitUpload = async () => {
     if (!selectedFiles.length) {
-      setMessageType('warning')
-      setMessage('请先选择需要上传的文件。')
+      Message.warning('请先选择文件')
       return
     }
-
     setUploading(true)
     setProgress(0)
-    setMessage('')
-
     const timer = window.setInterval(() => {
-      setProgress((current) => (current >= 90 ? current : current + 10))
+      setProgress(p => p >= 90 ? p : p + 10)
     }, 180)
-
     try {
       const result = await api.uploadFiles(selectedFiles)
       window.clearInterval(timer)
       setProgress(100)
-      setMessageType(result.success ? 'success' : 'error')
-      setMessage(result.message || (result.success ? '上传成功。' : '上传失败。'))
-
       if (result.success) {
+        Message.success(result.message || '上传成功')
         setSelectedFiles([])
+      } else {
+        Message.error(result.message || '上传失败')
       }
-    } catch (error) {
+    } catch (e) {
       window.clearInterval(timer)
       setProgress(100)
-      setMessageType('error')
-      setMessage(getErrorMessage(error, '上传失败，请稍后重试。'))
+      Message.error(getErrorMessage(e, '上传失败'))
     } finally {
       setUploading(false)
     }
   }
 
+  const columns = [
+    { title: '文件名', dataIndex: 'name' },
+    { title: '大小', dataIndex: 'size', width: 120, render: v => formatBytes(v) },
+    { title: '类型', dataIndex: 'type', width: 160, render: v => v || <Text type="secondary">未知</Text> },
+    {
+      title: '操作', width: 90, fixed: 'right',
+      render: (_, file) => {
+        const k = buildKey(file)
+        return (
+          <Button type="text" status="danger" size="small" icon={<IconDelete />}
+            onClick={() => setSelectedFiles(curr => curr.filter(f => buildKey(f) !== k))}>
+            移除
+          </Button>
+        )
+      },
+    },
+  ]
+
   return (
-    <div className="content-wrap">
-      <div className="page-header">
+    <div style={{ padding: 24, background: 'var(--color-fill-1)', minHeight: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <h1 className="page-title">本地上传</h1>
-          <p className="page-subtitle">处理本机文件、离线交付件和压缩包的快速入湖。远程来源接入、扫描预览和批量任务请使用"接入与扫描"。</p>
+          <Title heading={5} style={{ margin: 0 }}>本地上传</Title>
+          <Text type="secondary">本机文件、离线交付件和压缩包的快速入湖</Text>
         </div>
-        <div className="page-actions">
-          <NavLink to="/workbench" className="button button-secondary">
-            前往接入与扫描
-          </NavLink>
-          <button type="button" className="button button-primary" onClick={openPicker}>
-            选择文件
-          </button>
-        </div>
+        <Space>
+          <NavLink to="/workbench"><Button icon={<IconCloudDownload />}>前往接入与扫描</Button></NavLink>
+          <Button type="primary" icon={<IconPlus />} onClick={openPicker}>选择文件</Button>
+        </Space>
       </div>
 
-      {message ? <div className={`${messageType}-banner`}>{message}</div> : null}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={6}>
+          <Card bodyStyle={{ padding: 20 }}>
+            <Statistic title="入口类型" value="本地直传" />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card bodyStyle={{ padding: 20 }}>
+            <Statistic title="已选文件" value={selectedFiles.length} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card bodyStyle={{ padding: 20 }}>
+            <Statistic title="总大小" value={formatBytes(totalSize)} valueStyle={{ fontSize: 22 }} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card bodyStyle={{ padding: 20 }}>
+            <Text type="secondary" style={{ fontSize: 13 }}>支持格式</Text>
+            <div style={{ marginTop: 8 }}>
+              <Space wrap size={4}>
+                {acceptedFormats.slice(0, 6).map(f => <Tag key={f} color="arcoblue">{f}</Tag>)}
+                <Text type="secondary">等</Text>
+              </Space>
+            </div>
+          </Card>
+        </Col>
+      </Row>
 
-      <section className="glass-card workbench-console-panel">
-        <div className="workbench-guide-strip">
-          <span className="badge">Local Upload</span>
-          <span className="workbench-guide-copy">适合本地直传。压缩包会在服务端自动解包处理；如果数据本来就在 S3 / SeaweedFS 或 SFTP，不建议先下载再回来上传。</span>
-        </div>
-
-        <div className="workbench-summary-grid">
-          <div className="workbench-summary-card">
-            <div className="kpi-label">入口类型</div>
-            <div className="workbench-summary-value">本地直传</div>
-            <div className="workbench-summary-note">面向本机文件、离线材料和一次性交付包。</div>
-          </div>
-          <div className="workbench-summary-card">
-            <div className="kpi-label">支持格式</div>
-            <div className="workbench-summary-value">文件 / 压缩包</div>
-            <div className="workbench-summary-note">{formatSummary} 等格式，包含压缩包导入。</div>
-          </div>
-          <div className="workbench-summary-card">
-            <div className="kpi-label">已选文件</div>
-            <div className="workbench-summary-value">{selectedFiles.length}</div>
-            <div className="workbench-summary-note">可以批量选择并去重，支持拖拽追加。</div>
-          </div>
-          <div className="workbench-summary-card">
-            <div className="kpi-label">总大小</div>
-            <div className="workbench-summary-value">{formatBytes(totalSize)}</div>
-            <div className="workbench-summary-note">单次上传总大小受后端限制，超限会在服务端返回明确错误。</div>
-          </div>
-        </div>
-
-        <div className="local-upload-shell">
-          <div
-            className={`upload-dropzone local-upload-dropzone${dragging ? ' is-dragging' : ''}`}
-            onClick={openPicker}
-            onDragEnter={(event) => {
-              event.preventDefault()
-              setDragging(true)
-            }}
-            onDragOver={(event) => {
-              event.preventDefault()
-              setDragging(true)
-            }}
-            onDragLeave={(event) => {
-              event.preventDefault()
-              setDragging(false)
-            }}
-            onDrop={handleDrop}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault()
-                openPicker()
-              }
-            }}
-          >
-            <div className="upload-icon">LOCAL</div>
-            <h2>拖拽文件到这里，或点击选择文件</h2>
-            <p>面向本地文件直传。选完即可直接上传，不需要先配置远程来源。</p>
-            <div className="toolbar-group">
-              <button type="button" className="button button-primary">
+      <Card style={{ marginBottom: 16 }}>
+        <div
+          onClick={openPicker}
+          onDragEnter={e => { e.preventDefault(); setDragging(true) }}
+          onDragOver={e => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={e => { e.preventDefault(); setDragging(false) }}
+          onDrop={e => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files) }}
+          style={{
+            border: `2px dashed ${dragging ? 'var(--color-primary-light-3)' : 'var(--color-border-2)'}`,
+            borderRadius: 8,
+            padding: '48px 24px',
+            textAlign: 'center',
+            cursor: 'pointer',
+            background: dragging ? 'var(--color-primary-light-1)' : 'var(--color-fill-1)',
+            transition: 'all 0.2s',
+          }}
+        >
+          <IconUpload style={{ fontSize: 48, color: 'var(--color-primary-light-3)', marginBottom: 16 }} />
+          <Title heading={6} style={{ margin: 0, marginBottom: 8 }}>拖拽文件到这里，或点击选择</Title>
+          <Text type="secondary">支持批量选择，压缩包会在服务端自动解包</Text>
+          <div style={{ marginTop: 16 }}>
+            <Space>
+              <Button type="primary" icon={<IconFolder />} onClick={(e) => { e.stopPropagation(); openPicker() }}>
                 选择本地文件
-              </button>
-              <button type="button" className="button button-secondary" onClick={(event) => { event.stopPropagation(); submitUpload() }} disabled={uploading || !selectedFiles.length}>
-                {uploading ? '上传中...' : '上传并入湖'}
-              </button>
-            </div>
-            <input ref={inputRef} type="file" multiple className="hidden-input" onChange={handleInputChange} />
+              </Button>
+              <Button
+                type="outline"
+                icon={<IconUpload />}
+                onClick={(e) => { e.stopPropagation(); submitUpload() }}
+                loading={uploading}
+                disabled={!selectedFiles.length}
+              >
+                上传并入湖
+              </Button>
+            </Space>
           </div>
-
-          <div className="local-upload-side">
-            <section className="glass-card local-upload-side-card">
-              <div className="card-header">
-                <div>
-                  <h2>适用场景</h2>
-                  <p>把入口边界说清楚，避免把本地上传和来源接入混成一类。</p>
-                </div>
-              </div>
-              <div className="local-upload-note-list">
-                <div className="local-upload-note-item">适合：本地临时文件、离线材料、交付压缩包。</div>
-                <div className="local-upload-note-item">支持：`zip / tar / gz / tgz` 自动解包处理。</div>
-                <div className="local-upload-note-item">不适合：远程目录扫描、来源配置复用、按目录批量接入。</div>
-              </div>
-            </section>
-
-            <section className="glass-card local-upload-side-card">
-              <div className="card-header">
-                <div>
-                  <h2>当前选择</h2>
-                  <p>上传前先确认数量、大小和后续动作。</p>
-                </div>
-              </div>
-              <div className="detail-grid">
-                <div className="detail-item">
-                  <div className="kpi-label">文件数</div>
-                  <div className="detail-value">{selectedFiles.length}</div>
-                </div>
-                <div className="detail-item">
-                  <div className="kpi-label">总大小</div>
-                  <div className="detail-value">{formatBytes(totalSize)}</div>
-                </div>
-              </div>
-              <div className="toolbar-group">
-                <button type="button" className="button button-secondary" onClick={clearFiles} disabled={uploading || !selectedFiles.length}>
-                  清空列表
-                </button>
-                <NavLink to="/workbench" className="button button-ghost">
-                  改走接入与扫描
-                </NavLink>
-              </div>
-            </section>
-          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            style={{ display: 'none' }}
+            onChange={e => { addFiles(e.target.files); e.target.value = '' }}
+          />
         </div>
 
-        {progress > 0 ? (
-          <div className="progress-block">
-            <div className="progress-track">
-              <div className={`progress-value is-${messageType}`} style={{ width: `${progress}%` }} />
-            </div>
-            <div className="progress-text">上传进度 {progress}%</div>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="glass-card">
-        <div className="card-header">
-          <div>
-            <h2>待上传列表</h2>
-            <p>这里展示即将上传入湖的本地文件；上传成功后列表会清空。</p>
-          </div>
-          <span className="badge">{selectedFiles.length ? `${selectedFiles.length} 项` : '空列表'}</span>
-        </div>
-
-        {selectedFiles.length ? (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>文件名</th>
-                  <th>大小</th>
-                  <th>类型</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedFiles.map((file) => {
-                  const fileKey = buildKey(file)
-                  return (
-                    <tr key={fileKey}>
-                      <td>
-                        <div className="table-primary">{file.name}</div>
-                      </td>
-                      <td>{formatBytes(file.size)}</td>
-                      <td className="table-secondary">{file.type || '未知类型'}</td>
-                      <td>
-                        <button type="button" className="button button-small button-ghost" onClick={() => removeFile(fileKey)}>
-                          移除
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="empty-state small">还没有选中文件。</div>
+        {progress > 0 && (
+          <Progress
+            percent={progress}
+            style={{ marginTop: 16 }}
+            status={progress === 100 ? 'success' : 'normal'}
+          />
         )}
-      </section>
+      </Card>
+
+      <Card title={`待上传列表（${selectedFiles.length} 项）`}>
+        <Table
+          columns={columns}
+          data={selectedFiles}
+          rowKey={file => buildKey(file)}
+          pagination={{ pageSize: 10 }}
+          noDataElement={<Empty description="还没有选中文件" />}
+        />
+      </Card>
     </div>
   )
 }

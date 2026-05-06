@@ -1,130 +1,113 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Card, Button, Space, Typography, Grid, Statistic, Spin, Message, Tag } from '@arco-design/web-react'
+import { IconLeft } from '@arco-design/web-react/icon'
 import api, { getErrorMessage } from '@/api'
 import WorkflowStudio from '@/components/WorkflowStudio.jsx'
-import { formatNumber } from '@/utils/format'
+
+const { Row, Col } = Grid
+const { Title, Text, Paragraph } = Typography
 
 export default function WorkflowCenterPage() {
   const navigate = useNavigate()
   const [platformSettings, setPlatformSettings] = useState(null)
   const [workbenchSettings, setWorkbenchSettings] = useState(null)
   const [jobs, setJobs] = useState([])
-  const [banner, setBanner] = useState({ type: '', message: '' })
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const load = async () => {
-      setError('')
       try {
-        const [platformResponse, workbenchResponse, jobsResponse] = await Promise.all([
+        const [p, w, j] = await Promise.all([
           api.getPlatformSettings(),
           api.getWorkbenchSettings(),
-          api.getWorkbenchJobs(20)
+          api.getWorkbenchJobs(20),
         ])
-
-        setPlatformSettings(platformResponse?.data || null)
-        setWorkbenchSettings(workbenchResponse?.data || null)
-        setJobs(Array.isArray(jobsResponse?.jobs) ? jobsResponse.jobs : [])
-      } catch (requestError) {
-        setError(getErrorMessage(requestError, '加载编排中心失败。'))
+        setPlatformSettings(p?.data || null)
+        setWorkbenchSettings(w?.data || null)
+        setJobs(Array.isArray(j?.jobs) ? j.jobs : [])
+      } catch (e) {
+        Message.error(getErrorMessage(e, '加载编排中心失败'))
       } finally {
         setLoading(false)
       }
     }
-
     load()
   }, [])
 
-  const activeJobs = jobs.filter((job) => ['pending', 'running', 'cancelling'].includes(job.status)).length
+  const activeJobs = jobs.filter(j => ['pending', 'running', 'cancelling'].includes(j.status)).length
   const sourceHint = workbenchSettings?.source_type === 'sftp'
     ? (workbenchSettings?.sftp_path || '/')
     : (workbenchSettings?.prefix || '/')
 
   if (loading) {
-    return <div className="loading-state">编排中心加载中...</div>
+    return <div style={{ padding: 64, textAlign: 'center' }}><Spin size={32} /></div>
   }
 
   return (
-    <div className="content-wrap">
-      <div className="page-header">
+    <div style={{ padding: 24, background: 'var(--color-fill-1)', minHeight: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <h1 className="page-title">编排中心</h1>
-          <p className="page-subtitle">把 Daft ETL 工作流、Ray Job 资源约束和执行模板独立出来，形成真正的平台编排入口。</p>
+          <Title heading={5} style={{ margin: 0 }}>编排中心</Title>
+          <Text type="secondary">Daft ETL 工作流、Ray Job 资源约束和执行模板</Text>
         </div>
-        <div className="page-actions">
-          <button type="button" className="button button-secondary" onClick={() => navigate('/workbench')}>
-            返回 AI 工作台
-          </button>
-        </div>
+        <Button icon={<IconLeft />} onClick={() => navigate('/workbench')}>返回 AI 工作台</Button>
       </div>
 
-      {banner.message ? <div className={`${banner.type}-banner`}>{banner.message}</div> : null}
-      {error ? <div className="error-banner">{error}</div> : null}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={6}>
+          <Card bodyStyle={{ padding: 20 }}>
+            <Statistic title="Ray Dashboard" value={platformSettings?.ray_dashboard_url || '—'} valueStyle={{ fontSize: 14, fontFamily: 'monospace' }} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card bodyStyle={{ padding: 20 }}>
+            <Statistic title="SeaweedFS / Lance" value={platformSettings?.seaweedfs_s3_url || '—'} valueStyle={{ fontSize: 14, fontFamily: 'monospace' }} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card bodyStyle={{ padding: 20 }}>
+            <Statistic title="当前来源" value={sourceHint} valueStyle={{ fontSize: 14, fontFamily: 'monospace' }} />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card bodyStyle={{ padding: 20 }}>
+            <Statistic
+              title="活动任务"
+              value={activeJobs}
+              valueStyle={{ color: activeJobs > 0 ? '#165dff' : undefined }}
+            />
+          </Card>
+        </Col>
+      </Row>
 
-      <div className="workbench-strategy-grid">
-        <section className="glass-card workbench-platform-card">
-          <div className="card-header">
-            <div>
-              <h2>编排依赖矩阵</h2>
-              <p>工作流只是平台控制面的一部分，编排中心强调依赖关系、资源约束和模板化执行。</p>
-            </div>
-            <span className="badge">Workflow</span>
-          </div>
+      <Card title="使用建议" style={{ marginBottom: 16 }}>
+        <Row gutter={24}>
+          <Col span={8}>
+            <Tag color="arcoblue">先定模板</Tag>
+            <Paragraph style={{ marginTop: 8 }}>优先从预设工作流开始，减少手拼节点。</Paragraph>
+          </Col>
+          <Col span={8}>
+            <Tag color="green">职责分离</Tag>
+            <Paragraph style={{ marginTop: 8 }}>编排负责定义，治理负责观测，不要混用。</Paragraph>
+          </Col>
+          <Col span={8}>
+            <Tag color="orange">复用配置</Tag>
+            <Paragraph style={{ marginTop: 8 }}>来源配置在 AI 工作台维护，这里直接读最近保存的范围。</Paragraph>
+          </Col>
+        </Row>
+      </Card>
 
-          <div className="platform-service-grid compact-grid">
-            <div className="platform-service-card compact-card">
-              <div className="platform-service-title">Ray Dashboard</div>
-              <div className="platform-service-meta mono">{platformSettings?.ray_dashboard_url || '--'}</div>
-              <div className="platform-service-note">批量任务编排与执行目标</div>
-            </div>
-            <div className="platform-service-card compact-card">
-              <div className="platform-service-title">SeaweedFS / Lance</div>
-              <div className="platform-service-meta mono">{platformSettings?.seaweedfs_s3_url || '--'}</div>
-              <div className="platform-service-note">工作流输入输出的数据承载层</div>
-            </div>
-            <div className="platform-service-card compact-card">
-              <div className="platform-service-title">当前来源</div>
-              <div className="platform-service-meta mono">{sourceHint}</div>
-              <div className="platform-service-note">使用工作台最近一次保存的来源范围</div>
-            </div>
-            <div className="platform-service-card compact-card">
-              <div className="platform-service-title">活动任务</div>
-              <div className="platform-service-meta">{formatNumber(activeJobs)}</div>
-              <div className="platform-service-note">若过多，建议先去任务治理中心查看负载</div>
-            </div>
-          </div>
-        </section>
-
-        <section className="glass-card workbench-playbook-card">
-          <div className="card-header">
-            <div>
-              <h2>使用建议</h2>
-              <p>让编排中心更像平台，而不是单次任务配置器。</p>
-            </div>
-          </div>
-
-          <div className="platform-roadmap-list">
-            <div className="platform-roadmap-item">
-              <div className="platform-roadmap-title">先定模板，再调资源</div>
-              <div className="platform-roadmap-copy">优先从预设工作流开始，减少每次重新手拼节点导致的平台运行不稳定。</div>
-            </div>
-            <div className="platform-roadmap-item">
-              <div className="platform-roadmap-title">任务治理和编排分离</div>
-              <div className="platform-roadmap-copy">编排中心只负责定义任务和资源，不负责承载大批量日志与运行明细。</div>
-            </div>
-            <div className="platform-roadmap-item">
-              <div className="platform-roadmap-title">配置回到工作台复用</div>
-              <div className="platform-roadmap-copy">来源配置仍在 AI 工作台维护，编排中心读取最近一次保存的来源范围作为默认输入。</div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <WorkflowStudio
-        sourceHint={sourceHint}
-        onBanner={(type, message) => setBanner({ type, message })}
-      />
+      <Card title="工作流编辑器" bodyStyle={{ padding: 16 }}>
+        <WorkflowStudio
+          sourceHint={sourceHint}
+          onBanner={(type, message) => {
+            if (type === 'error') Message.error(message)
+            else if (type === 'success') Message.success(message)
+            else Message.info(message)
+          }}
+        />
+      </Card>
     </div>
   )
 }
