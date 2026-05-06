@@ -1,4 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
+import {
+  Button, Card, Space, Table, Tag, Modal, Switch, InputNumber, Message,
+  Typography, Empty, Select, Progress, Descriptions, Alert
+} from '@arco-design/web-react'
+import {
+  IconRefresh, IconPlayCircle, IconCheckCircle, IconCloseCircle,
+  IconExclamationCircle, IconClockCircle
+} from '@arco-design/web-react/icon'
+
+const { Title, Text } = Typography
+const Option = Select.Option
 
 const DORIS_BASE = '/api/doris'
 
@@ -32,69 +43,73 @@ async function dorisPut(path, body = {}) {
   return res.json()
 }
 
-function StatusBadge({ status }) {
+function StatusTag({ status }) {
   const map = {
-    SUCCESS: { label: '成功', cls: 'badge-success' },
-    FAILED: { label: '失败', cls: 'badge-error' },
-    WARNING: { label: '警告', cls: 'badge-warn' },
-    RUNNING: { label: '执行中', cls: 'badge-warn' },
-    PENDING: { label: '待执行', cls: 'badge-neutral' },
+    SUCCESS: { color: 'green', label: '成功', icon: <IconCheckCircle /> },
+    FAILED: { color: 'red', label: '失败', icon: <IconCloseCircle /> },
+    WARNING: { color: 'orange', label: '警告', icon: <IconExclamationCircle /> },
+    RUNNING: { color: 'arcoblue', label: '执行中', icon: <IconClockCircle /> },
+    PENDING: { color: 'gray', label: '待执行', icon: <IconClockCircle /> },
   }
-  const { label, cls } = map[status?.toUpperCase()] || { label: status || '—', cls: 'badge-neutral' }
-  return <span className={`status-badge ${cls}`}>{label}</span>
+  const v = map[String(status || '').toUpperCase()] || { color: 'gray', label: status || '—' }
+  return <Tag color={v.color} icon={v.icon}>{v.label}</Tag>
 }
 
-function ScoreGauge({ score }) {
-  if (score == null) return <span className="mpp-score-na">N/A</span>
+function ScoreDisplay({ score }) {
+  if (score == null) return <Text type="secondary">N/A</Text>
   const val = Number(score)
-  const cls = val >= 90 ? 'score-good' : val >= 70 ? 'score-warn' : 'score-bad'
-  return <span className={`mpp-score ${cls}`}>{val}</span>
+  const color = val >= 90 ? '#00b42a' : val >= 70 ? '#ff7d00' : '#f53f3f'
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <Progress
+        type="circle"
+        percent={val}
+        size="mini"
+        showText={false}
+        color={color}
+      />
+      <Text style={{ color, fontWeight: 600 }}>{val.toFixed(0)}</Text>
+    </span>
+  )
 }
 
-function ResultDetailModal({ inspection, onClose }) {
+function DetailModal({ inspection, visible, onClose }) {
   if (!inspection) return null
   const items = inspection.result?.items || []
+  const columns = [
+    { title: '检查项', dataIndex: 'name', width: 200 },
+    { title: '状态', dataIndex: 'status', width: 120, render: v => <StatusTag status={v} /> },
+    { title: '结果', dataIndex: 'value', render: v => <Text code>{v || '—'}</Text> },
+    { title: '建议', dataIndex: 'suggestion', render: v => v ? <Text type="warning">{v}</Text> : <Text type="secondary">—</Text> },
+  ]
   return (
-    <div className="mpp-modal-overlay" onClick={onClose}>
-      <div className="mpp-modal" onClick={e => e.stopPropagation()}>
-        <div className="mpp-modal-header">
-          <h3 className="mpp-modal-title">巡检详情</h3>
-          <button className="mpp-modal-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="mpp-modal-body">
-          <div className="mpp-result-meta">
-            <span>巡检时间：{inspection.created_at || '—'}</span>
-            <span>耗时：{inspection.duration != null ? `${inspection.duration}s` : '—'}</span>
-            <span>综合评分：<ScoreGauge score={inspection.score} /></span>
-            <span>状态：<StatusBadge status={inspection.status} /></span>
-          </div>
-          {items.length > 0 ? (
-            <table className="data-table" style={{ marginTop: 12 }}>
-              <thead>
-                <tr>
-                  <th>检查项</th>
-                  <th>状态</th>
-                  <th>结果</th>
-                  <th>建议</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, i) => (
-                  <tr key={i}>
-                    <td>{item.name || '—'}</td>
-                    <td><StatusBadge status={item.status} /></td>
-                    <td className="mono">{item.value || '—'}</td>
-                    <td>{item.suggestion || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p className="mpp-empty">暂无检查详情</p>
-          )}
-        </div>
-      </div>
-    </div>
+    <Modal
+      title="巡检详情"
+      visible={visible}
+      onCancel={onClose}
+      footer={null}
+      style={{ width: 800 }}
+    >
+      <Descriptions
+        column={2}
+        size="small"
+        data={[
+          { label: '巡检时间', value: inspection.created_at || '—' },
+          { label: '耗时', value: inspection.duration != null ? `${inspection.duration}s` : '—' },
+          { label: '综合评分', value: <ScoreDisplay score={inspection.score} /> },
+          { label: '状态', value: <StatusTag status={inspection.status} /> },
+        ]}
+        labelStyle={{ width: 90 }}
+        style={{ marginBottom: 16 }}
+      />
+      <Table
+        columns={columns}
+        data={items}
+        pagination={false}
+        rowKey="name"
+        noDataElement={<Empty description="暂无检查详情" />}
+      />
+    </Modal>
   )
 }
 
@@ -104,108 +119,100 @@ export default function InspectionPage() {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(false)
   const [running, setRunning] = useState(false)
-  const [error, setError] = useState('')
-  const [msg, setMsg] = useState('')
   const [detail, setDetail] = useState(null)
-  const [activeTab, setActiveTab] = useState('history')
-  const [polling, setPolling] = useState(null)
   const [schedule, setSchedule] = useState({ enabled: false, interval_minutes: 60, last_run_at: null })
-  const [savingSchedule, setSavingSchedule] = useState(false)
+  const pollRef = useRef(null)
 
-  // 加载集群列表
   useEffect(() => {
     dorisGet('/clusters').then(data => {
       const list = data.clusters || []
       setClusters(list)
-      if (list.length > 0) {
-        setClusterId(list[0].id)
-      }
+      if (list.length > 0) setClusterId(list[0].id)
     }).catch(() => {})
   }, [])
 
   const loadHistory = async () => {
     if (!clusterId) return
     setLoading(true)
-    setError('')
     try {
       const data = await dorisGet('/inspection/history', { cluster_id: clusterId, limit: 20 })
       setHistory(data.history || [])
     } catch (e) {
-      setError('加载巡检历史失败：' + e.message)
+      Message.error('加载巡检历史失败：' + e.message)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    if (clusterId) {
-      loadHistory()
-      dorisGet(`/inspection/schedule/${clusterId}`).then(d => {
-        if (d.schedule) setSchedule({
-          enabled: !!d.schedule.enabled,
-          interval_minutes: d.schedule.interval_minutes || 60,
-          last_run_at: d.schedule.last_run_at,
+  const loadSchedule = async () => {
+    if (!clusterId) return
+    try {
+      const data = await dorisGet(`/inspection/schedule/${clusterId}`)
+      if (data.schedule) {
+        setSchedule({
+          enabled: !!data.schedule.enabled,
+          interval_minutes: data.schedule.interval_minutes || 60,
+          last_run_at: data.schedule.last_run_at,
         })
-      }).catch(() => {})
-    }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  useEffect(() => {
+    if (clusterId) { loadHistory(); loadSchedule() }
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [clusterId])
 
   const saveSchedule = async (next) => {
     if (!clusterId) return
-    setSavingSchedule(true)
     try {
       await dorisPut(`/inspection/schedule/${clusterId}`, {
         enabled: next.enabled,
         interval_minutes: Number(next.interval_minutes) || 60,
       })
       setSchedule(s => ({ ...s, ...next }))
-      setMsg(next.enabled ? `已开启定时巡检：每 ${next.interval_minutes} 分钟一次` : '已关闭定时巡检')
+      Message.success(next.enabled ? `已开启定时巡检：每 ${next.interval_minutes} 分钟一次` : '已关闭定时巡检')
     } catch (e) {
-      setError('保存失败：' + e.message)
-    } finally {
-      setSavingSchedule(false)
+      Message.error('保存失败：' + e.message)
     }
   }
 
-  // 轮询巡检结果
-  const pollInspection = (inspectionId) => {
-    const timer = setInterval(async () => {
+  const pollInspection = (id) => {
+    if (pollRef.current) clearInterval(pollRef.current)
+    pollRef.current = setInterval(async () => {
       try {
-        const data = await dorisGet(`/inspection/${inspectionId}`)
+        const data = await dorisGet(`/inspection/${id}`)
         const ins = data.inspection || {}
         if (ins.status !== 'RUNNING') {
-          clearInterval(timer)
-          setPolling(null)
+          clearInterval(pollRef.current)
+          pollRef.current = null
           setRunning(false)
-          setMsg(`巡检完成，评分：${ins.score ?? 'N/A'}`)
-          await loadHistory()
+          Message.success(`巡检完成，评分：${ins.score ?? 'N/A'}`)
+          loadHistory()
         }
       } catch (e) {
-        clearInterval(timer)
-        setPolling(null)
+        clearInterval(pollRef.current)
+        pollRef.current = null
         setRunning(false)
       }
     }, 2000)
-    setPolling(timer)
   }
 
   const handleRunNow = async () => {
     if (!clusterId) return
     setRunning(true)
-    setError('')
-    setMsg('')
     try {
       const data = await dorisPost('/inspection/run', { cluster_id: clusterId })
       if (data.success) {
-        setMsg('巡检任务已启动，正在执行...')
+        Message.info('巡检任务已启动，正在执行...')
         pollInspection(data.inspection_id)
       } else {
         setRunning(false)
-        setError(data.detail || '启动巡检失败')
+        Message.error(data.detail || '启动巡检失败')
       }
     } catch (e) {
       setRunning(false)
-      setError('启动巡检失败：' + e.message)
+      Message.error('启动巡检失败：' + e.message)
     }
   }
 
@@ -218,127 +225,99 @@ export default function InspectionPage() {
     }
   }
 
+  const columns = [
+    { title: '巡检时间', dataIndex: 'created_at', width: 180 },
+    { title: '耗时', dataIndex: 'duration', width: 90, render: v => v != null ? <Text code>{v}s</Text> : '—' },
+    { title: '综合评分', dataIndex: 'score', width: 140, render: v => <ScoreDisplay score={v} /> },
+    { title: '状态', dataIndex: 'status', width: 110, render: v => <StatusTag status={v} /> },
+    { title: '检查项数', dataIndex: 'check_count', width: 100, render: v => <Text code>{v ?? '—'}</Text> },
+    {
+      title: '操作', width: 100, fixed: 'right',
+      render: (_, row) => <Button type="text" size="small" onClick={() => loadDetail(row)}>查看详情</Button>,
+    },
+  ]
+
   return (
-    <div className="content-wrap mpp-inspection-page">
-      <div className="page-header">
+    <div style={{ padding: 24, background: 'var(--color-fill-1)', minHeight: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <h1 className="page-title">自动巡检</h1>
-          <p className="page-sub">Doris 集群健康巡检</p>
+          <Title heading={5} style={{ margin: 0 }}>自动巡检</Title>
+          <Text type="secondary">Doris 集群健康巡检</Text>
         </div>
-        <div className="page-actions">
-          <select
-            className="field-input"
-            value={clusterId}
-            onChange={e => setClusterId(e.target.value)}
-            style={{ minWidth: 160, marginRight: 8 }}
+        <Space>
+          <Text type="secondary">集群：</Text>
+          <Select
+            placeholder="选择集群"
+            value={clusterId || undefined}
+            onChange={setClusterId}
+            style={{ width: 200 }}
           >
-            <option value="">选择集群</option>
-            {clusters.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          <button
-            className="button button-primary"
+            {clusters.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
+          </Select>
+          <Button
+            type="primary"
+            icon={<IconPlayCircle />}
             onClick={handleRunNow}
-            disabled={running || !clusterId}
+            loading={running}
+            disabled={!clusterId}
           >
-            {running ? '巡检中...' : '立即巡检'}
-          </button>
-          <button className="button button-secondary" onClick={loadHistory} disabled={loading} style={{ marginLeft: 8 }}>刷新</button>
-        </div>
+            立即巡检
+          </Button>
+          <Button icon={<IconRefresh />} onClick={loadHistory} loading={loading} disabled={!clusterId} />
+        </Space>
       </div>
 
-      {error && <div className="error-banner">{error}</div>}
-      {msg && <div className="info-banner">{msg}</div>}
+      {clusters.length === 0 ? (
+        <Card>
+          <Empty description="暂无集群，请先在「集群管理」页面注册 Doris 集群" />
+        </Card>
+      ) : (
+        <>
+          {/* 定时巡检配置 */}
+          <Card title="定时巡检" style={{ marginBottom: 16 }} bodyStyle={{ padding: 20 }}>
+            <Space size="large" wrap>
+              <Space>
+                <Text>启用定时巡检：</Text>
+                <Switch
+                  checked={schedule.enabled}
+                  onChange={(v) => saveSchedule({ ...schedule, enabled: v })}
+                />
+              </Space>
+              <Space>
+                <Text>执行间隔：</Text>
+                <InputNumber
+                  min={5}
+                  max={1440}
+                  step={5}
+                  value={schedule.interval_minutes}
+                  onChange={(v) => setSchedule(s => ({ ...s, interval_minutes: v }))}
+                  suffix="分钟"
+                  style={{ width: 140 }}
+                />
+                <Button size="small" onClick={() => saveSchedule(schedule)}>保存</Button>
+              </Space>
+              {schedule.last_run_at && (
+                <Text type="secondary">上次执行：{schedule.last_run_at}</Text>
+              )}
+            </Space>
+          </Card>
 
-      {!clusterId && (
-        <div className="mpp-empty-state">
-          <div className="mpp-empty-icon">🔍</div>
-          <div className="mpp-empty-title">请先注册 Doris 集群</div>
-          <p className="mpp-empty-desc">在「集群管理」页面注册 Doris 集群后，即可发起巡检</p>
-        </div>
+          {/* 巡检历史 */}
+          <Card title="巡检历史" bodyStyle={{ padding: 0 }}>
+            <Table
+              columns={columns}
+              data={history}
+              loading={loading}
+              rowKey="id"
+              pagination={{ pageSize: 10, showTotal: true }}
+              noDataElement={<Empty description="暂无巡检记录，点击「立即巡检」开始" />}
+              style={{ padding: 16 }}
+            />
+          </Card>
+        </>
       )}
 
-      {clusterId && (
-        <div className="glass-card mpp-tab-content" style={{ marginBottom: 12 }}>
-          <h3 className="mpp-section-title">定时巡检</h3>
-          <div className="mpp-action-row" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input
-                type="checkbox"
-                checked={schedule.enabled}
-                disabled={savingSchedule}
-                onChange={e => saveSchedule({ ...schedule, enabled: e.target.checked })}
-              />
-              <span>启用定时巡检</span>
-            </label>
-            <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span>间隔（分钟）：</span>
-              <input
-                className="field-input"
-                type="number"
-                min={5}
-                style={{ width: 100 }}
-                value={schedule.interval_minutes}
-                onChange={e => setSchedule(s => ({ ...s, interval_minutes: e.target.value }))}
-              />
-              <button
-                className="button button-secondary"
-                disabled={savingSchedule}
-                onClick={() => saveSchedule(schedule)}
-              >保存</button>
-            </label>
-            {schedule.last_run_at && (
-              <span className="mpp-info-key">上次执行：{schedule.last_run_at}</span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {clusterId && (
-        <div className="glass-card mpp-tab-content">
-          {loading ? (
-            <div className="mpp-loading">加载中...</div>
-          ) : history.length === 0 ? (
-            <div className="mpp-empty-state">
-              <div className="mpp-empty-icon">🔍</div>
-              <div className="mpp-empty-title">暂无巡检记录</div>
-              <p className="mpp-empty-desc">点击「立即巡检」开始第一次集群健康检查</p>
-            </div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>巡检时间</th>
-                  <th>耗时</th>
-                  <th>综合评分</th>
-                  <th>状态</th>
-                  <th>检查项数</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.created_at || '—'}</td>
-                    <td className="mono">{row.duration != null ? `${row.duration}s` : '—'}</td>
-                    <td><ScoreGauge score={row.score} /></td>
-                    <td><StatusBadge status={row.status} /></td>
-                    <td className="mono">{row.check_count ?? '—'}</td>
-                    <td>
-                      <button className="button button-small" onClick={() => loadDetail(row)}>查看详情</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      )}
-
-      {detail && (
-        <ResultDetailModal inspection={detail} onClose={() => setDetail(null)} />
-      )}
+      <DetailModal inspection={detail} visible={!!detail} onClose={() => setDetail(null)} />
     </div>
   )
 }

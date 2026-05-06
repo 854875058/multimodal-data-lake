@@ -1,4 +1,17 @@
 import { useEffect, useState } from 'react'
+import {
+  Button, Card, Space, Table, Tag, Tabs, Form, Input, InputNumber, Select,
+  Message, Popconfirm, Typography, Empty, Grid
+} from '@arco-design/web-react'
+import {
+  IconRefresh, IconDelete, IconPlus, IconNotification
+} from '@arco-design/web-react/icon'
+
+const { Row, Col } = Grid
+const { Title, Text } = Typography
+const TabPane = Tabs.TabPane
+const FormItem = Form.Item
+const Option = Select.Option
 
 const DORIS_BASE = '/api/doris'
 
@@ -22,26 +35,30 @@ async function dorisPost(path, body = {}) {
 }
 
 async function dorisDelete(path) {
-  const res = await fetch(DORIS_BASE + path, {
-    method: 'DELETE',
-    credentials: 'include',
-  })
+  const res = await fetch(DORIS_BASE + path, { method: 'DELETE', credentials: 'include' })
   if (!res.ok) throw new Error(`请求失败: ${res.status}`)
   return res.json()
 }
 
-function SeverityBadge({ level }) {
+function LevelTag({ level }) {
   const map = {
-    CRITICAL: { label: '严重', cls: 'badge-error' },
-    WARNING: { label: '警告', cls: 'badge-warn' },
-    INFO: { label: '信息', cls: 'badge-neutral' },
+    CRITICAL: { color: 'red', label: '严重' },
+    WARNING: { color: 'orange', label: '警告' },
+    INFO: { color: 'arcoblue', label: '信息' },
   }
-  const { label, cls } = map[level] || { label: level || '—', cls: 'badge-neutral' }
-  return <span className={`status-badge ${cls}`}>{label}</span>
+  const { color, label } = map[level] || { color: 'gray', label: level || '—' }
+  return <Tag color={color}>{label}</Tag>
 }
 
-// 告警记录面板
-function AlertHistoryPanel({ clusterId }) {
+const metricLabels = {
+  be_disk_usage: 'BE 磁盘使用率 (%)',
+  fe_alive_count: 'FE 存活节点数',
+  be_alive_count: 'BE 存活节点数',
+  query_latency_ms: '查询延迟 (ms)',
+  connection_count: '当前连接数',
+}
+
+function HistoryPanel({ clusterId }) {
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -51,230 +68,183 @@ function AlertHistoryPanel({ clusterId }) {
     try {
       const data = await dorisGet('/alerts/records', { cluster_id: clusterId, limit: 50 })
       setRecords(data.records || [])
-    } catch (e) {
-      console.warn('告警记录加载失败:', e.message)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) { /* ignore */ }
+    finally { setLoading(false) }
   }
 
   useEffect(() => { load() }, [clusterId])
 
+  const columns = [
+    { title: '告警时间', dataIndex: 'created_at', width: 180 },
+    { title: '规则名称', dataIndex: 'name' },
+    { title: '指标', dataIndex: 'metric', render: v => <Text code>{metricLabels[v] || v || '—'}</Text> },
+    { title: '当前值', dataIndex: 'value', width: 110, render: v => <Text code>{v != null ? Number(v).toFixed(2) : '—'}</Text> },
+    { title: '级别', dataIndex: 'level', width: 90, render: v => <LevelTag level={v} /> },
+    { title: '详情', dataIndex: 'message', render: v => <Text type="secondary">{v || '—'}</Text> },
+  ]
+
   return (
-    <div className="mpp-alert-panel glass-card">
-      <div className="mpp-panel-header">
-        <h3 className="mpp-section-title">告警记录</h3>
-        <button className="button button-secondary button-small" onClick={load} disabled={loading}>刷新</button>
+    <div>
+      <div style={{ marginBottom: 12, textAlign: 'right' }}>
+        <Button icon={<IconRefresh />} onClick={load} loading={loading}>刷新</Button>
       </div>
-      {loading ? <div className="mpp-loading">加载中...</div> : (
-        records.length === 0 ? <p className="mpp-empty">暂无告警记录</p> : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>告警时间</th>
-                <th>告警名称</th>
-                <th>指标</th>
-                <th>当前值</th>
-                <th>级别</th>
-                <th>详情</th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.map((r, i) => (
-                <tr key={i}>
-                  <td>{r.created_at || '—'}</td>
-                  <td>{r.name || '—'}</td>
-                  <td className="mono">{r.metric || '—'}</td>
-                  <td className="mono">{r.value !== undefined ? String(r.value) : '—'}</td>
-                  <td><SeverityBadge level={r.level} /></td>
-                  <td className="mpp-alert-msg">{r.message || '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )
-      )}
+      <Table
+        columns={columns}
+        data={records}
+        loading={loading}
+        rowKey="id"
+        pagination={{ pageSize: 10, showTotal: true }}
+        noDataElement={<Empty description="暂无告警记录" />}
+      />
     </div>
   )
 }
 
-// 告警规则面板
-function AlertRulesPanel({ clusterId, onRefresh }) {
+function RulesPanel({ clusterId, refreshKey }) {
   const [rules, setRules] = useState([])
   const [loading, setLoading] = useState(false)
-  const [opMsg, setOpMsg] = useState('')
 
   const load = async () => {
     setLoading(true)
     try {
       const data = await dorisGet('/alerts', clusterId ? { cluster_id: clusterId } : {})
       setRules(data.alerts || [])
-    } catch (e) {
-      console.warn('告警规则加载失败:', e.message)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) { /* ignore */ }
+    finally { setLoading(false) }
   }
 
-  const deleteRule = async (rule) => {
-    if (!window.confirm(`确认删除告警规则「${rule.name}」？`)) return
-    setOpMsg('')
+  useEffect(() => { load() }, [clusterId, refreshKey])
+
+  const handleDelete = async (rule) => {
     try {
       await dorisDelete(`/alerts/${rule.id}`)
-      setOpMsg('规则已删除')
+      Message.success('规则已删除')
       load()
     } catch (e) {
-      setOpMsg('删除失败：' + e.message)
+      Message.error('删除失败：' + e.message)
     }
   }
 
-  useEffect(() => { load() }, [clusterId, onRefresh])
+  const columns = [
+    { title: '规则名称', dataIndex: 'name' },
+    { title: '指标', dataIndex: 'metric', render: v => metricLabels[v] || v },
+    { title: '条件', dataIndex: 'operator', width: 80, render: v => <Text code>{v}</Text> },
+    { title: '阈值', dataIndex: 'threshold', width: 100, render: v => <Text code>{v}</Text> },
+    { title: '级别', dataIndex: 'level', width: 90, render: v => <LevelTag level={v} /> },
+    {
+      title: '状态', dataIndex: 'enabled', width: 90,
+      render: v => v ? <Tag color="green">已启用</Tag> : <Tag>已禁用</Tag>,
+    },
+    {
+      title: '操作', width: 90, fixed: 'right',
+      render: (_, rule) => (
+        <Popconfirm title={`确认删除规则「${rule.name}」？`} onOk={() => handleDelete(rule)}>
+          <Button type="text" status="danger" size="small" icon={<IconDelete />}>删除</Button>
+        </Popconfirm>
+      ),
+    },
+  ]
 
   return (
-    <div className="mpp-alert-panel glass-card">
-      <div className="mpp-panel-header">
-        <h3 className="mpp-section-title">告警规则管理</h3>
-        <button className="button button-secondary button-small" onClick={load} disabled={loading}>刷新</button>
+    <div>
+      <div style={{ marginBottom: 12, textAlign: 'right' }}>
+        <Button icon={<IconRefresh />} onClick={load} loading={loading}>刷新</Button>
       </div>
-      {opMsg && <div className="info-banner">{opMsg}</div>}
-      {loading ? <div className="mpp-loading">加载中...</div> : (
-        rules.length === 0 ? <p className="mpp-empty">暂无告警规则，请新建规则</p> : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>规则名称</th>
-                <th>指标</th>
-                <th>条件</th>
-                <th>阈值</th>
-                <th>级别</th>
-                <th>状态</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rules.map((rule, i) => (
-                <tr key={i}>
-                  <td>{rule.name || '—'}</td>
-                  <td className="mono">{rule.metric || '—'}</td>
-                  <td className="mono">{rule.operator || '>'}</td>
-                  <td className="mono">{rule.threshold}</td>
-                  <td><SeverityBadge level={rule.level} /></td>
-                  <td>
-                    {rule.enabled
-                      ? <span className="status-badge badge-success">已启用</span>
-                      : <span className="status-badge badge-neutral">已禁用</span>}
-                  </td>
-                  <td>
-                    <button className="button button-small button-danger" onClick={() => deleteRule(rule)}>删除</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )
-      )}
+      <Table
+        columns={columns}
+        data={rules}
+        loading={loading}
+        rowKey="id"
+        pagination={{ pageSize: 10, showTotal: true }}
+        noDataElement={<Empty description="暂无告警规则" />}
+      />
     </div>
   )
 }
 
-// 新建告警规则表单
 function CreateRulePanel({ clusterId, onCreated }) {
-  const [form, setForm] = useState({
-    name: '',
-    metric: 'be_disk_usage',
-    operator: '>',
-    threshold: 80,
-    level: 'WARNING',
-  })
+  const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
-  const [msg, setMsg] = useState('')
-
-  const metricOptions = [
-    { value: 'be_disk_usage', label: 'BE 磁盘使用率 (%)' },
-    { value: 'fe_alive_count', label: 'FE 存活节点数' },
-    { value: 'be_alive_count', label: 'BE 存活节点数' },
-    { value: 'query_latency_ms', label: '查询延迟 (ms)' },
-    { value: 'connection_count', label: '当前连接数' },
-  ]
 
   const handleSubmit = async () => {
-    if (!clusterId) { setMsg('请先选择集群'); return }
-    if (!form.name) { setMsg('请填写规则名称'); return }
-    setSubmitting(true)
-    setMsg('')
+    if (!clusterId) {
+      Message.warning('请先在右上角选择集群')
+      return
+    }
     try {
+      const values = await form.validate()
+      setSubmitting(true)
       await dorisPost('/alerts', {
         cluster_id: clusterId,
-        name: form.name,
-        metric: form.metric,
-        operator: form.operator,
-        threshold: Number(form.threshold),
-        level: form.level,
+        ...values,
+        threshold: Number(values.threshold),
       })
-      setMsg('告警规则已创建')
-      setForm({ name: '', metric: 'be_disk_usage', operator: '>', threshold: 80, level: 'WARNING' })
-      if (onCreated) onCreated()
+      Message.success('告警规则已创建')
+      form.resetFields()
+      onCreated && onCreated()
     } catch (e) {
-      setMsg('创建失败：' + e.message)
+      if (e?.message) Message.error('创建失败：' + e.message)
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div className="mpp-alert-panel glass-card">
-      <h3 className="mpp-section-title">新建告警规则</h3>
-      {msg && <div className={msg.includes('失败') ? 'error-banner' : 'info-banner'}>{msg}</div>}
-      <div className="mpp-form-grid">
-        <div className="mpp-form-field">
-          <label className="mpp-form-label">规则名称 *</label>
-          <input
-            className="field-input"
-            value={form.name}
-            onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            placeholder="如：BE 磁盘使用率过高"
-          />
-        </div>
-        <div className="mpp-form-field">
-          <label className="mpp-form-label">监控指标</label>
-          <select className="field-input" value={form.metric} onChange={e => setForm(f => ({ ...f, metric: e.target.value }))}>
-            {metricOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="mpp-form-field">
-          <label className="mpp-form-label">触发条件</label>
-          <select className="field-input" value={form.operator} onChange={e => setForm(f => ({ ...f, operator: e.target.value }))}>
-            <option value=">">大于 (&gt;)</option>
-            <option value=">=">大于等于 (&gt;=)</option>
-            <option value="<">小于 (&lt;)</option>
-            <option value="<=">小于等于 (&lt;=)</option>
-          </select>
-        </div>
-        <div className="mpp-form-field">
-          <label className="mpp-form-label">阈值</label>
-          <input
-            className="field-input"
-            type="number"
-            value={form.threshold}
-            onChange={e => setForm(f => ({ ...f, threshold: e.target.value }))}
-            placeholder="如：80"
-          />
-        </div>
-        <div className="mpp-form-field">
-          <label className="mpp-form-label">告警级别</label>
-          <select className="field-input" value={form.level} onChange={e => setForm(f => ({ ...f, level: e.target.value }))}>
-            <option value="INFO">信息</option>
-            <option value="WARNING">警告</option>
-            <option value="CRITICAL">严重</option>
-          </select>
-        </div>
-      </div>
-      <button className="button button-primary" onClick={handleSubmit} disabled={submitting || !clusterId}>
-        {submitting ? '创建中...' : '创建规则'}
-      </button>
-    </div>
+    <Form
+      form={form}
+      layout="vertical"
+      style={{ maxWidth: 720 }}
+      initialValues={{
+        metric: 'be_disk_usage',
+        operator: '>',
+        threshold: 80,
+        level: 'WARNING',
+      }}
+    >
+      <Row gutter={16}>
+        <Col span={24}>
+          <FormItem label="规则名称" field="name" rules={[{ required: true, message: '请填写规则名称' }]}>
+            <Input placeholder="如：BE 磁盘使用率过高" />
+          </FormItem>
+        </Col>
+        <Col span={12}>
+          <FormItem label="监控指标" field="metric">
+            <Select>
+              {Object.entries(metricLabels).map(([k, v]) => (
+                <Option key={k} value={k}>{v}</Option>
+              ))}
+            </Select>
+          </FormItem>
+        </Col>
+        <Col span={6}>
+          <FormItem label="触发条件" field="operator">
+            <Select>
+              <Option value=">">大于 (&gt;)</Option>
+              <Option value=">=">大于等于 (&gt;=)</Option>
+              <Option value="<">小于 (&lt;)</Option>
+              <Option value="<=">小于等于 (&lt;=)</Option>
+            </Select>
+          </FormItem>
+        </Col>
+        <Col span={6}>
+          <FormItem label="阈值" field="threshold" rules={[{ required: true, message: '请输入阈值' }]}>
+            <InputNumber placeholder="80" style={{ width: '100%' }} />
+          </FormItem>
+        </Col>
+        <Col span={12}>
+          <FormItem label="告警级别" field="level">
+            <Select>
+              <Option value="INFO">信息</Option>
+              <Option value="WARNING">警告</Option>
+              <Option value="CRITICAL">严重</Option>
+            </Select>
+          </FormItem>
+        </Col>
+      </Row>
+      <Button type="primary" icon={<IconPlus />} onClick={handleSubmit} loading={submitting} disabled={!clusterId}>
+        创建规则
+      </Button>
+    </Form>
   )
 }
 
@@ -282,7 +252,7 @@ export default function AlertPage() {
   const [clusters, setClusters] = useState([])
   const [clusterId, setClusterId] = useState('')
   const [activeTab, setActiveTab] = useState('history')
-  const [rulesKey, setRulesKey] = useState(0)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     dorisGet('/clusters').then(data => {
@@ -293,59 +263,49 @@ export default function AlertPage() {
   }, [])
 
   return (
-    <div className="content-wrap mpp-alert-page">
-      <div className="page-header">
+    <div style={{ padding: 24, background: 'var(--color-fill-1)', minHeight: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <h1 className="page-title">告警监控</h1>
-          <p className="page-sub">Doris 集群告警规则配置与历史记录</p>
+          <Title heading={5} style={{ margin: 0 }}>告警监控</Title>
+          <Text type="secondary">Doris 集群告警规则配置与历史记录</Text>
         </div>
-        <div className="page-actions">
-          <select
-            className="field-input mpp-cluster-select"
-            value={clusterId}
-            onChange={e => setClusterId(e.target.value)}
+        <Space>
+          <Text type="secondary">集群：</Text>
+          <Select
+            placeholder="选择集群"
+            value={clusterId || undefined}
+            onChange={setClusterId}
+            style={{ width: 200 }}
           >
-            <option value="">选择集群</option>
-            {clusters.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
+            {clusters.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
+          </Select>
+        </Space>
       </div>
 
-      {!clusterId && clusters.length === 0 && (
-        <div className="mpp-empty-state">
-          <div className="mpp-empty-icon">🔔</div>
-          <div className="mpp-empty-title">暂无集群</div>
-          <p className="mpp-empty-desc">请先在「集群管理」页面注册 Doris 集群，再配置告警规则</p>
-        </div>
-      )}
-
-      {clusters.length > 0 && (
-        <>
-          <div className="mpp-tabs">
-            {[
-              { key: 'history', label: '告警记录' },
-              { key: 'rules', label: '告警规则' },
-              { key: 'create', label: '新建规则' },
-            ].map(t => (
-              <button
-                key={t.key}
-                className={`mpp-tab${activeTab === t.key ? ' is-active' : ''}`}
-                onClick={() => setActiveTab(t.key)}
-              >{t.label}</button>
-            ))}
-          </div>
-
-          {activeTab === 'history' && <AlertHistoryPanel clusterId={clusterId} />}
-          {activeTab === 'rules' && <AlertRulesPanel key={rulesKey} clusterId={clusterId} />}
-          {activeTab === 'create' && (
-            <CreateRulePanel
-              clusterId={clusterId}
-              onCreated={() => { setActiveTab('rules'); setRulesKey(k => k + 1) }}
-            />
-          )}
-        </>
+      {clusters.length === 0 ? (
+        <Card>
+          <Empty
+            icon={<IconNotification style={{ fontSize: 48, color: 'var(--color-text-3)' }} />}
+            description="暂无集群，请先在「集群管理」页面注册 Doris 集群"
+          />
+        </Card>
+      ) : (
+        <Card>
+          <Tabs activeTab={activeTab} onChange={setActiveTab}>
+            <TabPane key="history" title="告警记录">
+              <HistoryPanel clusterId={clusterId} />
+            </TabPane>
+            <TabPane key="rules" title="告警规则">
+              <RulesPanel clusterId={clusterId} refreshKey={refreshKey} />
+            </TabPane>
+            <TabPane key="create" title="新建规则">
+              <CreateRulePanel
+                clusterId={clusterId}
+                onCreated={() => { setActiveTab('rules'); setRefreshKey(k => k + 1) }}
+              />
+            </TabPane>
+          </Tabs>
+        </Card>
       )}
     </div>
   )

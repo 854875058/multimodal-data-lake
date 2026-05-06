@@ -1,4 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
+import {
+  Button, Card, Space, Table, Tag, Tabs, Select, Input, Popconfirm,
+  Message, Typography, Empty, Spin, Tree
+} from '@arco-design/web-react'
+import {
+  IconPlayArrow, IconRefresh, IconDelete, IconStorage, IconCommand, IconHistory
+} from '@arco-design/web-react/icon'
+
+const { Title, Text } = Typography
+const TabPane = Tabs.TabPane
+const Option = Select.Option
+const TextArea = Input.TextArea
 
 const DORIS_BASE = '/api/doris'
 
@@ -29,46 +41,44 @@ async function dorisDelete(path, params = {}) {
   return res.json()
 }
 
-function ResultTable({ columns, rows }) {
-  if (!columns || columns.length === 0) return <p className="mpp-empty">无结果集</p>
-  return (
-    <div className="mpp-result-scroll">
-      <table className="data-table mpp-result-table">
-        <thead>
-          <tr>{columns.map((col, i) => <th key={i}>{col}</th>)}</tr>
-        </thead>
-        <tbody>
-          {(rows || []).map((row, ri) => (
-            <tr key={ri}>
-              {columns.map((col, ci) => (
-                <td key={ci} className="mono">
-                  {row[col] === null || row[col] === undefined
-                    ? <span className="mpp-null">NULL</span>
-                    : String(row[col])}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
 export default function SqlEditorPage() {
   const [clusters, setClusters] = useState([])
   const [clusterId, setClusterId] = useState('')
   const [databases, setDatabases] = useState([])
-  const [selectedDb, setSelectedDb] = useState('')
-  const [tables, setTables] = useState([])
+  const [tablesByDb, setTablesByDb] = useState({})
+  const [expandedKeys, setExpandedKeys] = useState([])
   const [sql, setSql] = useState('SELECT 1;')
   const [result, setResult] = useState(null)
   const [executing, setExecuting] = useState(false)
-  const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('editor')
   const [history, setHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
-  const textareaRef = useRef(null)
+
+  useEffect(() => {
+    dorisGet('/clusters').then(data => {
+      const list = data.clusters || []
+      setClusters(list)
+      if (list.length > 0) setClusterId(list[0].id)
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!clusterId) return
+    setDatabases([])
+    setTablesByDb({})
+    setExpandedKeys([])
+    dorisGet('/sql/databases', { cluster_id: clusterId }).then(data => {
+      setDatabases(data.databases || [])
+    }).catch(() => {})
+  }, [clusterId])
+
+  const loadTables = async (db) => {
+    if (tablesByDb[db]) return
+    try {
+      const data = await dorisGet('/sql/tables', { cluster_id: clusterId, database: db })
+      setTablesByDb(prev => ({ ...prev, [db]: data.tables || [] }))
+    } catch (e) { /* ignore */ }
+  }
 
   const loadHistory = async () => {
     if (!clusterId) return
@@ -76,39 +86,9 @@ export default function SqlEditorPage() {
     try {
       const data = await dorisGet('/sql/history', { cluster_id: clusterId, limit: 50 })
       setHistory(data.history || [])
-    } catch (e) {
-      // ignore
-    } finally {
-      setHistoryLoading(false)
-    }
+    } catch (e) { /* ignore */ }
+    finally { setHistoryLoading(false) }
   }
-
-  // 加载集群列表
-  useEffect(() => {
-    dorisGet('/clusters').then(data => {
-      const list = data.clusters || []
-      setClusters(list)
-      if (list.length > 0) {
-        setClusterId(list[0].id)
-      }
-    }).catch(() => {})
-  }, [])
-
-  // 加载数据库列表
-  useEffect(() => {
-    if (!clusterId) return
-    dorisGet('/sql/databases', { cluster_id: clusterId }).then(data => {
-      setDatabases(data.databases || [])
-    }).catch(() => {})
-  }, [clusterId])
-
-  // 加载表列表
-  useEffect(() => {
-    if (!clusterId || !selectedDb) return
-    dorisGet('/sql/tables', { cluster_id: clusterId, database: selectedDb }).then(data => {
-      setTables(data.tables || [])
-    }).catch(() => {})
-  }, [clusterId, selectedDb])
 
   useEffect(() => {
     if (activeTab === 'history') loadHistory()
@@ -117,11 +97,10 @@ export default function SqlEditorPage() {
   const handleExecute = async () => {
     if (!sql.trim()) return
     if (!clusterId) {
-      setError('请先选择集群')
+      Message.warning('请先选择集群')
       return
     }
     setExecuting(true)
-    setError('')
     setResult(null)
     try {
       const data = await dorisPost('/sql/execute', {
@@ -130,7 +109,7 @@ export default function SqlEditorPage() {
         limit: 500,
       })
       if (!data.success) {
-        setError(data.detail || '执行失败')
+        Message.error(data.detail || '执行失败')
         return
       }
       setResult({
@@ -142,7 +121,7 @@ export default function SqlEditorPage() {
         message: data.message,
       })
     } catch (e) {
-      setError('执行失败：' + e.message)
+      Message.error('执行失败：' + e.message)
     } finally {
       setExecuting(false)
     }
@@ -153,214 +132,186 @@ export default function SqlEditorPage() {
       e.preventDefault()
       handleExecute()
     }
-    if (e.key === 'Tab') {
-      e.preventDefault()
-      const start = e.target.selectionStart
-      const end = e.target.selectionEnd
-      const next = sql.substring(0, start) + '  ' + sql.substring(end)
-      setSql(next)
-      setTimeout(() => {
-        e.target.selectionStart = e.target.selectionEnd = start + 2
-      }, 0)
-    }
   }
 
-  const insertTable = (tableName) => {
-    const insert = `SELECT * FROM ${selectedDb ? '`' + selectedDb + '`.' : ''}\`${tableName}\` LIMIT 100;`
+  const insertTable = (db, tableName) => {
+    const insert = `SELECT * FROM \`${db}\`.\`${tableName}\` LIMIT 100;`
     setSql(insert)
-    textareaRef.current?.focus()
+    setActiveTab('editor')
   }
+
+  const treeData = databases.map(db => ({
+    key: `db:${db}`,
+    title: (
+      <span><IconStorage style={{ marginRight: 6, color: 'var(--color-text-3)' }} />{db}</span>
+    ),
+    children: (tablesByDb[db] || []).map(t => ({
+      key: `tbl:${db}:${t}`,
+      title: (
+        <span style={{ cursor: 'pointer' }} onClick={() => insertTable(db, t)}>
+          <IconCommand style={{ marginRight: 6, color: 'var(--color-text-3)' }} />{t}
+        </span>
+      ),
+      isLeaf: true,
+    })),
+  }))
+
+  const resultColumns = (result?.columns || []).map(col => ({
+    title: col,
+    dataIndex: col,
+    render: v => v == null ? <Text type="secondary">NULL</Text> : <Text code>{String(v)}</Text>,
+    ellipsis: true,
+  }))
+
+  const historyColumns = [
+    { title: '时间', dataIndex: 'created_at', width: 170 },
+    { title: '状态', dataIndex: 'success', width: 80,
+      render: v => v ? <Tag color="green">成功</Tag> : <Tag color="red">失败</Tag> },
+    { title: '耗时(s)', dataIndex: 'elapsed', width: 90, render: v => <Text code>{v ?? '—'}</Text> },
+    { title: '返回行', width: 80, render: (_, r) => <Text code>{r.rows_returned || r.affected_rows || 0}</Text> },
+    { title: 'SQL', dataIndex: 'sql', ellipsis: true,
+      render: v => <Text code style={{ fontSize: 12 }}>{v}</Text> },
+    { title: '操作', width: 90, fixed: 'right',
+      render: (_, r) => (
+        <Button type="text" size="small" onClick={() => { setSql(r.sql); setActiveTab('editor') }}>回填</Button>
+      ) },
+  ]
 
   return (
-    <div className="content-wrap mpp-sql-editor-page">
-      <div className="page-header">
+    <div style={{ padding: 24, background: 'var(--color-fill-1)', minHeight: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <h1 className="page-title">SQL 编辑器</h1>
-          <p className="page-sub">面向 Doris 集群的多标签 SQL 查询工具</p>
+          <Title heading={5} style={{ margin: 0 }}>SQL 编辑器</Title>
+          <Text type="secondary">面向 Doris 集群的 SQL 查询工具</Text>
         </div>
+        <Space>
+          <Text type="secondary">集群：</Text>
+          <Select
+            placeholder="选择集群"
+            value={clusterId || undefined}
+            onChange={setClusterId}
+            style={{ width: 200 }}
+          >
+            {clusters.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
+          </Select>
+        </Space>
       </div>
 
-      <div className="mpp-sql-layout">
-        {/* 左侧数据库树 */}
-        <div className="mpp-sql-sidebar">
-          <div className="mpp-sql-sidebar-head">
-            <select
-              className="field-input mpp-cluster-select"
-              value={clusterId}
-              onChange={e => { setClusterId(e.target.value); setSelectedDb(''); setTables([]) }}
-            >
-              <option value="">选择集群</option>
-              {clusters.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
+      <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 180px)', minHeight: 560 }}>
+        {/* 左侧库表树 */}
+        <Card
+          title="数据库"
+          style={{ width: 280, flexShrink: 0 }}
+          bodyStyle={{ padding: 8, overflow: 'auto', height: 'calc(100% - 50px)' }}
+        >
+          {clusters.length === 0 ? (
+            <Empty description="请先注册集群" />
+          ) : databases.length === 0 ? (
+            <Empty description="暂无数据库" />
+          ) : (
+            <Tree
+              treeData={treeData}
+              expandedKeys={expandedKeys}
+              onExpand={(keys, { node }) => {
+                setExpandedKeys(keys)
+                if (node._key.startsWith('db:')) loadTables(node._key.slice(3))
+              }}
+              blockNode
+            />
+          )}
+        </Card>
 
-          <div className="mpp-db-tree">
-            {clusters.length === 0 ? (
-              <p className="mpp-empty">请先在集群管理中添加 Doris 集群</p>
-            ) : databases.length === 0 ? (
-              <p className="mpp-empty">暂无数据库</p>
-            ) : databases.map((dbName, i) => {
-              const isOpen = selectedDb === dbName
-              return (
-                <div key={i} className="mpp-db-node">
-                  <button
-                    className={`mpp-db-label${isOpen ? ' is-open' : ''}`}
-                    onClick={() => setSelectedDb(isOpen ? '' : dbName)}
-                  >
-                    <span className="mpp-db-icon">🗄️</span>
-                    <span>{dbName}</span>
-                    <span className="mpp-db-chevron">{isOpen ? '▾' : '▸'}</span>
-                  </button>
-                  {isOpen && (
-                    <div className="mpp-table-list">
-                      {tables.length === 0 ? (
-                        <span className="mpp-table-empty">暂无表</span>
-                      ) : tables.map((tName, j) => (
-                        <button
-                          key={j}
-                          className="mpp-table-item"
-                          onClick={() => insertTable(tName)}
-                          title="点击生成 SELECT 语句"
-                        >
-                          <span className="mpp-table-icon">📋</span>
-                          <span>{tName}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* 右侧编辑区 */}
-        <div className="mpp-sql-main">
-          <div className="mpp-tabs">
-            {[
-              { key: 'editor', label: 'SQL 编辑器' },
-              { key: 'history', label: '执行历史' },
-            ].map(t => (
-              <button
-                key={t.key}
-                className={`mpp-tab${activeTab === t.key ? ' is-active' : ''}`}
-                onClick={() => setActiveTab(t.key)}
-              >{t.label}</button>
-            ))}
-          </div>
+        {/* 右侧编辑器 */}
+        <Card style={{ flex: 1, display: 'flex', flexDirection: 'column' }} bodyStyle={{ padding: 0, height: 'calc(100% - 50px)', display: 'flex', flexDirection: 'column' }}>
+          <Tabs
+            activeTab={activeTab}
+            onChange={setActiveTab}
+            style={{ padding: '0 16px' }}
+          >
+            <TabPane key="editor" title={<span><IconCommand /> SQL 编辑器</span>} />
+            <TabPane key="history" title={<span><IconHistory /> 执行历史</span>} />
+          </Tabs>
 
           {activeTab === 'editor' && (
-            <div className="mpp-editor-panel">
-              <div className="mpp-editor-toolbar">
-                <select
-                  className="field-input mpp-db-select"
-                  value={selectedDb}
-                  onChange={e => setSelectedDb(e.target.value)}
-                >
-                  <option value="">选择数据库</option>
-                  {databases.map((dbName, i) => (
-                    <option key={i} value={dbName}>{dbName}</option>
-                  ))}
-                </select>
-                <button
-                  className="button button-primary"
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              <div style={{ marginBottom: 12 }}>
+                <Button
+                  type="primary"
+                  icon={<IconPlayArrow />}
                   onClick={handleExecute}
-                  disabled={executing || !clusterId}
+                  loading={executing}
+                  disabled={!clusterId}
                 >
-                  {executing ? '执行中...' : '▶ 执行 (Ctrl+Enter)'}
-                </button>
+                  执行 (Ctrl+Enter)
+                </Button>
               </div>
-
-              <textarea
-                ref={textareaRef}
-                className="mpp-sql-textarea"
+              <TextArea
                 value={sql}
-                onChange={e => setSql(e.target.value)}
+                onChange={setSql}
                 onKeyDown={handleKeyDown}
                 placeholder="输入 SQL 语句，Ctrl+Enter 执行..."
-                spellCheck={false}
+                style={{
+                  fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                  fontSize: 13,
+                  minHeight: 180,
+                  resize: 'vertical',
+                }}
+                autoSize={{ minRows: 8, maxRows: 16 }}
               />
 
-              {error && <div className="error-banner">{error}</div>}
-
               {result && (
-                <div className="mpp-result-panel">
-                  <div className="mpp-result-meta">
-                    {result.affectedRows !== undefined && result.affectedRows !== null && (
-                      <span>影响行数：{result.affectedRows}</span>
-                    )}
-                    {result.elapsed !== undefined && <span>耗时：{result.elapsed} s</span>}
-                    {result.rows && result.columns.length > 0 && <span>结果行数：{result.rows.length}</span>}
-                    {result.hasMore && <span className="mpp-warn">（结果已截断，最多显示 500 行）</span>}
-                    {result.message && <span>{result.message}</span>}
-                  </div>
-                  <ResultTable columns={result.columns} rows={result.rows} />
+                <div style={{ marginTop: 16, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                  <Space style={{ marginBottom: 8 }} size="large">
+                    {result.elapsed != null && <Text type="secondary">耗时：<Text code>{result.elapsed}s</Text></Text>}
+                    {result.affectedRows != null && <Text type="secondary">影响：<Text code>{result.affectedRows}</Text> 行</Text>}
+                    {result.rows && result.columns.length > 0 && <Text type="secondary">返回：<Text code>{result.rows.length}</Text> 行</Text>}
+                    {result.hasMore && <Tag color="orange">已截断（最多 500 行）</Tag>}
+                    {result.message && <Text type="success">{result.message}</Text>}
+                  </Space>
+                  {result.columns.length > 0 ? (
+                    <Table
+                      columns={resultColumns}
+                      data={result.rows}
+                      pagination={{ pageSize: 20 }}
+                      rowKey={(_, i) => i}
+                      scroll={{ x: 'max-content' }}
+                      size="small"
+                      border
+                    />
+                  ) : (
+                    <Empty description="无结果集" />
+                  )}
                 </div>
               )}
             </div>
           )}
 
           {activeTab === 'history' && (
-            <div className="mpp-editor-panel">
-              <div className="mpp-editor-toolbar">
-                <button className="button button-secondary" onClick={loadHistory} disabled={!clusterId || historyLoading}>
-                  {historyLoading ? '加载中...' : '刷新'}
-                </button>
-                <button
-                  className="button button-danger"
-                  disabled={!clusterId}
-                  onClick={async () => {
-                    if (!window.confirm('确认清空当前集群的 SQL 执行历史？')) return
+            <div style={{ padding: 16, flex: 1, minHeight: 0, overflow: 'auto' }}>
+              <Space style={{ marginBottom: 12 }}>
+                <Button icon={<IconRefresh />} onClick={loadHistory} loading={historyLoading} disabled={!clusterId}>刷新</Button>
+                <Popconfirm
+                  title="确认清空当前集群的 SQL 历史？"
+                  onOk={async () => {
                     await dorisDelete('/sql/history', { cluster_id: clusterId })
+                    Message.success('历史已清空')
                     loadHistory()
                   }}
-                >清空历史</button>
-              </div>
-              {!clusterId ? (
-                <p className="mpp-empty">请先选择集群</p>
-              ) : history.length === 0 ? (
-                <p className="mpp-empty">{historyLoading ? '加载中...' : '暂无历史记录'}</p>
-              ) : (
-                <div className="mpp-result-scroll">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th style={{ width: 160 }}>时间</th>
-                        <th style={{ width: 60 }}>状态</th>
-                        <th style={{ width: 80 }}>耗时(s)</th>
-                        <th style={{ width: 80 }}>返回行</th>
-                        <th>SQL</th>
-                        <th style={{ width: 80 }}>操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {history.map((h) => (
-                        <tr key={h.id}>
-                          <td className="mono">{h.created_at}</td>
-                          <td>{h.success ? <span className="status-badge badge-success">成功</span> : <span className="status-badge badge-error">失败</span>}</td>
-                          <td className="mono">{h.elapsed ?? '—'}</td>
-                          <td className="mono">{h.rows_returned || h.affected_rows || 0}</td>
-                          <td className="mono" title={h.error || ''} style={{ maxWidth: 480, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {h.sql}
-                          </td>
-                          <td>
-                            <button
-                              className="button button-secondary"
-                              style={{ padding: '2px 8px', fontSize: 12 }}
-                              onClick={() => { setSql(h.sql); setActiveTab('editor') }}
-                            >回填</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                >
+                  <Button status="danger" icon={<IconDelete />} disabled={!clusterId}>清空历史</Button>
+                </Popconfirm>
+              </Space>
+              <Table
+                columns={historyColumns}
+                data={history}
+                loading={historyLoading}
+                rowKey="id"
+                pagination={{ pageSize: 10, showTotal: true }}
+                noDataElement={<Empty description={!clusterId ? '请先选择集群' : '暂无历史记录'} />}
+              />
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   )

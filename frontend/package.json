@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@arco-design/color": "^0.4.0",
+    "@arco-design/web-react": "^2.66.14",
     "axios": "^1.6.0",
     "echarts": "^5.4.3",
     "react": "^18.3.1",

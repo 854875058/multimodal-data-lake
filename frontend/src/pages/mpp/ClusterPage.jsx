@@ -1,4 +1,17 @@
 import { useEffect, useState } from 'react'
+import {
+  Button, Card, Space, Table, Tag, Tabs, Modal, Form, Input, InputNumber,
+  Message, Popconfirm, Statistic, Grid, Typography, Empty, Spin, Descriptions
+} from '@arco-design/web-react'
+import {
+  IconPlus, IconRefresh, IconEdit, IconDelete, IconCheckCircle,
+  IconCloseCircle, IconStorage, IconSync
+} from '@arco-design/web-react/icon'
+
+const { Row, Col } = Grid
+const { Title, Text } = Typography
+const TabPane = Tabs.TabPane
+const FormItem = Form.Item
 
 const API = '/api/doris'
 
@@ -38,136 +51,125 @@ async function dorisDelete(path) {
   return res.json()
 }
 
-function StatusBadge({ alive }) {
+function AliveTag({ alive }) {
   if (alive === true || alive === 'true')
-    return <span className="status-badge badge-success">存活</span>
+    return <Tag color="green" icon={<IconCheckCircle />}>存活</Tag>
   if (alive === false || alive === 'false')
-    return <span className="status-badge badge-error">离线</span>
-  return <span className="status-badge badge-neutral">—</span>
+    return <Tag color="red" icon={<IconCloseCircle />}>离线</Tag>
+  return <Tag>—</Tag>
 }
 
-function StatCard({ label, value, sub }) {
-  return (
-    <div className="mpp-stat-card">
-      <div className="mpp-stat-label">{label}</div>
-      <div className="mpp-stat-value">{value ?? '—'}</div>
-      {sub && <div className="mpp-stat-sub">{sub}</div>}
-    </div>
-  )
-}
-
-function ClusterFormModal({ initial, onClose, onSave }) {
-  const isEdit = !!initial?.id
-  const [form, setForm] = useState(() => ({
-    name: initial?.name || '',
-    fe_host: initial?.fe_host || '',
-    fe_query_port: initial?.fe_query_port ?? 9030,
-    fe_http_port: initial?.fe_http_port ?? 8030,
-    username: initial?.username || 'root',
-    password: initial?.password || '',
-    description: initial?.description || ''
-  }))
+function ClusterFormModal({ visible, initial, onClose, onSaved }) {
+  const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)
-  const [err, setErr] = useState('')
+  const isEdit = !!initial?.id
 
-  const handleChange = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  useEffect(() => {
+    if (visible) {
+      form.setFieldsValue(initial || {
+        name: '', fe_host: '', fe_query_port: 9030, fe_http_port: 8030,
+        username: 'root', password: '', description: '',
+      })
+    }
+  }, [visible, initial])
 
-  const handleSubmit = async () => {
-    if (!form.name || !form.fe_host) { setErr('集群名称和 FE 地址不能为空'); return }
-    setSaving(true)
-    setErr('')
+  const handleOk = async () => {
     try {
-      const payload = {
-        ...form,
-        fe_query_port: Number(form.fe_query_port),
-        fe_http_port: Number(form.fe_http_port),
-      }
+      const values = await form.validate()
+      setSaving(true)
       const data = isEdit
-        ? await dorisPut(`/clusters/${initial.id}`, payload)
-        : await dorisPost('/clusters', payload)
-      if (data.success) { onSave(); onClose() }
-      else setErr(data.detail || '保存失败')
+        ? await dorisPut(`/clusters/${initial.id}`, values)
+        : await dorisPost('/clusters', values)
+      if (data.success) {
+        Message.success(isEdit ? '集群已更新' : '集群已注册')
+        onSaved()
+        onClose()
+      } else {
+        Message.error(data.detail || '保存失败')
+      }
     } catch (e) {
-      setErr(e.message)
+      if (e?.message) Message.error(e.message)
     } finally {
       setSaving(false)
     }
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3 className="modal-title">{isEdit ? '编辑 Doris 集群' : '注册 Doris 集群'}</h3>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body">
-          {err && <div className="error-banner">{err}</div>}
-          <div className="form-grid-2">
-            {[
-              { label: '集群名称 *', key: 'name', placeholder: '如：生产集群' },
-              { label: 'FE 地址 *', key: 'fe_host', placeholder: '如：192.168.1.10' },
-              { label: 'Query 端口', key: 'fe_query_port', placeholder: '9030' },
-              { label: 'HTTP 端口', key: 'fe_http_port', placeholder: '8030' },
-              { label: '用户名', key: 'username', placeholder: 'root' },
-              { label: '密码', key: 'password', placeholder: '留空则无密码', type: 'password' },
-            ].map(({ label, key, placeholder, type }) => (
-              <div key={key} className="form-field">
-                <label className="form-label">{label}</label>
-                <input
-                  className="field-input"
-                  type={type || 'text'}
-                  placeholder={placeholder}
-                  value={form[key]}
-                  onChange={e => handleChange(key, e.target.value)}
-                />
-              </div>
-            ))}
-            <div className="form-field" style={{ gridColumn: '1/-1' }}>
-              <label className="form-label">备注</label>
-              <input
-                className="field-input"
-                placeholder="可选"
-                value={form.description}
-                onChange={e => handleChange('description', e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button className="button button-secondary" onClick={onClose}>取消</button>
-          <button className="button button-primary" onClick={handleSubmit} disabled={saving}>
-            {saving ? '保存中...' : '保存'}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Modal
+      title={isEdit ? '编辑 Doris 集群' : '注册 Doris 集群'}
+      visible={visible}
+      onOk={handleOk}
+      onCancel={onClose}
+      confirmLoading={saving}
+      style={{ width: 560 }}
+    >
+      <Form form={form} layout="vertical" autoComplete="off">
+        <Row gutter={16}>
+          <Col span={24}>
+            <FormItem label="集群名称" field="name" rules={[{ required: true, message: '请输入集群名称' }]}>
+              <Input placeholder="如：生产集群" />
+            </FormItem>
+          </Col>
+          <Col span={24}>
+            <FormItem label="FE 地址" field="fe_host" rules={[{ required: true, message: '请输入 FE 主机地址' }]}>
+              <Input placeholder="如：192.168.1.10" />
+            </FormItem>
+          </Col>
+          <Col span={12}>
+            <FormItem label="Query 端口" field="fe_query_port">
+              <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+            </FormItem>
+          </Col>
+          <Col span={12}>
+            <FormItem label="HTTP 端口" field="fe_http_port">
+              <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+            </FormItem>
+          </Col>
+          <Col span={12}>
+            <FormItem label="用户名" field="username">
+              <Input />
+            </FormItem>
+          </Col>
+          <Col span={12}>
+            <FormItem label="密码" field="password">
+              <Input.Password />
+            </FormItem>
+          </Col>
+          <Col span={24}>
+            <FormItem label="备注" field="description">
+              <Input.TextArea rows={2} placeholder="可选" />
+            </FormItem>
+          </Col>
+        </Row>
+      </Form>
+    </Modal>
   )
 }
 
 export default function ClusterPage() {
   const [clusters, setClusters] = useState([])
-  const [currentCluster, setCurrentCluster] = useState(null)
+  const [currentId, setCurrentId] = useState(null)
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(false)
   const [statusLoading, setStatusLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [actionMsg, setActionMsg] = useState('')
   const [activeTab, setActiveTab] = useState('overview')
-  const [modalState, setModalState] = useState(null) // null | { mode: 'add' } | { mode: 'edit', cluster }
+  const [modalState, setModalState] = useState(null)
+
+  const currentCluster = clusters.find(c => c.id === currentId) || null
 
   const loadClusters = async () => {
     setLoading(true)
-    setError('')
     try {
       const data = await dorisGet('/clusters')
       const list = data.clusters || []
       setClusters(list)
-      if (list.length > 0 && !currentCluster) {
-        setCurrentCluster(list[0])
+      if (list.length > 0 && !list.find(c => c.id === currentId)) {
+        setCurrentId(list[0].id)
+      } else if (list.length === 0) {
+        setCurrentId(null)
       }
     } catch (e) {
-      setError('获取集群列表失败：' + e.message)
+      Message.error('获取集群列表失败：' + e.message)
     } finally {
       setLoading(false)
     }
@@ -180,236 +182,225 @@ export default function ClusterPage() {
       const data = await dorisGet(`/clusters/${clusterId}/status`)
       setStatus(data)
     } catch (e) {
-      console.warn('集群状态加载失败:', e.message)
+      setStatus({ connected: false, fe_nodes: [], be_nodes: [] })
     } finally {
       setStatusLoading(false)
     }
   }
 
-  const handleTestConnection = async () => {
+  useEffect(() => { loadClusters() }, [])
+  useEffect(() => { if (currentId) loadStatus(currentId) }, [currentId])
+
+  const handleTest = async () => {
     if (!currentCluster) return
-    setActionMsg('')
     try {
       const data = await dorisPost(`/clusters/${currentCluster.id}/test`)
-      setActionMsg(data.success ? `✅ 连接成功，版本：${data.version}` : `❌ 连接失败：${data.message}`)
+      if (data.success) Message.success(`连接成功，版本：${data.version}`)
+      else Message.error('连接失败：' + data.message)
     } catch (e) {
-      setActionMsg('❌ 连接测试失败：' + e.message)
+      Message.error('连接测试失败：' + e.message)
     }
   }
 
-  const handleDeleteCluster = async () => {
+  const handleDelete = async () => {
     if (!currentCluster) return
-    if (!window.confirm(`确认删除集群「${currentCluster.name}」？`)) return
     try {
       await dorisDelete(`/clusters/${currentCluster.id}`)
-      setCurrentCluster(null)
+      Message.success('集群已删除')
+      setCurrentId(null)
       setStatus(null)
       loadClusters()
     } catch (e) {
-      setError('删除失败：' + e.message)
+      Message.error('删除失败：' + e.message)
     }
   }
-
-  useEffect(() => { loadClusters() }, [])
-
-  useEffect(() => {
-    if (currentCluster?.id) {
-      loadStatus(currentCluster.id)
-    }
-  }, [currentCluster?.id])
 
   const feNodes = status?.fe_nodes || []
   const beNodes = status?.be_nodes || []
 
-  return (
-    <div className="content-wrap mpp-cluster-page">
-      {modalState && (
-        <ClusterFormModal
-          initial={modalState.mode === 'edit' ? modalState.cluster : null}
-          onClose={() => setModalState(null)}
-          onSave={async () => {
-            await loadClusters()
-            if (modalState.mode === 'edit' && currentCluster?.id === modalState.cluster.id) {
-              const data = await dorisGet(`/clusters/${modalState.cluster.id}`)
-              if (data.cluster) setCurrentCluster(data.cluster)
-            }
-          }}
-        />
-      )}
+  const feColumns = [
+    { title: '主机', dataIndex: 'host', render: v => <Text code>{v || '—'}</Text> },
+    { title: 'Query 端口', dataIndex: 'port', render: v => <Text code>{v || '—'}</Text> },
+    { title: 'HTTP 端口', dataIndex: 'http_port', render: v => <Text code>{v || '—'}</Text> },
+    { title: '角色', dataIndex: 'role' },
+    { title: 'Master', dataIndex: 'is_master', render: v => v ? <Tag color="arcoblue">是</Tag> : '否' },
+    { title: '状态', dataIndex: 'alive', render: v => <AliveTag alive={v} /> },
+    { title: '最后心跳', dataIndex: 'last_heartbeat' },
+  ]
 
-      <div className="page-header">
+  const beColumns = [
+    { title: '主机', dataIndex: 'host', render: v => <Text code>{v || '—'}</Text> },
+    { title: '心跳端口', dataIndex: 'port', render: v => <Text code>{v || '—'}</Text> },
+    { title: 'BE 端口', dataIndex: 'be_port', render: v => <Text code>{v || '—'}</Text> },
+    { title: '状态', dataIndex: 'alive', render: v => <AliveTag alive={v} /> },
+    { title: '总容量', dataIndex: 'total_capacity' },
+    { title: '已用', dataIndex: 'used_capacity' },
+    { title: '最后心跳', dataIndex: 'last_heartbeat' },
+  ]
+
+  return (
+    <div style={{ padding: 24, background: 'var(--color-fill-1)', minHeight: '100%' }}>
+      <ClusterFormModal
+        visible={!!modalState}
+        initial={modalState?.cluster || null}
+        onClose={() => setModalState(null)}
+        onSaved={loadClusters}
+      />
+
+      {/* 页头 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <h1 className="page-title">Doris 集群管理</h1>
-          <p className="page-sub">MPP 数据库集群运维与监控</p>
+          <Title heading={5} style={{ margin: 0 }}>Doris 集群管理</Title>
+          <Text type="secondary">MPP 数据库集群运维与监控</Text>
         </div>
-        <div className="page-actions">
-          <button className="button button-secondary" onClick={loadClusters} disabled={loading}>
-            {loading ? '刷新中...' : '刷新'}
-          </button>
-          <button className="button button-primary" onClick={() => setModalState({ mode: 'add' })}>+ 注册集群</button>
-        </div>
+        <Space>
+          <Button icon={<IconRefresh />} onClick={loadClusters} loading={loading}>刷新</Button>
+          <Button type="primary" icon={<IconPlus />} onClick={() => setModalState({ cluster: null })}>
+            注册集群
+          </Button>
+        </Space>
       </div>
 
-      {error && <div className="error-banner">{error}</div>}
-      {actionMsg && <div className="info-banner">{actionMsg}</div>}
-
-      {/* 集群选择器 */}
+      {/* 集群选择 */}
       {clusters.length > 0 && (
-        <div className="mpp-cluster-selector">
-          <span className="mpp-selector-label">选择集群：</span>
-          <div className="mpp-cluster-tabs">
-            {clusters.map((c) => (
-              <button
+        <Card size="small" style={{ marginBottom: 16 }} bodyStyle={{ padding: '12px 16px' }}>
+          <Space wrap>
+            <Text type="secondary">选择集群：</Text>
+            {clusters.map(c => (
+              <Tag
                 key={c.id}
-                className={`mpp-cluster-tab${currentCluster?.id === c.id ? ' is-active' : ''}`}
-                onClick={() => setCurrentCluster(c)}
+                size="medium"
+                color={currentId === c.id ? 'arcoblue' : undefined}
+                checkable
+                checked={currentId === c.id}
+                onCheck={() => setCurrentId(c.id)}
+                style={{ cursor: 'pointer', padding: '4px 12px' }}
               >
+                <IconStorage style={{ marginRight: 4 }} />
                 {c.name}
-              </button>
+              </Tag>
             ))}
-          </div>
-        </div>
+          </Space>
+        </Card>
       )}
 
-      {clusters.length === 0 && !loading && !error && (
-        <div className="mpp-empty-state">
-          <div className="mpp-empty-icon">🗄️</div>
-          <div className="mpp-empty-title">暂无集群</div>
-          <p className="mpp-empty-desc">请点击「注册集群」添加 Doris FE 节点的连接信息</p>
-          <button className="button button-primary" onClick={() => setModalState({ mode: 'add' })}>注册第一个集群</button>
-        </div>
+      {/* 空状态 */}
+      {clusters.length === 0 && !loading && (
+        <Card>
+          <Empty
+            description="暂无集群，请注册 Doris FE 节点的连接信息"
+          >
+            <Button type="primary" icon={<IconPlus />} onClick={() => setModalState({ cluster: null })}>
+              注册第一个集群
+            </Button>
+          </Empty>
+        </Card>
       )}
 
       {currentCluster && (
         <>
           {/* 统计卡片 */}
-          <div className="mpp-stats-row">
-            <StatCard label="集群名称" value={currentCluster.name} />
-            <StatCard label="FE 地址" value={currentCluster.fe_host} sub={`:${currentCluster.fe_query_port}`} />
-            <StatCard label="连接状态" value={statusLoading ? '检测中...' : (status?.connected ? '✅ 已连接' : '❌ 未连接')} />
-            <StatCard label="FE 节点数" value={statusLoading ? '—' : feNodes.length} />
-            <StatCard label="BE 节点数" value={statusLoading ? '—' : beNodes.length} />
-          </div>
+          <Row gutter={16} style={{ marginBottom: 16 }}>
+            <Col span={6}>
+              <Card bodyStyle={{ padding: 20 }}>
+                <Statistic title="集群名称" value={currentCluster.name} />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card bodyStyle={{ padding: 20 }}>
+                <Statistic
+                  title="FE 地址"
+                  value={currentCluster.fe_host}
+                  suffix={<Text type="secondary" style={{ fontSize: 13 }}>:{currentCluster.fe_query_port}</Text>}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card bodyStyle={{ padding: 20 }}>
+                <Statistic
+                  title="连接状态"
+                  value={statusLoading ? '检测中' : (status?.connected ? '已连接' : '未连接')}
+                  valueStyle={{ color: status?.connected ? '#00b42a' : '#f53f3f' }}
+                  prefix={status?.connected ? <IconCheckCircle /> : <IconCloseCircle />}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card bodyStyle={{ padding: 20 }}>
+                <Statistic
+                  title="节点总数"
+                  value={statusLoading ? 0 : feNodes.length + beNodes.length}
+                  suffix={
+                    <Text type="secondary" style={{ fontSize: 13 }}>
+                      FE {feNodes.length} / BE {beNodes.length}
+                    </Text>
+                  }
+                />
+              </Card>
+            </Col>
+          </Row>
 
-          {/* Tab 切换 */}
-          <div className="mpp-tabs">
-            {[
-              { key: 'overview', label: '集群概览' },
-              { key: 'fe', label: `FE 节点 (${feNodes.length})` },
-              { key: 'be', label: `BE 节点 (${beNodes.length})` },
-            ].map(tab => (
-              <button
-                key={tab.key}
-                className={`mpp-tab${activeTab === tab.key ? ' is-active' : ''}`}
-                onClick={() => setActiveTab(tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          {/* Tab 区 */}
+          <Card>
+            <Tabs activeTab={activeTab} onChange={setActiveTab}>
+              <TabPane key="overview" title="集群概览">
+                <Descriptions
+                  column={2}
+                  size="medium"
+                  data={[
+                    { label: '集群 ID', value: <Text code copyable>{currentCluster.id}</Text> },
+                    { label: '集群名称', value: currentCluster.name },
+                    { label: 'FE 主机', value: <Text code>{currentCluster.fe_host}</Text> },
+                    { label: 'Query 端口', value: <Text code>{currentCluster.fe_query_port}</Text> },
+                    { label: 'HTTP 端口', value: <Text code>{currentCluster.fe_http_port}</Text> },
+                    { label: '用户名', value: currentCluster.username },
+                    { label: '备注', value: currentCluster.description || <Text type="secondary">—</Text> },
+                    { label: '注册时间', value: <Text type="secondary">{currentCluster.created_at || '—'}</Text> },
+                  ]}
+                  labelStyle={{ width: 110 }}
+                />
+                <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--color-border-2)' }}>
+                  <Space>
+                    <Button type="primary" icon={<IconCheckCircle />} onClick={handleTest}>测试连接</Button>
+                    <Button icon={<IconSync />} onClick={() => loadStatus(currentCluster.id)} loading={statusLoading}>刷新状态</Button>
+                    <Button icon={<IconEdit />} onClick={() => setModalState({ cluster: currentCluster })}>编辑</Button>
+                    <Popconfirm
+                      title={`确认删除集群「${currentCluster.name}」？`}
+                      onOk={handleDelete}
+                    >
+                      <Button status="danger" icon={<IconDelete />}>删除</Button>
+                    </Popconfirm>
+                  </Space>
+                </div>
+              </TabPane>
 
-          {activeTab === 'overview' && (
-            <div className="mpp-tab-content glass-card">
-              <h3 className="mpp-section-title">集群基本信息</h3>
-              <div className="mpp-info-grid">
-                {[
-                  ['集群 ID', currentCluster.id],
-                  ['集群名称', currentCluster.name],
-                  ['FE 主机', currentCluster.fe_host],
-                  ['Query 端口', currentCluster.fe_query_port],
-                  ['HTTP 端口', currentCluster.fe_http_port],
-                  ['用户名', currentCluster.username],
-                  ['备注', currentCluster.description || '—'],
-                  ['注册时间', currentCluster.created_at || '—'],
-                ].map(([k, v]) => (
-                  <div key={k} className="mpp-info-item">
-                    <span className="mpp-info-key">{k}</span>
-                    <span className="mpp-info-val mono">{v || '—'}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mpp-action-row" style={{ marginTop: 16 }}>
-                <button className="button button-primary" onClick={handleTestConnection}>测试连接</button>
-                <button className="button button-secondary" onClick={() => loadStatus(currentCluster.id)}>刷新状态</button>
-                <button className="button button-secondary" onClick={() => setModalState({ mode: 'edit', cluster: currentCluster })}>编辑集群</button>
-                <button className="button button-danger" onClick={handleDeleteCluster}>删除集群</button>
-              </div>
-            </div>
-          )}
+              <TabPane key="fe" title={`FE 节点 (${feNodes.length})`}>
+                <Spin loading={statusLoading} style={{ display: 'block' }}>
+                  <Table
+                    columns={feColumns}
+                    data={feNodes}
+                    rowKey="host"
+                    pagination={false}
+                    border={false}
+                    noDataElement={<Empty description={statusLoading ? '加载中...' : '暂无 FE 节点'} />}
+                  />
+                </Spin>
+              </TabPane>
 
-          {activeTab === 'fe' && (
-            <div className="mpp-tab-content glass-card">
-              <h3 className="mpp-section-title">FE 节点列表</h3>
-              {feNodes.length === 0
-                ? <p className="mpp-empty">{statusLoading ? '加载中...' : '暂无 FE 节点数据（请确认 Doris 连接正常）'}</p>
-                : (
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>主机</th>
-                        <th>Query 端口</th>
-                        <th>HTTP 端口</th>
-                        <th>角色</th>
-                        <th>是否 Master</th>
-                        <th>存活状态</th>
-                        <th>最后心跳</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {feNodes.map((node, i) => (
-                        <tr key={i}>
-                          <td className="mono">{node.host || '—'}</td>
-                          <td className="mono">{node.port || '—'}</td>
-                          <td className="mono">{node.http_port || '—'}</td>
-                          <td>{node.role || '—'}</td>
-                          <td>{node.is_master ? '✅ 是' : '否'}</td>
-                          <td><StatusBadge alive={node.alive} /></td>
-                          <td>{node.last_heartbeat || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )
-              }
-            </div>
-          )}
-
-          {activeTab === 'be' && (
-            <div className="mpp-tab-content glass-card">
-              <h3 className="mpp-section-title">BE 节点列表</h3>
-              {beNodes.length === 0
-                ? <p className="mpp-empty">{statusLoading ? '加载中...' : '暂无 BE 节点数据（请确认 Doris 连接正常）'}</p>
-                : (
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>主机</th>
-                        <th>心跳端口</th>
-                        <th>BE 端口</th>
-                        <th>存活状态</th>
-                        <th>总容量</th>
-                        <th>已用容量</th>
-                        <th>最后心跳</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {beNodes.map((node, i) => (
-                        <tr key={i}>
-                          <td className="mono">{node.host || '—'}</td>
-                          <td className="mono">{node.port || '—'}</td>
-                          <td className="mono">{node.be_port || '—'}</td>
-                          <td><StatusBadge alive={node.alive} /></td>
-                          <td>{node.total_capacity || '—'}</td>
-                          <td>{node.used_capacity || '—'}</td>
-                          <td>{node.last_heartbeat || '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )
-              }
-            </div>
-          )}
+              <TabPane key="be" title={`BE 节点 (${beNodes.length})`}>
+                <Spin loading={statusLoading} style={{ display: 'block' }}>
+                  <Table
+                    columns={beColumns}
+                    data={beNodes}
+                    rowKey="host"
+                    pagination={false}
+                    border={false}
+                    noDataElement={<Empty description={statusLoading ? '加载中...' : '暂无 BE 节点'} />}
+                  />
+                </Spin>
+              </TabPane>
+            </Tabs>
+          </Card>
         </>
       )}
     </div>
