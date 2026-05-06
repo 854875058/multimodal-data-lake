@@ -66,7 +66,7 @@ const navGroups = [
   },
   {
     key: 'mpp-database',
-    title: 'Doris 集群',
+    title: '湖运维',
     icon: <IconCommon />,
     items: [
       { path: '/mpp/cluster', label: '集群管理', icon: <IconCommon /> },
