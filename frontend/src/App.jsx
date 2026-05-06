@@ -72,6 +72,7 @@ const navGroups = [
       { path: '/mpp/cluster', label: '集群管理', icon: <IconCommon /> },
       { path: '/mpp/sql', label: 'SQL 编辑器', icon: <IconCommand /> },
       { path: '/mpp/alert', label: '告警监控', icon: <IconNotification /> },
+      { path: '/mpp/inspection', label: '自动巡检', icon: <IconBug /> },
     ],
   },
   {

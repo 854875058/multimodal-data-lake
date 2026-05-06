@@ -36,9 +36,15 @@ def _get_ray_client():
     """获取 Ray 客户端连接"""
     try:
         from ray.job_submission import JobSubmissionClient
-        from config import S3_CONFIG
         import os
-        ray_url = os.getenv('RAY_DASHBOARD_URL', 'http://127.0.0.1:8265')
+        ray_url = ''
+        try:
+            from backend.api.platform import _get_platform_settings
+            ray_url = (_get_platform_settings() or {}).get('ray_dashboard_url') or ''
+        except Exception:
+            ray_url = ''
+        if not ray_url:
+            ray_url = os.getenv('RAY_DASHBOARD_URL', 'http://127.0.0.1:8265')
         return JobSubmissionClient(ray_url)
     except ImportError:
         logger.warning("Ray 未安装，当前计算编排不可用")

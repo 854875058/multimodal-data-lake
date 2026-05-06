@@ -1,3 +1,12 @@
+function DetailItem({ label, value, mono }) {
+  return (
+    <div className="detail-item">
+      <div className="kpi-label">{label}</div>
+      <div className={`detail-value${mono ? ' mono' : ''}`}>{value ?? '—'}</div>
+    </div>
+  )
+}
+
 function ModalShell({ open, title, subtitle, badge, onClose, children }) {
   if (!open) return null
   return (
