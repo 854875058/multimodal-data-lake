@@ -486,33 +486,10 @@ export default function ConfigCenterPage() {
         </section>
       </div>
 
-      <section className="glass-card">
-        <div className="card-header">
-          <div>
-            <h2>组件状态总览</h2>
-            <p>当前平台关键组件状态汇总，便于统一确认配置是否生效。</p>
-          </div>
-        </div>
-
-        <div className="platform-service-grid dashboard-service-grid">
-          {componentStatus.map((item) => (
-            <div className="platform-service-card" key={item.id}>
-              <div className="platform-service-head">
-                <div className="platform-service-title">{item.title}</div>
-                <span className={`badge ${item.online ? 'is-success' : 'is-warning'}`}>{item.status}</span>
-              </div>
-              <div className="platform-service-meta mono">{item.endpoint || '--'}</div>
-              <div className="platform-service-note">{item.note}</div>
-              <div className="platform-service-probe">最后探测：{item.probed_at ? formatDateTime(item.probed_at) : '--'}</div>
-              <div className="toolbar-group" style={{ marginTop: 10 }}>
-                <button type="button" className="button button-small button-ghost" onClick={() => navigate(item.action_route || '/dashboard')}>
-                  去对应页面
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <div className="info-banner">
+        组件运行状态请前往「湖总览 → 平台服务」查看，本页只负责配置参数维护。
+        <a href="#/dashboard" style={{ marginLeft: 8 }}>查看运行状态</a>
+      </div>
     </div>
   )
 }

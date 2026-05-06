@@ -29,6 +29,7 @@ import SqlEditorPage from './pages/mpp/SqlEditorPage.jsx'
 import AlertPage from './pages/mpp/AlertPage.jsx'
 import InspectionPage from './pages/mpp/InspectionPage.jsx'
 import RayJobsPage from './pages/RayJobsPage.jsx'
+import TaskCenterPage from './pages/TaskCenterPage.jsx'
 
 const { Sider, Header, Content } = Layout
 const { SubMenu, Item: MenuItem } = Menu
@@ -51,8 +52,7 @@ const navGroups = [
     items: [
       { path: '/search', label: '查询分析', icon: <IconSearch /> },
       { path: '/workflow', label: '工作流编排', icon: <IconLayout /> },
-      { path: '/governance', label: '任务治理', icon: <IconCalendarClock /> },
-      { path: '/ray/jobs', label: 'Ray 作业监控', icon: <IconRobot /> },
+      { path: '/task-center', label: '任务中心', icon: <IconCalendarClock /> },
     ],
   },
   {
@@ -72,7 +72,6 @@ const navGroups = [
       { path: '/mpp/cluster', label: '集群管理', icon: <IconCommon /> },
       { path: '/mpp/sql', label: 'SQL 编辑器', icon: <IconCommand /> },
       { path: '/mpp/alert', label: '告警监控', icon: <IconNotification /> },
-      { path: '/mpp/inspection', label: '自动巡检', icon: <IconBug /> },
     ],
   },
   {
@@ -276,6 +275,7 @@ function AppShell({ authSession, onLogout }) {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/workbench" element={<ErrorBoundary pageName="接入工作台"><IngestionWorkbenchPage /></ErrorBoundary>} />
             <Route path="/workflow" element={<WorkflowCenterPage />} />
+            <Route path="/task-center" element={<TaskCenterPage />} />
             <Route path="/governance" element={<TaskGovernancePage />} />
             <Route path="/settings" element={<Navigate to="/settings/access" replace />} />
             <Route path="/settings/access" element={<ConfigCenterPage />} />
