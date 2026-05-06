@@ -47,11 +47,18 @@ const navGroups = [
     ],
   },
   {
+    key: 'lake-query',
+    title: '湖查询',
+    icon: <IconSearch />,
+    items: [
+      { path: '/lake-query', label: '湖查询', icon: <IconSearch /> },
+    ],
+  },
+  {
     key: 'lake-compute',
     title: '湖计算',
     icon: <IconCommand />,
     items: [
-      { path: '/lake-query', label: '湖查询', icon: <IconSearch /> },
       { path: '/workflow', label: '工作流编排', icon: <IconLayout /> },
       { path: '/task-center', label: '任务中心', icon: <IconCalendarClock /> },
     ],
