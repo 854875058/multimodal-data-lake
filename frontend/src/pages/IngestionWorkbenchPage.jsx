@@ -1395,58 +1395,55 @@ export default function IngestionWorkbenchPage() {
           ))}
         </div>
 
+        <div className="info-banner" style={{ marginBottom: 12 }}>
+          连接参数（{getSourceTypeText(form.source_type)}）已统一在「系统配置 → 来源配置」中维护，本页不再允许修改。当前连接信息显示如下，如需调整请到来源配置页修改后回到本页继续工作。
+          <a href="#/settings/access" style={{ marginLeft: 8 }}>前往来源配置</a>
+        </div>
+
         <div className="workbench-form-grid">
           {form.source_type === 's3' ? (
             <>
               <div className="field">
-                <label htmlFor="endpoint_url">S3 Endpoint</label>
-                <input id="endpoint_url" name="endpoint_url" className="input" value={form.endpoint_url} onChange={handleInputChange} placeholder="http://127.0.0.1:8333" />
+                <label>S3 Endpoint</label>
+                <input className="input" value={form.endpoint_url || '—'} disabled readOnly />
               </div>
-
               <div className="field">
-                <label htmlFor="bucket_name">Bucket</label>
-                <input id="bucket_name" name="bucket_name" className="input" value={form.bucket_name} onChange={handleInputChange} placeholder="multimodal-lake-bucket" />
+                <label>Bucket</label>
+                <input className="input" value={form.bucket_name || '—'} disabled readOnly />
               </div>
-
               <div className="field">
-                <label htmlFor="prefix">目录前缀</label>
+                <label htmlFor="prefix">目录前缀（业务参数，可改）</label>
                 <input id="prefix" name="prefix" className="input" value={form.prefix} onChange={handleInputChange} placeholder="raw/docs/2026" />
               </div>
-
               <div className="field">
-                <label htmlFor="access_key_id">Access Key</label>
-                <input id="access_key_id" name="access_key_id" className="input" value={form.access_key_id} onChange={handleInputChange} placeholder="mykey" />
+                <label>Access Key</label>
+                <input className="input" value={form.access_key_id ? '已配置' : '—'} disabled readOnly />
               </div>
-
               <div className="field">
-                <label htmlFor="secret_access_key">Secret Key</label>
-                <input id="secret_access_key" name="secret_access_key" type="password" className="input" value={form.secret_access_key} onChange={handleInputChange} placeholder="请输入密钥" />
+                <label>Secret Key</label>
+                <input className="input" value={form.secret_access_key ? '已配置' : '—'} disabled readOnly type="password" />
               </div>
             </>
           ) : (
             <>
               <div className="field">
-                <label htmlFor="sftp_host">SFTP 主机</label>
-                <input id="sftp_host" name="sftp_host" className="input" value={form.sftp_host} onChange={handleInputChange} placeholder="192.168.20.10" />
+                <label>SFTP 主机</label>
+                <input className="input" value={form.sftp_host || '—'} disabled readOnly />
               </div>
-
               <div className="field">
-                <label htmlFor="sftp_port">SFTP 端口</label>
-                <input id="sftp_port" name="sftp_port" type="number" min="1" max="65535" className="input" value={form.sftp_port} onChange={handleInputChange} placeholder="22" />
+                <label>SFTP 端口</label>
+                <input className="input" value={form.sftp_port || '—'} disabled readOnly />
               </div>
-
               <div className="field">
-                <label htmlFor="sftp_user">用户名</label>
-                <input id="sftp_user" name="sftp_user" className="input" value={form.sftp_user} onChange={handleInputChange} placeholder="root" />
+                <label>用户名</label>
+                <input className="input" value={form.sftp_user || '—'} disabled readOnly />
               </div>
-
               <div className="field">
-                <label htmlFor="sftp_password">密码</label>
-                <input id="sftp_password" name="sftp_password" type="password" className="input" value={form.sftp_password} onChange={handleInputChange} placeholder="请输入密码" />
+                <label>密码</label>
+                <input className="input" value={form.sftp_password ? '已配置' : '—'} disabled readOnly type="password" />
               </div>
-
               <div className="field">
-                <label htmlFor="sftp_path">远程路径</label>
+                <label htmlFor="sftp_path">远程路径（业务参数，可改）</label>
                 <input id="sftp_path" name="sftp_path" className="input" value={form.sftp_path} onChange={handleInputChange} placeholder="/tmp" />
               </div>
             </>
