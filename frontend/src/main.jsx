@@ -5,6 +5,7 @@ import zhCN from '@arco-design/web-react/es/locale/zh-CN'
 import '@arco-design/web-react/dist/css/arco.css'
 import App from './App.jsx'
 import './assets/styles.css'
+import './assets/arco-overrides.css'
 
 ReactDOM.createRoot(document.getElementById('app')).render(
   <HashRouter>
