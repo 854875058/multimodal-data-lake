@@ -51,7 +51,12 @@ const navGroups = [
     title: '湖查询',
     icon: <IconSearch />,
     items: [
-      { path: '/lake-query', label: '湖查询', icon: <IconSearch /> },
+      { path: '/lake-query/sql', label: 'SQL 查询', icon: <IconCommand /> },
+      { path: '/lake-query/vector', label: '向量检索', icon: <IconSearch /> },
+      { path: '/lake-query/multimodal', label: '多模态检索', icon: <IconLayout /> },
+      { path: '/lake-query/hybrid', label: '混合检索', icon: <IconCommon /> },
+      { path: '/lake-query/nl2sql', label: 'NL2SQL', icon: <IconCommand /> },
+      { path: '/lake-query/copilot', label: 'AI 数据副驾驶', icon: <IconRobot /> },
     ],
   },
   {
@@ -291,8 +296,9 @@ function AppShell({ authSession, onLogout }) {
             <Route path="/settings/users" element={<RequireAdmin user={currentUser}><UserManagementPage /></RequireAdmin>} />
             <Route path="/settings/permissions" element={<RequireAdmin user={currentUser}><PermissionManagementPage /></RequireAdmin>} />
             <Route path="/upload" element={<UploadPage />} />
-            <Route path="/lake-query" element={<LakeQueryPage />} />
-            <Route path="/search" element={<Navigate to="/lake-query" replace />} />
+            <Route path="/lake-query" element={<Navigate to="/lake-query/sql" replace />} />
+            <Route path="/lake-query/:tab" element={<LakeQueryPage />} />
+            <Route path="/search" element={<Navigate to="/lake-query/sql" replace />} />
             <Route path="/files" element={<FilesPage />} />
             <Route path="/logs" element={<LogsPage />} />
             <Route path="/mpp/cluster" element={<ClusterPage />} />

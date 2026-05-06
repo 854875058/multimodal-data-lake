@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   Card, Button, Space, Table, Tag, Tabs, Select, Input, Form, Popconfirm,
   Message, Typography, Empty, Tree, InputNumber, Grid, Avatar
@@ -360,55 +361,55 @@ function PlaceholderTab({ icon, title, milestone, desc }) {
   )
 }
 
+const TITLE_MAP = {
+  sql: 'SQL 查询',
+  vector: '向量检索',
+  multimodal: '多模态检索',
+  hybrid: '混合检索',
+  nl2sql: 'NL2SQL',
+  copilot: 'AI 数据副驾驶',
+}
+
 export default function LakeQueryPage() {
-  const [activeTab, setActiveTab] = useState('sql')
+  const { tab } = useParams()
+  const navigate = useNavigate()
+  const activeTab = TITLE_MAP[tab] ? tab : 'sql'
 
   return (
     <div style={{ padding: 24, background: 'var(--color-fill-1)', minHeight: '100%' }}>
       <div style={{ marginBottom: 16 }}>
-        <Title heading={5} style={{ margin: 0 }}>湖查询</Title>
-        <Text type="secondary">SQL · 向量 · 多模态 · 混合检索 · 自然语言查询 · AI 数据副驾驶</Text>
+        <Title heading={5} style={{ margin: 0 }}>{TITLE_MAP[activeTab]}</Title>
+        <Text type="secondary">湖查询 · {TITLE_MAP[activeTab]}</Text>
       </div>
 
-      <Card bodyStyle={{ padding: 0 }}>
-        <Tabs activeTab={activeTab} onChange={setActiveTab} style={{ padding: '0 16px' }}>
-          <TabPane key="sql" title={<span><IconCommand /> SQL 查询</span>} />
-          <TabPane key="vector" title={<span><IconSearch /> 向量检索</span>} />
-          <TabPane key="multimodal" title={<span><IconImage /> 多模态检索</span>} />
-          <TabPane key="hybrid" title={<span><IconSwap /> 混合检索</span>} />
-          <TabPane key="nl2sql" title={<span><IconCommand /> NL2SQL</span>} />
-          <TabPane key="copilot" title={<span><IconRobot /> AI 数据副驾驶</span>} />
-        </Tabs>
-
-        <div style={{ padding: 16 }}>
-          {activeTab === 'sql' && <SqlQueryTab />}
-          {activeTab === 'vector' && <VectorSearchTab />}
-          {activeTab === 'multimodal' && (
-            <PlaceholderTab
-              icon={<IconImage style={{ fontSize: 28 }} />}
-              title="多模态检索"
-              milestone="M4 · 跨模态向量检索"
-              desc="支持 文本 ↔ 图像 ↔ 音频 跨模态检索：用文本检索图片、用图片检索文本、用音频检索视频片段。基于 CLIP / Whisper 多模态向量索引，返回带模态标签的统一结果集。"
-            />
-          )}
-          {activeTab === 'hybrid' && (
-            <PlaceholderTab
-              icon={<IconSwap style={{ fontSize: 28 }} />}
-              title="混合检索"
-              milestone="M4-3 · BM25 + 向量 RRF 融合"
-              desc="将 BM25 关键词召回和向量语义召回通过 Reciprocal Rank Fusion 融合，平衡精确匹配和语义相似度。后端 Lance 已就绪 RRF 模式，前端将提供融合权重、召回数量、降权策略等可视化配置。"
-            />
-          )}
-          {activeTab === 'nl2sql' && <NL2SqlTab onJumpToSql={() => setActiveTab('sql')} />}
-          {activeTab === 'copilot' && (
-            <PlaceholderTab
-              icon={<IconRobot style={{ fontSize: 28 }} />}
-              title="AI 数据副驾驶"
-              milestone="M5-5 · LangGraph 编排"
-              desc="用自然语言提问，AI 自动检索元数据 → 生成 SQL → 执行 → 总结。每一步都可追溯，并能调用 nl2sql / vector_search / chart_recommend 等 MCP 工具。"
-            />
-          )}
-        </div>
+      <Card bodyStyle={{ padding: 16 }}>
+        {activeTab === 'sql' && <SqlQueryTab />}
+        {activeTab === 'vector' && <VectorSearchTab />}
+        {activeTab === 'multimodal' && (
+          <PlaceholderTab
+            icon={<IconImage style={{ fontSize: 28 }} />}
+            title="多模态检索"
+            milestone="M4 · 跨模态向量检索"
+            desc="支持 文本 ↔ 图像 ↔ 音频 跨模态检索：用文本检索图片、用图片检索文本、用音频检索视频片段。基于 CLIP / Whisper 多模态向量索引，返回带模态标签的统一结果集。"
+          />
+        )}
+        {activeTab === 'hybrid' && (
+          <PlaceholderTab
+            icon={<IconSwap style={{ fontSize: 28 }} />}
+            title="混合检索"
+            milestone="M4-3 · BM25 + 向量 RRF 融合"
+            desc="将 BM25 关键词召回和向量语义召回通过 Reciprocal Rank Fusion 融合，平衡精确匹配和语义相似度。后端 Lance 已就绪 RRF 模式，前端将提供融合权重、召回数量、降权策略等可视化配置。"
+          />
+        )}
+        {activeTab === 'nl2sql' && <NL2SqlTab onJumpToSql={() => navigate('/lake-query/sql')} />}
+        {activeTab === 'copilot' && (
+          <PlaceholderTab
+            icon={<IconRobot style={{ fontSize: 28 }} />}
+            title="AI 数据副驾驶"
+            milestone="M5-5 · LangGraph 编排"
+            desc="用自然语言提问，AI 自动检索元数据 → 生成 SQL → 执行 → 总结。每一步都可追溯，并能调用 nl2sql / vector_search / chart_recommend 等 MCP 工具。"
+          />
+        )}
       </Card>
     </div>
   )
