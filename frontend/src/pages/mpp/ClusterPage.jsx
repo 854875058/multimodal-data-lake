@@ -21,6 +21,17 @@ async function dorisPost(path, body = {}) {
   return res.json()
 }
 
+async function dorisPut(path, body = {}) {
+  const res = await fetch(API + path, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
+  return res.json()
+}
+
 async function dorisDelete(path) {
   const res = await fetch(API + path, { method: 'DELETE', credentials: 'include' })
   if (!res.ok) throw new Error(`请求失败: ${res.status}`)
@@ -45,11 +56,17 @@ function StatCard({ label, value, sub }) {
   )
 }
 
-function AddClusterModal({ onClose, onSave }) {
-  const [form, setForm] = useState({
-    name: '', fe_host: '', fe_query_port: 9030, fe_http_port: 8030,
-    username: 'root', password: '', description: ''
-  })
+function ClusterFormModal({ initial, onClose, onSave }) {
+  const isEdit = !!initial?.id
+  const [form, setForm] = useState(() => ({
+    name: initial?.name || '',
+    fe_host: initial?.fe_host || '',
+    fe_query_port: initial?.fe_query_port ?? 9030,
+    fe_http_port: initial?.fe_http_port ?? 8030,
+    username: initial?.username || 'root',
+    password: initial?.password || '',
+    description: initial?.description || ''
+  }))
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
@@ -60,13 +77,16 @@ function AddClusterModal({ onClose, onSave }) {
     setSaving(true)
     setErr('')
     try {
-      const data = await dorisPost('/clusters', {
+      const payload = {
         ...form,
         fe_query_port: Number(form.fe_query_port),
         fe_http_port: Number(form.fe_http_port),
-      })
+      }
+      const data = isEdit
+        ? await dorisPut(`/clusters/${initial.id}`, payload)
+        : await dorisPost('/clusters', payload)
       if (data.success) { onSave(); onClose() }
-      else setErr(data.detail || '创建失败')
+      else setErr(data.detail || '保存失败')
     } catch (e) {
       setErr(e.message)
     } finally {
@@ -78,7 +98,7 @@ function AddClusterModal({ onClose, onSave }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">注册 Doris 集群</h3>
+          <h3 className="modal-title">{isEdit ? '编辑 Doris 集群' : '注册 Doris 集群'}</h3>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
@@ -134,7 +154,7 @@ export default function ClusterPage() {
   const [error, setError] = useState('')
   const [actionMsg, setActionMsg] = useState('')
   const [activeTab, setActiveTab] = useState('overview')
-  const [showAdd, setShowAdd] = useState(false)
+  const [modalState, setModalState] = useState(null) // null | { mode: 'add' } | { mode: 'edit', cluster }
 
   const loadClusters = async () => {
     setLoading(true)
@@ -203,7 +223,19 @@ export default function ClusterPage() {
 
   return (
     <div className="content-wrap mpp-cluster-page">
-      {showAdd && <AddClusterModal onClose={() => setShowAdd(false)} onSave={loadClusters} />}
+      {modalState && (
+        <ClusterFormModal
+          initial={modalState.mode === 'edit' ? modalState.cluster : null}
+          onClose={() => setModalState(null)}
+          onSave={async () => {
+            await loadClusters()
+            if (modalState.mode === 'edit' && currentCluster?.id === modalState.cluster.id) {
+              const data = await dorisGet(`/clusters/${modalState.cluster.id}`)
+              if (data.cluster) setCurrentCluster(data.cluster)
+            }
+          }}
+        />
+      )}
 
       <div className="page-header">
         <div>
@@ -214,7 +246,7 @@ export default function ClusterPage() {
           <button className="button button-secondary" onClick={loadClusters} disabled={loading}>
             {loading ? '刷新中...' : '刷新'}
           </button>
-          <button className="button button-primary" onClick={() => setShowAdd(true)}>+ 注册集群</button>
+          <button className="button button-primary" onClick={() => setModalState({ mode: 'add' })}>+ 注册集群</button>
         </div>
       </div>
 
@@ -244,7 +276,7 @@ export default function ClusterPage() {
           <div className="mpp-empty-icon">🗄️</div>
           <div className="mpp-empty-title">暂无集群</div>
           <p className="mpp-empty-desc">请点击「注册集群」添加 Doris FE 节点的连接信息</p>
-          <button className="button button-primary" onClick={() => setShowAdd(true)}>注册第一个集群</button>
+          <button className="button button-primary" onClick={() => setModalState({ mode: 'add' })}>注册第一个集群</button>
         </div>
       )}
 
@@ -299,6 +331,7 @@ export default function ClusterPage() {
               <div className="mpp-action-row" style={{ marginTop: 16 }}>
                 <button className="button button-primary" onClick={handleTestConnection}>测试连接</button>
                 <button className="button button-secondary" onClick={() => loadStatus(currentCluster.id)}>刷新状态</button>
+                <button className="button button-secondary" onClick={() => setModalState({ mode: 'edit', cluster: currentCluster })}>编辑集群</button>
                 <button className="button button-danger" onClick={handleDeleteCluster}>删除集群</button>
               </div>
             </div>

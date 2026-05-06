@@ -75,6 +75,28 @@ def init_doris_tables():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS doris_sql_history (
+                id TEXT PRIMARY KEY,
+                cluster_id TEXT NOT NULL,
+                sql TEXT NOT NULL,
+                success INTEGER DEFAULT 1,
+                elapsed REAL,
+                rows_returned INTEGER DEFAULT 0,
+                affected_rows INTEGER DEFAULT 0,
+                error TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS doris_inspection_schedules (
+                cluster_id TEXT PRIMARY KEY,
+                enabled INTEGER DEFAULT 0,
+                interval_minutes INTEGER DEFAULT 60,
+                last_run_at TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         conn.commit()
     finally:
         conn.close()
@@ -341,11 +363,28 @@ async def execute_sql(req: SqlRequest):
         if kw in sql_upper and "WHERE" not in sql_upper:
             raise HTTPException(status_code=400, detail=f"危险操作需要 WHERE 条件: {kw}")
 
+    import time
+    start = time.time()
+    history_id = str(uuid.uuid4())
+
+    def _save_history(success: int, elapsed: float, rows_returned: int = 0,
+                      affected_rows: int = 0, error: str = ""):
+        try:
+            h = sqlite3.connect(DB_PATH)
+            h.execute(
+                """INSERT INTO doris_sql_history (id, cluster_id, sql, success, elapsed,
+                   rows_returned, affected_rows, error) VALUES (?,?,?,?,?,?,?,?)""",
+                (history_id, req.cluster_id, sql, success, elapsed, rows_returned,
+                 affected_rows, error[:500] if error else ""),
+            )
+            h.commit()
+            h.close()
+        except Exception as ex:
+            logger.warning(f"保存 SQL 历史失败: {ex}")
+
     try:
-        import time
         conn = _get_doris_conn(req.cluster_id)
         cur = conn.cursor()
-        start = time.time()
         cur.execute(sql)
         elapsed = round(time.time() - start, 3)
 
@@ -355,6 +394,7 @@ async def execute_sql(req: SqlRequest):
             data = [dict(zip(columns, row)) for row in rows]
             total = cur.rowcount if cur.rowcount >= 0 else len(data)
             conn.close()
+            _save_history(1, elapsed, rows_returned=len(data))
             return {
                 "success": True,
                 "columns": columns,
@@ -367,6 +407,7 @@ async def execute_sql(req: SqlRequest):
             affected = cur.rowcount
             conn.commit()
             conn.close()
+            _save_history(1, elapsed, affected_rows=affected)
             return {
                 "success": True,
                 "columns": [],
@@ -379,8 +420,46 @@ async def execute_sql(req: SqlRequest):
     except HTTPException:
         raise
     except Exception as e:
+        elapsed = round(time.time() - start, 3)
+        _save_history(0, elapsed, error=str(e))
         logger.error(f"SQL 执行失败: {e}")
         raise HTTPException(status_code=400, detail=f"SQL 执行失败: {str(e)}")
+
+
+@router.get("/sql/history")
+async def list_sql_history(cluster_id: Optional[str] = None, limit: int = 50):
+    """获取 SQL 执行历史"""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.row_factory = sqlite3.Row
+        if cluster_id:
+            rows = conn.execute(
+                """SELECT * FROM doris_sql_history WHERE cluster_id=?
+                   ORDER BY created_at DESC LIMIT ?""",
+                (cluster_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM doris_sql_history ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return {"success": True, "history": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.delete("/sql/history")
+async def clear_sql_history(cluster_id: Optional[str] = None):
+    """清空 SQL 历史"""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        if cluster_id:
+            conn.execute("DELETE FROM doris_sql_history WHERE cluster_id=?", (cluster_id,))
+        else:
+            conn.execute("DELETE FROM doris_sql_history")
+        conn.commit()
+    finally:
+        conn.close()
+    return {"success": True, "message": "历史已清空"}
 
 
 @router.get("/sql/databases")
@@ -691,3 +770,295 @@ async def get_inspection_result(inspection_id: str):
         return {"success": True, "inspection": item}
     finally:
         conn.close()
+
+
+# ─── 巡检调度配置 ────────────────────────────────────────────────────────────
+
+class InspectionScheduleUpdate(BaseModel):
+    enabled: bool
+    interval_minutes: int = 60
+
+
+@router.get("/inspection/schedule/{cluster_id}")
+async def get_inspection_schedule(cluster_id: str):
+    """获取巡检定时配置"""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM doris_inspection_schedules WHERE cluster_id=?", (cluster_id,)
+        ).fetchone()
+        if not row:
+            return {"success": True, "schedule": {"enabled": False, "interval_minutes": 60, "last_run_at": None}}
+        return {"success": True, "schedule": dict(row)}
+    finally:
+        conn.close()
+
+
+@router.put("/inspection/schedule/{cluster_id}")
+async def update_inspection_schedule(cluster_id: str, req: InspectionScheduleUpdate):
+    """更新巡检定时配置"""
+    interval = max(5, int(req.interval_minutes))
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute(
+            """INSERT INTO doris_inspection_schedules (cluster_id, enabled, interval_minutes, updated_at)
+               VALUES (?,?,?,CURRENT_TIMESTAMP)
+               ON CONFLICT(cluster_id) DO UPDATE SET
+                 enabled=excluded.enabled,
+                 interval_minutes=excluded.interval_minutes,
+                 updated_at=CURRENT_TIMESTAMP""",
+            (cluster_id, 1 if req.enabled else 0, interval),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return {"success": True, "message": "已保存"}
+
+
+# ─── 后台告警 + 巡检调度引擎 ─────────────────────────────────────────────────
+
+_engine_started = False
+_engine_lock = None
+
+
+def _eval_metric_value(cluster_id: str, metric: str) -> Optional[float]:
+    """采集指定 metric 的实时值"""
+    try:
+        conn = _get_doris_conn(cluster_id)
+        cur = conn.cursor()
+        try:
+            if metric == "be_disk_usage":
+                cur.execute("SHOW BACKENDS")
+                cols = [d[0] for d in cur.description]
+                max_usage = 0.0
+                for row in cur.fetchall():
+                    r = dict(zip(cols, row))
+                    used = _parse_capacity(str(r.get("DataUsedCapacity", "0") or "0"))
+                    total = _parse_capacity(str(r.get("TotalCapacity", "0") or "0"))
+                    if total > 0:
+                        max_usage = max(max_usage, used / total * 100)
+                return max_usage
+            elif metric == "fe_alive_count":
+                cur.execute("SHOW FRONTENDS")
+                cols = [d[0] for d in cur.description]
+                return float(sum(
+                    1 for row in cur.fetchall()
+                    if str(dict(zip(cols, row)).get("Alive", "")).lower() == "true"
+                ))
+            elif metric == "be_alive_count":
+                cur.execute("SHOW BACKENDS")
+                cols = [d[0] for d in cur.description]
+                return float(sum(
+                    1 for row in cur.fetchall()
+                    if str(dict(zip(cols, row)).get("Alive", "")).lower() == "true"
+                ))
+            elif metric == "connection_count":
+                cur.execute("SHOW PROCESSLIST")
+                return float(len(cur.fetchall()))
+            elif metric == "query_latency_ms":
+                import time as _t
+                t0 = _t.time()
+                cur.execute("SELECT 1")
+                cur.fetchall()
+                return (_t.time() - t0) * 1000
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.debug(f"采集 metric {metric} 失败 (cluster={cluster_id}): {e}")
+    return None
+
+
+def _compare(value: float, op: str, threshold: float) -> bool:
+    if op == ">":  return value > threshold
+    if op == ">=": return value >= threshold
+    if op == "<":  return value < threshold
+    if op == "<=": return value <= threshold
+    if op == "==": return value == threshold
+    if op == "!=": return value != threshold
+    return False
+
+
+def _alert_engine_loop():
+    """告警执行循环：每 60s 评估一次，记录触发的 records"""
+    import time as _time
+    while True:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            rules = conn.execute(
+                "SELECT * FROM doris_alerts WHERE enabled=1"
+            ).fetchall()
+            conn.close()
+
+            cache: Dict[str, Optional[float]] = {}
+            for rule in rules:
+                key = f"{rule['cluster_id']}::{rule['metric']}"
+                if key not in cache:
+                    cache[key] = _eval_metric_value(rule["cluster_id"], rule["metric"])
+                value = cache[key]
+                if value is None:
+                    continue
+                if _compare(value, rule["operator"], rule["threshold"]):
+                    rec_id = str(uuid.uuid4())
+                    msg = f"{rule['metric']}={value:.2f} {rule['operator']} {rule['threshold']}"
+                    try:
+                        c2 = sqlite3.connect(DB_PATH)
+                        c2.execute(
+                            """INSERT INTO doris_alert_records (id, cluster_id, alert_id, name,
+                               metric, value, level, message) VALUES (?,?,?,?,?,?,?,?)""",
+                            (rec_id, rule["cluster_id"], rule["id"], rule["name"],
+                             rule["metric"], value, rule["level"], msg),
+                        )
+                        c2.commit()
+                        c2.close()
+                    except Exception as e:
+                        logger.warning(f"写入告警记录失败: {e}")
+        except Exception as e:
+            logger.warning(f"告警引擎异常: {e}")
+        _time.sleep(60)
+
+
+def _inspection_scheduler_loop():
+    """巡检调度循环：每分钟检查一次哪些集群该巡检了"""
+    import time as _time
+    import json as _json
+    import threading as _threading
+    while True:
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            schedules = conn.execute(
+                "SELECT * FROM doris_inspection_schedules WHERE enabled=1"
+            ).fetchall()
+            conn.close()
+
+            now = datetime.now()
+            for sch in schedules:
+                last = sch["last_run_at"]
+                interval = max(5, int(sch["interval_minutes"] or 60))
+                should_run = False
+                if not last:
+                    should_run = True
+                else:
+                    try:
+                        last_dt = datetime.fromisoformat(str(last).replace("Z", ""))
+                        if (now - last_dt).total_seconds() >= interval * 60:
+                            should_run = True
+                    except Exception:
+                        should_run = True
+
+                if should_run:
+                    cluster_id = sch["cluster_id"]
+                    inspection_id = str(uuid.uuid4())
+                    try:
+                        c2 = sqlite3.connect(DB_PATH)
+                        c2.execute(
+                            """INSERT INTO doris_inspection_history (id, cluster_id, status, check_count, created_at)
+                               VALUES (?,?,?,?,CURRENT_TIMESTAMP)""",
+                            (inspection_id, cluster_id, "RUNNING", 0),
+                        )
+                        c2.execute(
+                            "UPDATE doris_inspection_schedules SET last_run_at=CURRENT_TIMESTAMP WHERE cluster_id=?",
+                            (cluster_id,),
+                        )
+                        c2.commit()
+                        c2.close()
+                    except Exception as e:
+                        logger.warning(f"调度巡检失败: {e}")
+                        continue
+                    _threading.Thread(
+                        target=_run_inspection_sync, args=(cluster_id, inspection_id), daemon=True
+                    ).start()
+        except Exception as e:
+            logger.warning(f"巡检调度异常: {e}")
+        _time.sleep(60)
+
+
+def _run_inspection_sync(cluster_id: str, inspection_id: str):
+    """复用 run_inspection 中的检查逻辑（同步执行）"""
+    import json as _json
+    items = []
+    score = 100.0
+    start = datetime.now()
+    try:
+        doris_conn = _get_doris_conn(cluster_id)
+        cur = doris_conn.cursor()
+        try:
+            cur.execute("SHOW FRONTENDS")
+            cols = [d[0] for d in cur.description]
+            frontends = [dict(zip(cols, r)) for r in cur.fetchall()]
+            alive_fe = sum(1 for f in frontends if str(f.get("Alive", "")).lower() == "true")
+            total_fe = len(frontends)
+            status = "SUCCESS" if alive_fe == total_fe else "FAILED"
+            if status == "FAILED": score -= 20
+            items.append({"name": "FE 节点存活检查", "status": status,
+                          "value": f"{alive_fe}/{total_fe} 存活", "suggestion": ""})
+        except Exception as e:
+            items.append({"name": "FE 节点存活检查", "status": "FAILED", "value": str(e), "suggestion": ""})
+            score -= 20
+        try:
+            cur.execute("SHOW BACKENDS")
+            cols = [d[0] for d in cur.description]
+            backends = [dict(zip(cols, r)) for r in cur.fetchall()]
+            alive_be = sum(1 for b in backends if str(b.get("Alive", "")).lower() == "true")
+            total_be = len(backends)
+            status = "SUCCESS" if alive_be == total_be and total_be > 0 else "FAILED"
+            if status == "FAILED": score -= 30
+            items.append({"name": "BE 节点存活检查", "status": status,
+                          "value": f"{alive_be}/{total_be} 存活", "suggestion": ""})
+            max_usage = 0.0
+            for b in backends:
+                used = _parse_capacity(str(b.get("DataUsedCapacity", "0") or "0"))
+                total = _parse_capacity(str(b.get("TotalCapacity", "0") or "0"))
+                if total > 0:
+                    max_usage = max(max_usage, used / total * 100)
+            disk_status = "SUCCESS" if max_usage < 80 else ("WARNING" if max_usage < 90 else "FAILED")
+            if disk_status == "FAILED": score -= 20
+            elif disk_status == "WARNING": score -= 10
+            items.append({"name": "磁盘使用率检查", "status": disk_status,
+                          "value": f"最高 {max_usage:.1f}%", "suggestion": ""})
+        except Exception as e:
+            items.append({"name": "BE 节点检查", "status": "FAILED", "value": str(e), "suggestion": ""})
+            score -= 30
+        try:
+            cur.execute("SHOW PROCESSLIST")
+            proc_count = len(cur.fetchall())
+            status = "SUCCESS" if proc_count < 1000 else "WARNING"
+            if status == "WARNING": score -= 5
+            items.append({"name": "连接数检查", "status": status,
+                          "value": f"当前 {proc_count} 个连接", "suggestion": ""})
+        except Exception as e:
+            items.append({"name": "连接数检查", "status": "WARNING", "value": str(e), "suggestion": ""})
+        doris_conn.close()
+    except Exception as e:
+        items.append({"name": "集群连通性", "status": "FAILED", "value": str(e), "suggestion": "检查 FE 地址和端口"})
+        score -= 50
+
+    elapsed = (datetime.now() - start).total_seconds()
+    score = max(0.0, min(100.0, score))
+    result_json = _json.dumps({"items": items}, ensure_ascii=False)
+    try:
+        c2 = sqlite3.connect(DB_PATH)
+        c2.execute(
+            """UPDATE doris_inspection_history
+               SET status=?, score=?, check_count=?, duration=?, result_json=?
+               WHERE id=?""",
+            ("SUCCESS", score, len(items), round(elapsed, 2), result_json, inspection_id),
+        )
+        c2.commit()
+        c2.close()
+    except Exception as e:
+        logger.warning(f"更新巡检结果失败: {e}")
+
+
+def start_doris_engines():
+    """启动告警 + 巡检调度后台线程（应用启动时调用一次）"""
+    global _engine_started
+    if _engine_started:
+        return
+    _engine_started = True
+    import threading as _t
+    _t.Thread(target=_alert_engine_loop, daemon=True, name="doris-alert-engine").start()
+    _t.Thread(target=_inspection_scheduler_loop, daemon=True, name="doris-inspection-scheduler").start()
+    logger.info("Doris 告警引擎与巡检调度已启动")

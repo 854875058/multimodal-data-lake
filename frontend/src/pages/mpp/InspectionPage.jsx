@@ -21,6 +21,17 @@ async function dorisPost(path, body = {}) {
   return res.json()
 }
 
+async function dorisPut(path, body = {}) {
+  const res = await fetch(DORIS_BASE + path, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
+  return res.json()
+}
+
 function StatusBadge({ status }) {
   const map = {
     SUCCESS: { label: '成功', cls: 'badge-success' },
@@ -98,6 +109,8 @@ export default function InspectionPage() {
   const [detail, setDetail] = useState(null)
   const [activeTab, setActiveTab] = useState('history')
   const [polling, setPolling] = useState(null)
+  const [schedule, setSchedule] = useState({ enabled: false, interval_minutes: 60, last_run_at: null })
+  const [savingSchedule, setSavingSchedule] = useState(false)
 
   // 加载集群列表
   useEffect(() => {
@@ -125,8 +138,34 @@ export default function InspectionPage() {
   }
 
   useEffect(() => {
-    if (clusterId) loadHistory()
+    if (clusterId) {
+      loadHistory()
+      dorisGet(`/inspection/schedule/${clusterId}`).then(d => {
+        if (d.schedule) setSchedule({
+          enabled: !!d.schedule.enabled,
+          interval_minutes: d.schedule.interval_minutes || 60,
+          last_run_at: d.schedule.last_run_at,
+        })
+      }).catch(() => {})
+    }
   }, [clusterId])
+
+  const saveSchedule = async (next) => {
+    if (!clusterId) return
+    setSavingSchedule(true)
+    try {
+      await dorisPut(`/inspection/schedule/${clusterId}`, {
+        enabled: next.enabled,
+        interval_minutes: Number(next.interval_minutes) || 60,
+      })
+      setSchedule(s => ({ ...s, ...next }))
+      setMsg(next.enabled ? `已开启定时巡检：每 ${next.interval_minutes} 分钟一次` : '已关闭定时巡检')
+    } catch (e) {
+      setError('保存失败：' + e.message)
+    } finally {
+      setSavingSchedule(false)
+    }
+  }
 
   // 轮询巡检结果
   const pollInspection = (inspectionId) => {
@@ -217,6 +256,42 @@ export default function InspectionPage() {
           <div className="mpp-empty-icon">🔍</div>
           <div className="mpp-empty-title">请先注册 Doris 集群</div>
           <p className="mpp-empty-desc">在「集群管理」页面注册 Doris 集群后，即可发起巡检</p>
+        </div>
+      )}
+
+      {clusterId && (
+        <div className="glass-card mpp-tab-content" style={{ marginBottom: 12 }}>
+          <h3 className="mpp-section-title">定时巡检</h3>
+          <div className="mpp-action-row" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                checked={schedule.enabled}
+                disabled={savingSchedule}
+                onChange={e => saveSchedule({ ...schedule, enabled: e.target.checked })}
+              />
+              <span>启用定时巡检</span>
+            </label>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span>间隔（分钟）：</span>
+              <input
+                className="field-input"
+                type="number"
+                min={5}
+                style={{ width: 100 }}
+                value={schedule.interval_minutes}
+                onChange={e => setSchedule(s => ({ ...s, interval_minutes: e.target.value }))}
+              />
+              <button
+                className="button button-secondary"
+                disabled={savingSchedule}
+                onClick={() => saveSchedule(schedule)}
+              >保存</button>
+            </label>
+            {schedule.last_run_at && (
+              <span className="mpp-info-key">上次执行：{schedule.last_run_at}</span>
+            )}
+          </div>
         </div>
       )}
 

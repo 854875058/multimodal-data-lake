@@ -21,6 +21,14 @@ async function dorisPost(path, body = {}) {
   return res.json()
 }
 
+async function dorisDelete(path, params = {}) {
+  const url = new URL(DORIS_BASE + path, window.location.origin)
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
+  const res = await fetch(url.toString(), { method: 'DELETE', credentials: 'include' })
+  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
+  return res.json()
+}
+
 function ResultTable({ columns, rows }) {
   if (!columns || columns.length === 0) return <p className="mpp-empty">无结果集</p>
   return (
@@ -58,7 +66,22 @@ export default function SqlEditorPage() {
   const [executing, setExecuting] = useState(false)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('editor')
+  const [history, setHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
   const textareaRef = useRef(null)
+
+  const loadHistory = async () => {
+    if (!clusterId) return
+    setHistoryLoading(true)
+    try {
+      const data = await dorisGet('/sql/history', { cluster_id: clusterId, limit: 50 })
+      setHistory(data.history || [])
+    } catch (e) {
+      // ignore
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
 
   // 加载集群列表
   useEffect(() => {
@@ -86,6 +109,10 @@ export default function SqlEditorPage() {
       setTables(data.tables || [])
     }).catch(() => {})
   }, [clusterId, selectedDb])
+
+  useEffect(() => {
+    if (activeTab === 'history') loadHistory()
+  }, [activeTab, clusterId])
 
   const handleExecute = async () => {
     if (!sql.trim()) return
@@ -214,6 +241,7 @@ export default function SqlEditorPage() {
           <div className="mpp-tabs">
             {[
               { key: 'editor', label: 'SQL 编辑器' },
+              { key: 'history', label: '执行历史' },
             ].map(t => (
               <button
                 key={t.key}
@@ -269,6 +297,65 @@ export default function SqlEditorPage() {
                     {result.message && <span>{result.message}</span>}
                   </div>
                   <ResultTable columns={result.columns} rows={result.rows} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'history' && (
+            <div className="mpp-editor-panel">
+              <div className="mpp-editor-toolbar">
+                <button className="button button-secondary" onClick={loadHistory} disabled={!clusterId || historyLoading}>
+                  {historyLoading ? '加载中...' : '刷新'}
+                </button>
+                <button
+                  className="button button-danger"
+                  disabled={!clusterId}
+                  onClick={async () => {
+                    if (!window.confirm('确认清空当前集群的 SQL 执行历史？')) return
+                    await dorisDelete('/sql/history', { cluster_id: clusterId })
+                    loadHistory()
+                  }}
+                >清空历史</button>
+              </div>
+              {!clusterId ? (
+                <p className="mpp-empty">请先选择集群</p>
+              ) : history.length === 0 ? (
+                <p className="mpp-empty">{historyLoading ? '加载中...' : '暂无历史记录'}</p>
+              ) : (
+                <div className="mpp-result-scroll">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 160 }}>时间</th>
+                        <th style={{ width: 60 }}>状态</th>
+                        <th style={{ width: 80 }}>耗时(s)</th>
+                        <th style={{ width: 80 }}>返回行</th>
+                        <th>SQL</th>
+                        <th style={{ width: 80 }}>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map((h) => (
+                        <tr key={h.id}>
+                          <td className="mono">{h.created_at}</td>
+                          <td>{h.success ? <span className="status-badge badge-success">成功</span> : <span className="status-badge badge-error">失败</span>}</td>
+                          <td className="mono">{h.elapsed ?? '—'}</td>
+                          <td className="mono">{h.rows_returned || h.affected_rows || 0}</td>
+                          <td className="mono" title={h.error || ''} style={{ maxWidth: 480, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {h.sql}
+                          </td>
+                          <td>
+                            <button
+                              className="button button-secondary"
+                              style={{ padding: '2px 8px', fontSize: 12 }}
+                              onClick={() => { setSql(h.sql); setActiveTab('editor') }}
+                            >回填</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

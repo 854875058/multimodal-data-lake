@@ -67,6 +67,11 @@ async def lifespan(app: FastAPI):
     init_permissions_tables()
     logger.info('权限表初始化完成')
 
+    from backend.api.doris import init_doris_tables, start_doris_engines
+    init_doris_tables()
+    start_doris_engines()
+    logger.info('Doris 表与后台引擎初始化完成')
+
     threading.Thread(target=_load_background_resources, daemon=True).start()
     yield
 
