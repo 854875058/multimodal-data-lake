@@ -213,7 +213,7 @@ function AppShell({ authSession, onLogout }) {
         }}
       >
         <div style={{
-          height: 84,
+          height: 76,
           display: 'flex',
           alignItems: 'center',
           gap: collapsed ? 0 : 16,
@@ -235,8 +235,8 @@ function AppShell({ authSession, onLogout }) {
           />
           {!collapsed && (
             <div style={{ overflow: 'hidden', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div style={{ fontSize: 17, fontWeight: 700, lineHeight: '23px', color: 'var(--color-text-1)' }}>湖仓控制台</div>
-              <div style={{ marginTop: 4, fontSize: 13, lineHeight: '19px', color: 'var(--color-text-3)' }}>多模态数据湖</div>
+              <div style={{ fontSize: 16, fontWeight: 700, lineHeight: '22px', color: 'var(--color-text-1)' }}>湖仓控制台</div>
+              <div style={{ marginTop: 3, fontSize: 12, lineHeight: '18px', color: 'var(--color-text-3)' }}>多模态数据湖</div>
             </div>
           )}
         </div>
@@ -245,7 +245,7 @@ function AppShell({ authSession, onLogout }) {
           mode="vertical"
           selectedKeys={[currentNav.path]}
           defaultOpenKeys={navGroups.map(g => g.key)}
-          style={{ width: '100%', borderRight: 'none', height: 'calc(100% - 84px)', overflowY: 'auto' }}
+          style={{ width: '100%', borderRight: 'none', height: 'calc(100% - 76px)', overflowY: 'auto' }}
           onClickMenuItem={(key) => navigate(key)}
         >
           {visibleGroups.map(group => (
