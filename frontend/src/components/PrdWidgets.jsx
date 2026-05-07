@@ -59,11 +59,11 @@ export function ClusterTopology({ feNodes = [], beNodes = [] }) {
       <svg viewBox="0 0 600 180" preserveAspectRatio="none">
         {feNodes.map((_, i) => (
           <line key={`fl-${i}`} x1={(feLefts[i] || 50) * 6} y1={feY + 30}
-            x2={300} y2={beY - 10} stroke="#D6DDEE" strokeWidth="1" />
+            x2={300} y2={beY - 10} stroke="#C8D4EC" strokeWidth="1.2" />
         ))}
         {beNodes.map((_, i) => (
           <line key={`bl-${i}`} x1={300} y1={beY - 10}
-            x2={(beLefts[i] || 50) * 6} y2={beY + 20} stroke="#D6DDEE" strokeWidth="1" />
+            x2={(beLefts[i] || 50) * 6} y2={beY + 20} stroke="#C8D4EC" strokeWidth="1.2" />
         ))}
       </svg>
       {feNodes.map((n, i) => (

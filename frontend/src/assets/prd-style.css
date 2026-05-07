@@ -227,24 +227,26 @@
 }
 .prd-topo .node {
   position: absolute;
-  width: 60px;
-  height: 60px;
-  border-radius: 12px;
+  width: 72px;
+  height: 72px;
+  border-radius: 14px;
   display: grid;
   place-items: center;
-  font-size: 10px;
-  font-weight: 600;
-  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  color: #f8fbff;
   background: var(--prd-brand);
-  box-shadow: 0 4px 12px rgba(31, 79, 224, 0.25);
+  box-shadow: 0 8px 20px rgba(31, 79, 224, 0.24);
   text-align: center;
-  line-height: 1.3;
+  line-height: 1.4;
+  text-shadow: 0 1px 2px rgba(7, 15, 33, 0.24);
+  padding: 6px;
 }
 .prd-topo .node.fe {
-  background: linear-gradient(135deg, #1F4FE0, #0B2BAE);
+  background: linear-gradient(135deg, #2f63ea, #1538b8);
 }
 .prd-topo .node.be {
-  background: linear-gradient(135deg, #00B7C2, #00897B);
+  background: linear-gradient(135deg, #17b7bf, #0a9a93);
 }
 .prd-topo .node.warn::after {
   content: "";
