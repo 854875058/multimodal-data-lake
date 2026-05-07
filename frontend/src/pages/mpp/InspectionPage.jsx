@@ -1,18 +1,31 @@
-import { useEffect, useState, useRef, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Button, Card, Space, Table, Tag, Modal, Switch, InputNumber, Message,
-  Typography, Empty, Select, Progress, Descriptions, Tabs
+  Button,
+  Empty,
+  InputNumber,
+  Message,
+  Modal,
+  Select,
+  Space,
+  Switch,
+  Table,
+  Typography,
 } from '@arco-design/web-react'
 import {
-  IconRefresh, IconPlayCircle, IconCheckCircle, IconCloseCircle,
-  IconExclamationCircle, IconClockCircle, IconBug, IconStorage, IconCommand
+  IconBug,
+  IconCheckCircle,
+  IconClockCircle,
+  IconCloseCircle,
+  IconExclamationCircle,
+  IconPlayCircle,
+  IconRefresh,
+  IconStorage,
 } from '@arco-design/web-react/icon'
 import ChartPanel from '@/components/ChartPanel.jsx'
-import { HealthRing, PrdCard, CheckRow, PrdTag, StatCard } from '@/components/PrdWidgets.jsx'
+import { CheckRow, HealthRing, PrdCard, PrdTag, StatCard } from '@/components/PrdWidgets.jsx'
 
 const { Title, Text } = Typography
 const Option = Select.Option
-const TabPane = Tabs.TabPane
 
 const DORIS_BASE = '/api/doris'
 
@@ -26,7 +39,8 @@ async function dorisGet(path, params = {}) {
 
 async function dorisPost(path, body = {}) {
   const res = await fetch(DORIS_BASE + path, {
-    method: 'POST', credentials: 'include',
+    method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
@@ -36,7 +50,8 @@ async function dorisPost(path, body = {}) {
 
 async function dorisPut(path, body = {}) {
   const res = await fetch(DORIS_BASE + path, {
-    method: 'PUT', credentials: 'include',
+    method: 'PUT',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
@@ -45,22 +60,46 @@ async function dorisPut(path, body = {}) {
 }
 
 function StatusTag({ status }) {
-  const map = {
-    SUCCESS: { color: 'green', label: '成功', icon: <IconCheckCircle /> },
-    FAILED: { color: 'red', label: '失败', icon: <IconCloseCircle /> },
-    WARNING: { color: 'orange', label: '警告', icon: <IconExclamationCircle /> },
-    RUNNING: { color: 'arcoblue', label: '执行中', icon: <IconClockCircle /> },
-  }
-  const v = map[String(status || '').toUpperCase()] || { color: 'gray', label: status || '—' }
-  return <Tag color={v.color} icon={v.icon}>{v.label}</Tag>
+  const upper = String(status || '').toUpperCase()
+  if (upper === 'SUCCESS') return <PrdTag kind="ok" led>成功</PrdTag>
+  if (upper === 'FAILED') return <PrdTag kind="bad" led>失败</PrdTag>
+  if (upper === 'WARNING') return <PrdTag kind="warn" led>警告</PrdTag>
+  if (upper === 'RUNNING') return <PrdTag kind="info" led>执行中</PrdTag>
+  return <PrdTag kind="info">未知</PrdTag>
 }
 
-function matchCheckIcon(name) {
-  if (name?.includes('FE')) return <IconCommand />
-  if (name?.includes('BE')) return <IconStorage />
-  if (name?.includes('磁盘')) return <IconStorage />
-  if (name?.includes('连接')) return <IconCommand />
+function pickCheckIcon(name = '') {
+  if (name.includes('FE')) return <IconStorage />
+  if (name.includes('BE')) return <IconStorage />
+  if (name.includes('连接')) return <IconExclamationCircle />
   return <IconBug />
+}
+
+function classifyCheck(item) {
+  const name = String(item?.name || '')
+  if (name.includes('FE')) return 'FE'
+  if (name.includes('BE')) return 'BE'
+  if (name.includes('磁盘') || name.includes('存储')) return '存储'
+  if (name.includes('连接') || name.includes('心跳')) return '连接'
+  if (name.includes('副本')) return '副本'
+  return '通用'
+}
+
+function scoreLevel(score) {
+  if (score >= 90) return { label: '健康', kind: 'ok' }
+  if (score >= 75) return { label: '注意', kind: 'warn' }
+  return { label: '风险', kind: 'bad' }
+}
+
+function buildRecommendations(items = []) {
+  return items
+    .filter((item) => String(item?.status || '').toUpperCase() !== 'SUCCESS')
+    .map((item) => ({
+      title: item.name || '巡检项',
+      severity: String(item?.status || '').toUpperCase() === 'FAILED' ? 'critical' : 'warning',
+      copy: item.suggestion || '建议结合集群状态、告警阈值和最近变更记录进一步排查。',
+      value: item.value,
+    }))
 }
 
 export default function InspectionPage() {
@@ -71,25 +110,35 @@ export default function InspectionPage() {
   const [running, setRunning] = useState(false)
   const [detail, setDetail] = useState(null)
   const [schedule, setSchedule] = useState({ enabled: false, interval_minutes: 60, last_run_at: null })
-  const [activeTab, setActiveTab] = useState('latest')
   const pollRef = useRef(null)
 
   useEffect(() => {
-    dorisGet('/clusters').then(d => {
-      const list = d.clusters || []
-      setClusters(list)
-      if (list.length > 0) setClusterId(list[0].id)
-    }).catch(() => {})
+    dorisGet('/clusters')
+      .then((data) => {
+        const list = data.clusters || []
+        setClusters(list)
+        if (list.length > 0) setClusterId(list[0].id)
+      })
+      .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!clusterId) return
+    loadHistory()
+    loadSchedule()
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, [clusterId])
 
   const loadHistory = async () => {
     if (!clusterId) return
     setLoading(true)
     try {
-      const d = await dorisGet('/inspection/history', { cluster_id: clusterId, limit: 30 })
-      setHistory(d.history || [])
-    } catch (e) {
-      Message.error('加载巡检历史失败：' + e.message)
+      const data = await dorisGet('/inspection/history', { cluster_id: clusterId, limit: 30 })
+      setHistory(data.history || [])
+    } catch (error) {
+      Message.error(`加载巡检历史失败: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -98,50 +147,47 @@ export default function InspectionPage() {
   const loadSchedule = async () => {
     if (!clusterId) return
     try {
-      const d = await dorisGet(`/inspection/schedule/${clusterId}`)
-      if (d.schedule) {
+      const data = await dorisGet(`/inspection/schedule/${clusterId}`)
+      if (data.schedule) {
         setSchedule({
-          enabled: !!d.schedule.enabled,
-          interval_minutes: d.schedule.interval_minutes || 60,
-          last_run_at: d.schedule.last_run_at,
+          enabled: Boolean(data.schedule.enabled),
+          interval_minutes: data.schedule.interval_minutes || 60,
+          last_run_at: data.schedule.last_run_at,
         })
       }
-    } catch { /* */ }
-  }
-
-  useEffect(() => {
-    if (clusterId) { loadHistory(); loadSchedule() }
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [clusterId])
-
-  const saveSchedule = async (next) => {
-    if (!clusterId) return
-    try {
-      await dorisPut(`/inspection/schedule/${clusterId}`, {
-        enabled: next.enabled,
-        interval_minutes: Number(next.interval_minutes) || 60,
-      })
-      setSchedule(s => ({ ...s, ...next }))
-      Message.success(next.enabled ? `已开启定时巡检：每 ${next.interval_minutes} 分钟一次` : '已关闭定时巡检')
-    } catch (e) {
-      Message.error('保存失败：' + e.message)
+    } catch {
+      // ignore
     }
   }
 
-  const pollInspection = (id) => {
+  const saveSchedule = async (nextSchedule) => {
+    if (!clusterId) return
+    try {
+      await dorisPut(`/inspection/schedule/${clusterId}`, {
+        enabled: nextSchedule.enabled,
+        interval_minutes: Number(nextSchedule.interval_minutes) || 60,
+      })
+      setSchedule((current) => ({ ...current, ...nextSchedule }))
+      Message.success(nextSchedule.enabled ? `已启用定时巡检，每 ${nextSchedule.interval_minutes} 分钟执行一次` : '已关闭定时巡检')
+    } catch (error) {
+      Message.error(`保存失败: ${error.message}`)
+    }
+  }
+
+  const pollInspection = (inspectionId) => {
     if (pollRef.current) clearInterval(pollRef.current)
     pollRef.current = setInterval(async () => {
       try {
-        const d = await dorisGet(`/inspection/${id}`)
-        const ins = d.inspection || {}
-        if (ins.status !== 'RUNNING') {
+        const data = await dorisGet(`/inspection/${inspectionId}`)
+        const inspection = data.inspection || {}
+        if (inspection.status !== 'RUNNING') {
           clearInterval(pollRef.current)
           pollRef.current = null
           setRunning(false)
-          Message.success(`巡检完成，评分：${ins.score ?? 'N/A'}`)
+          Message.success(`巡检完成，评分 ${inspection.score ?? '--'}`)
           loadHistory()
         }
-      } catch (e) {
+      } catch {
         clearInterval(pollRef.current)
         pollRef.current = null
         setRunning(false)
@@ -153,52 +199,69 @@ export default function InspectionPage() {
     if (!clusterId) return
     setRunning(true)
     try {
-      const d = await dorisPost('/inspection/run', { cluster_id: clusterId })
-      if (d.success) {
+      const data = await dorisPost('/inspection/run', { cluster_id: clusterId })
+      if (data.success) {
         Message.info('巡检任务已启动，正在执行...')
-        pollInspection(d.inspection_id)
+        pollInspection(data.inspection_id)
       } else {
         setRunning(false)
-        Message.error(d.detail || '启动巡检失败')
+        Message.error(data.detail || '启动巡检失败')
       }
-    } catch (e) {
+    } catch (error) {
       setRunning(false)
-      Message.error('启动巡检失败：' + e.message)
+      Message.error(`启动巡检失败: ${error.message}`)
     }
   }
 
-  const loadDetail = async (record) => {
+  const openDetail = async (record) => {
     try {
-      const d = await dorisGet(`/inspection/${record.id}`)
-      setDetail(d.inspection || record)
-    } catch (e) {
+      const data = await dorisGet(`/inspection/${record.id}`)
+      setDetail(data.inspection || record)
+    } catch {
       setDetail(record)
     }
   }
 
-  // 派生数据
-  const latest = history.find(h => h.status === 'SUCCESS') || history[0]
+  const latest = useMemo(() => history.find((item) => item.status === 'SUCCESS') || history[0] || null, [history])
   const latestItems = latest?.result?.items || []
-  const successCount = history.filter(h => h.status === 'SUCCESS').length
-  const failedCount = history.filter(h => h.status === 'FAILED').length
+  const recommendations = useMemo(() => buildRecommendations(latestItems), [latestItems])
+  const latestLevel = scoreLevel(Number(latest?.score || 0))
 
-  // 评分趋势（按时间正序）
+  const categorySummary = useMemo(() => {
+    const groups = new Map()
+    for (const item of latestItems) {
+      const key = classifyCheck(item)
+      if (!groups.has(key)) {
+        groups.set(key, { title: key, total: 0, failed: 0, warning: 0, passed: 0 })
+      }
+      const group = groups.get(key)
+      group.total += 1
+      const status = String(item.status || '').toUpperCase()
+      if (status === 'SUCCESS') group.passed += 1
+      else if (status === 'WARNING') group.warning += 1
+      else group.failed += 1
+    }
+    return Array.from(groups.values())
+  }, [latestItems])
+
   const scoreTrend = useMemo(() => {
-    const sorted = [...history].slice(0, 14).reverse()
+    const rows = [...history].slice(0, 14).reverse()
     return {
-      dates: sorted.map(h => (h.created_at || '').slice(5, 16)),
-      scores: sorted.map(h => Number(h.score || 0)),
+      dates: rows.map((item) => (item.created_at || '').slice(5, 16)),
+      scores: rows.map((item) => Number(item.score || 0)),
     }
   }, [history])
 
-  const trendOption = {
+  const trendOption = useMemo(() => ({
     tooltip: { trigger: 'axis' },
     grid: { left: 24, right: 18, top: 30, bottom: 24, containLabel: true },
     xAxis: { type: 'category', data: scoreTrend.dates, axisLabel: { fontSize: 10 } },
     yAxis: { type: 'value', min: 0, max: 100 },
     series: [{
-      type: 'line', smooth: true, data: scoreTrend.scores,
-      areaStyle: { color: 'rgba(31, 79, 224, 0.14)' },
+      type: 'line',
+      smooth: true,
+      data: scoreTrend.scores,
+      areaStyle: { color: 'rgba(31, 79, 224, 0.12)' },
       lineStyle: { color: '#1F4FE0', width: 2.4 },
       itemStyle: { color: '#1F4FE0' },
       markLine: {
@@ -206,37 +269,61 @@ export default function InspectionPage() {
         symbol: 'none',
         data: [
           { yAxis: 90, lineStyle: { color: '#1B9E5C', type: 'dashed' }, label: { formatter: '优秀 90', position: 'end' } },
-          { yAxis: 70, lineStyle: { color: '#E68B00', type: 'dashed' }, label: { formatter: '警告 70', position: 'end' } },
+          { yAxis: 75, lineStyle: { color: '#E68B00', type: 'dashed' }, label: { formatter: '预警 75', position: 'end' } },
         ],
       },
     }],
-  }
+  }), [scoreTrend])
 
   const historyColumns = [
-    { title: '巡检时间', dataIndex: 'created_at', width: 180 },
-    { title: '耗时', dataIndex: 'duration', width: 90, render: v => v != null ? <Text code>{v}s</Text> : '—' },
-    { title: '综合评分', dataIndex: 'score', width: 110,
-      render: v => v != null
-        ? <Text style={{ color: v >= 90 ? '#1B9E5C' : v >= 70 ? '#E68B00' : '#D63B3B', fontWeight: 700 }}>{Math.round(v)}</Text>
-        : '—' },
-    { title: '状态', dataIndex: 'status', width: 110, render: v => <StatusTag status={v} /> },
-    { title: '检查项数', dataIndex: 'check_count', width: 100, render: v => <Text code>{v ?? '—'}</Text> },
-    { title: '操作', width: 100, fixed: 'right',
-      render: (_, row) => <Button type="text" size="small" onClick={() => loadDetail(row)}>查看详情</Button>,
+    {
+      title: '巡检时间',
+      dataIndex: 'created_at',
+      width: 170,
+    },
+    {
+      title: '状态',
+      width: 110,
+      render: (_, row) => <StatusTag status={row.status} />,
+    },
+    {
+      title: '综合评分',
+      dataIndex: 'score',
+      width: 100,
+      render: (value) => (value != null ? <Text bold style={{ color: Number(value) >= 90 ? '#1B9E5C' : Number(value) >= 75 ? '#E68B00' : '#D63B3B' }}>{Math.round(Number(value))}</Text> : '--'),
+    },
+    {
+      title: '检查项',
+      dataIndex: 'check_count',
+      width: 90,
+      render: (value) => <Text code>{value ?? '--'}</Text>,
+    },
+    {
+      title: '耗时',
+      dataIndex: 'duration',
+      width: 90,
+      render: (value) => <Text code>{value != null ? `${value}s` : '--'}</Text>,
+    },
+    {
+      title: '操作',
+      width: 100,
+      render: (_, row) => <Button type="text" size="small" onClick={() => openDetail(row)}>查看详情</Button>,
     },
   ]
 
   return (
-    <div style={{ padding: 24, background: 'var(--prd-bg)', minHeight: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+    <div className="prd-page" style={{ padding: 24, background: 'var(--prd-bg)', minHeight: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <Title heading={5} style={{ margin: 0 }}>自动巡检</Title>
-          <Text type="secondary">Doris 集群健康评分 · 检查项明细 · 历史趋势</Text>
+          <Title heading={5} style={{ margin: 0 }}>自动巡检评分报告</Title>
+          <Text type="secondary">将原来的巡检入口升级为评分报告页，强调整体健康分、分类结果、失败项和修复建议。</Text>
         </div>
-        <Space>
-          <Text type="secondary">集群：</Text>
-          <Select placeholder="选择集群" value={clusterId || undefined} onChange={setClusterId} style={{ width: 200 }}>
-            {clusters.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
+        <Space wrap>
+          <Text type="secondary">集群</Text>
+          <Select placeholder="选择集群" value={clusterId || undefined} onChange={setClusterId} style={{ width: 220 }}>
+            {clusters.map((cluster) => (
+              <Option key={cluster.id} value={cluster.id}>{cluster.name}</Option>
+            ))}
           </Select>
           <Button type="primary" icon={<IconPlayCircle />} onClick={handleRunNow} loading={running} disabled={!clusterId}>
             立即巡检
@@ -246,131 +333,151 @@ export default function InspectionPage() {
       </div>
 
       {clusters.length === 0 ? (
-        <Card><Empty description="暂无集群，请先在「湖运维 → 集群管理」注册" /></Card>
+        <PrdCard title="自动巡检" sub="需要先完成集群接入">
+          <Empty description="请先到湖运维中的集群管理页注册 Doris 集群" />
+        </PrdCard>
       ) : (
         <>
-          {/* ── PRD 风格 hero：评分 + 趋势 + KPI ─────────────────── */}
-          <div className="prd-row-2-1" style={{ marginBottom: 12 }}>
-            <PrdCard
-              title="最近巡检评分趋势"
-              sub={`近 ${scoreTrend.scores.length} 次巡检`}
-              extra={latest && <PrdTag kind={latest.score >= 90 ? 'ok' : latest.score >= 70 ? 'warn' : 'bad'} led>
-                {latest.score >= 90 ? '健康' : latest.score >= 70 ? '注意' : '风险'}
-              </PrdTag>}
-            >
-              {scoreTrend.scores.length === 0 ? (
-                <Empty description="暂无巡检数据，点击「立即巡检」" />
-              ) : (
-                <ChartPanel option={trendOption} height={240} />
-              )}
+          <div className="prd-kpi-grid">
+            <StatCard label="最近巡检评分" value={latest?.score != null ? Math.round(Number(latest.score)) : '--'} valueSuffix={latest?.score != null ? '/100' : ''} sub={latest ? latest.created_at : '尚无成功巡检记录'} icon={<IconCheckCircle />} iconBg={latestLevel.kind === 'ok' ? '#E5F6EC' : latestLevel.kind === 'warn' ? '#FFF4E0' : '#FBE7E7'} iconColor={latestLevel.kind === 'ok' ? '#1B9E5C' : latestLevel.kind === 'warn' ? '#E68B00' : '#D63B3B'} />
+            <StatCard label="近 30 次巡检" value={formatNumber(history.length)} sub={`${formatNumber(history.filter((item) => item.status === 'SUCCESS').length)} 成功 / ${formatNumber(history.filter((item) => item.status === 'FAILED').length)} 失败`} icon={<IconClockCircle />} iconBg="#EAF0FF" iconColor="#1F4FE0" />
+            <StatCard label="失败项数量" value={formatNumber(recommendations.length)} sub="按失败和警告项生成修复建议" icon={<IconExclamationCircle />} iconBg="#FBE7E7" iconColor="#D63B3B" />
+            <StatCard label="定时巡检" value={schedule.enabled ? `每 ${schedule.interval_minutes} 分钟` : '未开启'} sub={schedule.last_run_at ? `最近执行 ${schedule.last_run_at}` : '尚未有调度执行记录'} icon={<IconStorage />} iconBg="#F5E8FA" iconColor="#7B1FA2" />
+          </div>
+
+          <div className="inspection-score-grid">
+            <PrdCard title="整体健康评分" sub="这一块应该成为汇报时的视觉中心" extra={<PrdTag kind={latestLevel.kind} led>{latestLevel.label}</PrdTag>}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                <HealthRing percent={Number(latest?.score || 0)} />
+              </div>
+              <div className="inspection-category-grid">
+                {categorySummary.length ? (
+                  categorySummary.map((item) => (
+                    <div key={item.title} className="inspection-category-card">
+                      <div className="title">{item.title}</div>
+                      <div className="meta">检查项 {item.total} · 通过 {item.passed} · 警告 {item.warning} · 失败 {item.failed}</div>
+                    </div>
+                  ))
+                ) : (
+                  <Empty description="暂无分类结果" />
+                )}
+              </div>
             </PrdCard>
 
-            <PrdCard title="最新评分" sub={latest ? latest.created_at : '尚未巡检'}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-                <HealthRing percent={latest?.score || 0} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                <div style={{ padding: '8px 10px', background: 'var(--prd-ok-soft)', borderRadius: 6, textAlign: 'center' }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#1B9E5C' }}>{successCount}</div>
-                  <div style={{ fontSize: 10, color: 'var(--prd-ink-3)' }}>成功</div>
-                </div>
-                <div style={{ padding: '8px 10px', background: 'var(--prd-bad-soft)', borderRadius: 6, textAlign: 'center' }}>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#D63B3B' }}>{failedCount}</div>
-                  <div style={{ fontSize: 10, color: 'var(--prd-ink-3)' }}>失败</div>
-                </div>
-              </div>
+            <PrdCard title="评分历史趋势" sub="用于展示最近巡检质量是否持续改善">
+              {scoreTrend.scores.length ? (
+                <ChartPanel option={trendOption} height={300} />
+              ) : (
+                <Empty description="暂无历史评分趋势" />
+              )}
             </PrdCard>
           </div>
 
-          {/* ── 定时巡检设置 ──────────────────────────────────── */}
-          <Card title="定时巡检" style={{ marginBottom: 12 }} bodyStyle={{ padding: 16 }}>
-            <Space size="large" wrap>
-              <Space>
-                <Text>启用定时巡检：</Text>
-                <Switch checked={schedule.enabled} onChange={v => saveSchedule({ ...schedule, enabled: v })} />
-              </Space>
-              <Space>
-                <Text>执行间隔：</Text>
-                <InputNumber min={5} max={1440} step={5} value={schedule.interval_minutes}
-                  onChange={v => setSchedule(s => ({ ...s, interval_minutes: v }))} suffix="分钟" style={{ width: 140 }} />
-                <Button size="small" onClick={() => saveSchedule(schedule)}>保存</Button>
-              </Space>
-              {schedule.last_run_at && <Text type="secondary">上次执行：{schedule.last_run_at}</Text>}
-            </Space>
-          </Card>
-
-          {/* ── Tab：最新检查项 / 历史列表 ──────────────────────── */}
-          <Card bodyStyle={{ padding: 0 }}>
-            <Tabs activeTab={activeTab} onChange={setActiveTab} style={{ padding: '0 16px' }}>
-              <TabPane key="latest" title={`最新检查项 (${latestItems.length})`} />
-              <TabPane key="history" title={`历史巡检 (${history.length})`} />
-            </Tabs>
-            <div style={{ padding: 16 }}>
-              {activeTab === 'latest' && (
-                latestItems.length === 0 ? (
-                  <Empty description="暂无检查项数据，点击「立即巡检」开始" />
-                ) : (
-                  <div>
-                    {latestItems.map((item, i) => {
-                      const s = (item.status || '').toUpperCase()
-                      const status = s === 'SUCCESS' ? 'ok' : s === 'WARNING' ? 'warn' : 'bad'
-                      return (
-                        <CheckRow
-                          key={i}
-                          status={status}
-                          icon={matchCheckIcon(item.name)}
-                          title={item.name}
-                          meta={item.suggestion || (status === 'ok' ? '检查通过' : '需要关注')}
-                          value={item.value}
-                        />
-                      )
-                    })}
-                  </div>
-                )
+          <div className="prd-row-2-1">
+            <PrdCard title="修复建议" sub="优先展示失败项和警告项，让运维知道下一步该做什么">
+              {recommendations.length ? (
+                <div className="inspection-recommend-list">
+                  {recommendations.map((item) => (
+                    <div key={`${item.title}-${item.copy}`} className="inspection-recommend-item">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                        <div className="title">{item.title}</div>
+                        <PrdTag kind={item.severity === 'critical' ? 'bad' : 'warn'}>{item.severity === 'critical' ? '高优先级' : '处理中'}</PrdTag>
+                      </div>
+                      <div className="meta">{item.copy}</div>
+                      {item.value ? <div className="prd-code-block">{String(item.value)}</div> : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Empty description="当前最新巡检没有失败项和警告项" />
               )}
-              {activeTab === 'history' && (
-                <Table columns={historyColumns} data={history} loading={loading} rowKey="id"
-                  pagination={{ pageSize: 10, showTotal: true }}
-                  noDataElement={<Empty description="暂无巡检记录" />} />
-              )}
-            </div>
-          </Card>
-        </>
-      )}
+            </PrdCard>
 
-      {/* 详情弹窗 */}
-      <Modal
-        title="巡检详情"
-        visible={!!detail}
-        onCancel={() => setDetail(null)}
-        footer={null}
-        style={{ width: 800 }}
-      >
-        {detail && (
-          <>
-            <Descriptions column={2} size="small" data={[
-              { label: '巡检时间', value: detail.created_at || '—' },
-              { label: '耗时', value: detail.duration != null ? `${detail.duration}s` : '—' },
-              { label: '综合评分', value: <Text style={{ color: detail.score >= 90 ? '#1B9E5C' : detail.score >= 70 ? '#E68B00' : '#D63B3B', fontWeight: 700, fontSize: 16 }}>{Math.round(detail.score || 0)}</Text> },
-              { label: '状态', value: <StatusTag status={detail.status} /> },
-            ]} labelStyle={{ width: 90 }} style={{ marginBottom: 16 }} />
-            <div>
-              {(detail.result?.items || []).map((item, i) => {
-                const s = (item.status || '').toUpperCase()
-                const status = s === 'SUCCESS' ? 'ok' : s === 'WARNING' ? 'warn' : 'bad'
+            <PrdCard title="定时巡检设置" sub="保留原有运维能力，并将它融入报告页">
+              <Space direction="vertical" style={{ width: '100%' }} size="large">
+                <Space>
+                  <Text>启用定时巡检</Text>
+                  <Switch checked={schedule.enabled} onChange={(value) => saveSchedule({ ...schedule, enabled: value })} />
+                </Space>
+                <Space align="center">
+                  <Text>执行间隔</Text>
+                  <InputNumber
+                    min={5}
+                    max={1440}
+                    step={5}
+                    value={schedule.interval_minutes}
+                    onChange={(value) => setSchedule((current) => ({ ...current, interval_minutes: value }))}
+                    suffix="分钟"
+                    style={{ width: 160 }}
+                  />
+                  <Button size="small" onClick={() => saveSchedule(schedule)}>保存</Button>
+                </Space>
+                {schedule.last_run_at ? <Text type="secondary">最近调度执行: {schedule.last_run_at}</Text> : <Text type="secondary">尚无定时执行记录</Text>}
+              </Space>
+            </PrdCard>
+          </div>
+
+          <PrdCard title="最近巡检明细" sub="保留时间线、评分和详情入口，便于后续导出报告或做审计">
+            <Table
+              columns={historyColumns}
+              data={history}
+              rowKey="id"
+              loading={loading}
+              pagination={{ pageSize: 10, showTotal: true }}
+              noDataElement={<Empty description="暂无巡检历史" />}
+            />
+          </PrdCard>
+
+          <PrdCard title="最新巡检项结果" sub="适合在报告页底部展开看具体检查项">
+            {latestItems.length ? (
+              latestItems.map((item, index) => {
+                const status = String(item.status || '').toUpperCase()
                 return (
                   <CheckRow
-                    key={i} status={status}
-                    icon={matchCheckIcon(item.name)}
+                    key={`${item.name}-${index}`}
+                    status={status === 'SUCCESS' ? 'ok' : status === 'WARNING' ? 'warn' : 'bad'}
+                    icon={pickCheckIcon(item.name)}
                     title={item.name}
-                    meta={item.suggestion || (status === 'ok' ? '检查通过' : '需要关注')}
+                    meta={item.suggestion || (status === 'SUCCESS' ? '检查通过' : '需要进一步处理')}
                     value={item.value}
                   />
                 )
-              })}
+              })
+            ) : (
+              <Empty description="尚未生成巡检项结果，点击“立即巡检”开始执行" />
+            )}
+          </PrdCard>
+        </>
+      )}
+
+      <Modal title="巡检详情" visible={!!detail} onCancel={() => setDetail(null)} footer={null} style={{ width: 840 }}>
+        {detail ? (
+          <div className="prd-page">
+            <div className="prd-kpi-grid">
+              <StatCard label="状态" value={String(detail.status || '--')} />
+              <StatCard label="评分" value={detail.score != null ? Math.round(Number(detail.score)) : '--'} />
+              <StatCard label="检查项" value={formatNumber(detail.check_count || 0)} />
+              <StatCard label="耗时" value={detail.duration != null ? `${detail.duration}s` : '--'} />
             </div>
-          </>
-        )}
+            {(detail.result?.items || []).length ? (
+              (detail.result.items || []).map((item, index) => {
+                const status = String(item.status || '').toUpperCase()
+                return (
+                  <CheckRow
+                    key={`${item.name}-${index}`}
+                    status={status === 'SUCCESS' ? 'ok' : status === 'WARNING' ? 'warn' : 'bad'}
+                    icon={pickCheckIcon(item.name)}
+                    title={item.name}
+                    meta={item.suggestion || (status === 'SUCCESS' ? '检查通过' : '需要处理')}
+                    value={item.value}
+                  />
+                )
+              })
+            ) : (
+              <Empty description="暂无巡检项明细" />
+            )}
+          </div>
+        ) : null}
       </Modal>
     </div>
   )
