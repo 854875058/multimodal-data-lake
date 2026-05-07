@@ -55,7 +55,6 @@ const navGroups = [
       { path: '/lake-query/vector', label: '向量检索', icon: <IconSearch /> },
       { path: '/lake-query/multimodal', label: '多模态检索', icon: <IconLayout /> },
       { path: '/lake-query/hybrid', label: '混合检索', icon: <IconCommon /> },
-      { path: '/lake-query/nl2sql', label: 'NL2SQL', icon: <IconCommand /> },
       { path: '/lake-query/copilot', label: 'AI 数据副驾驶', icon: <IconRobot /> },
     ],
   },
