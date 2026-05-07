@@ -206,19 +206,19 @@ function AppShell({ authSession, onLogout }) {
         collapsed={collapsed}
         onCollapse={setCollapsed}
         collapsible
-        width={268}
+        width={262}
         style={{
           background: 'var(--color-bg-2)',
           borderRight: '1px solid var(--color-border-2)',
         }}
       >
         <div style={{
-          height: 98,
+          height: 84,
           display: 'flex',
           alignItems: 'center',
-          gap: collapsed ? 0 : 16,
+          gap: collapsed ? 0 : 14,
           justifyContent: collapsed ? 'center' : 'flex-start',
-          padding: collapsed ? '0 14px' : '0 18px',
+          padding: collapsed ? '0 14px' : '0 16px',
           borderBottom: '1px solid var(--color-border-2)',
         }}>
           <img
@@ -226,8 +226,8 @@ function AppShell({ authSession, onLogout }) {
             alt="BONC"
             style={{
               width: collapsed ? 38 : 'auto',
-              height: collapsed ? 38 : 66,
-              maxWidth: collapsed ? 38 : 92,
+              height: collapsed ? 38 : 54,
+              maxWidth: collapsed ? 38 : 78,
               objectFit: 'contain',
               borderRadius: 6,
               flexShrink: 0,
@@ -235,8 +235,8 @@ function AppShell({ authSession, onLogout }) {
           />
           {!collapsed && (
             <div style={{ overflow: 'hidden', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div style={{ fontSize: 16, fontWeight: 700, lineHeight: '22px', color: 'var(--color-text-1)' }}>湖仓控制台</div>
-              <div style={{ marginTop: 4, fontSize: 12, lineHeight: '18px', color: 'var(--color-text-3)' }}>多模态数据湖</div>
+              <div style={{ fontSize: 17, fontWeight: 700, lineHeight: '23px', color: 'var(--color-text-1)' }}>湖仓控制台</div>
+              <div style={{ marginTop: 4, fontSize: 13, lineHeight: '19px', color: 'var(--color-text-3)' }}>多模态数据湖</div>
             </div>
           )}
         </div>
@@ -245,7 +245,7 @@ function AppShell({ authSession, onLogout }) {
           mode="vertical"
           selectedKeys={[currentNav.path]}
           defaultOpenKeys={navGroups.map(g => g.key)}
-          style={{ width: '100%', borderRight: 'none', height: 'calc(100% - 98px)', overflowY: 'auto' }}
+          style={{ width: '100%', borderRight: 'none', height: 'calc(100% - 84px)', overflowY: 'auto' }}
           onClickMenuItem={(key) => navigate(key)}
         >
           {visibleGroups.map(group => (
