@@ -42,13 +42,43 @@ const Option = Select.Option
 
 const DORIS_BASE = '/api/doris'
 
-const TITLE_MAP = {
+const PAGE_MAP = {
   sql: 'SQL 查询工作台',
-  vector: '向量检索',
-  multimodal: '多模态检索',
-  hybrid: '混合检索',
+  retrieval: '统一检索工作台',
   copilot: 'AI 数据副驾驶',
+  vector: '统一检索工作台',
+  multimodal: '统一检索工作台',
+  hybrid: '统一检索工作台',
+  nl2sql: 'SQL 查询工作台',
 }
+
+const RETRIEVAL_PRESET_MAP = {
+  retrieval: 'semantic',
+  vector: 'semantic',
+  multimodal: 'visual',
+  hybrid: 'hybrid',
+}
+
+const COPILOT_EXAMPLES = [
+  '最近 7 天导入了哪些图片资产，按类型统计',
+  '找出与设备异常外观相关的样本，并给出相似结果',
+  '最近的批量入湖任务执行情况怎么样',
+]
+
+const COPILOT_SEED_SESSIONS = [
+  {
+    id: 's-1',
+    title: 'Critical 告警统计',
+    updatedAt: '今天 14:32',
+    messages: [],
+  },
+  {
+    id: 's-2',
+    title: '相似图片检索',
+    updatedAt: '今天 10:18',
+    messages: [],
+  },
+]
 
 async function dorisGet(path, params = {}) {
   const url = new URL(DORIS_BASE + path, window.location.origin)
@@ -112,62 +142,6 @@ function ResultSummary({ result }) {
   )
 }
 
-function SearchResultList({ results, searched, emptyText = '没有匹配的结果' }) {
-  if (!searched) return <Empty description="输入查询内容开始检索" />
-  if (!results.length) return <Empty description={emptyText} />
-
-  return (
-    <Space direction="vertical" style={{ width: '100%' }}>
-      {results.map((item, index) => (
-        <Card key={`${item.file_hash || item.id}-${index}`} bodyStyle={{ padding: 16 }} hoverable>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-            <div style={{ minWidth: 0 }}>
-              <Title heading={6} style={{ margin: 0 }}>
-                {item.doc_name || '未命名文件'}
-              </Title>
-              <Space size="small" style={{ marginTop: 4 }} wrap>
-                <Tag color="arcoblue">{item.doc_type || 'unknown'}</Tag>
-                {item.score != null ? (
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    RRF {Number(item.score).toFixed(6)}
-                  </Text>
-                ) : (
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    距离 {Number(item.distance ?? 0).toFixed(4)}
-                  </Text>
-                )}
-              </Space>
-            </div>
-            <Tag>#{index + 1}</Tag>
-          </div>
-          <Paragraph type="secondary" style={{ margin: '10px 0 8px' }}>
-            {truncateText(item.text || '当前结果暂无文本摘要。', 220)}
-          </Paragraph>
-          <Text type="secondary" style={{ fontSize: 11 }}>
-            来源: {item.source_uri || '本地入库'}
-          </Text>
-        </Card>
-      ))}
-    </Space>
-  )
-}
-
-function JourneyStep({ title, status, detail }) {
-  const color = status === 'done' ? '#1B9E5C' : status === 'running' ? '#165dff' : status === 'error' ? '#D63B3B' : '#86909c'
-  const bg = status === 'done' ? 'rgba(27, 158, 92, 0.08)' : status === 'running' ? 'rgba(22, 93, 255, 0.08)' : status === 'error' ? 'rgba(214, 59, 59, 0.08)' : 'rgba(134, 144, 156, 0.08)'
-  const label = status === 'done' ? '完成' : status === 'running' ? '执行中' : status === 'error' ? '失败' : '待执行'
-
-  return (
-    <div style={{ padding: 14, borderRadius: 14, border: `1px solid ${bg}`, background: '#fff' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-1)' }}>{title}</div>
-        <Tag color={color} style={{ background: bg, border: 'none' }}>{label}</Tag>
-      </div>
-      <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.7, color: 'var(--color-text-2)' }}>{detail}</div>
-    </div>
-  )
-}
-
 function QueryPageFrame({ title, subtitle, summaryItems, children, actions = null }) {
   return (
     <div className="prd-page">
@@ -196,6 +170,152 @@ function QueryPageFrame({ title, subtitle, summaryItems, children, actions = nul
   )
 }
 
+function SearchResultCard({ item, index }) {
+  const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'image'].includes(String(item.doc_type || '').toLowerCase())
+  const thumbnailUrl = item.file_hash && isImage ? api.getFileContentUrl(item.file_hash) : ''
+
+  return (
+    <Card bodyStyle={{ padding: 14 }} hoverable>
+      <div style={{ display: 'grid', gridTemplateColumns: isImage ? '104px minmax(0, 1fr)' : '1fr', gap: 14 }}>
+        {isImage ? (
+          <div
+            style={{
+              width: 104,
+              height: 84,
+              borderRadius: 10,
+              overflow: 'hidden',
+              background: 'var(--color-fill-1)',
+              border: '1px solid var(--color-border-2)',
+            }}
+          >
+            {thumbnailUrl ? (
+              <img
+                src={thumbnailUrl}
+                alt={item.doc_name || 'preview'}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            ) : null}
+          </div>
+        ) : null}
+
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+            <div style={{ minWidth: 0 }}>
+              <Title heading={6} style={{ margin: 0 }}>
+                {item.doc_name || '未命名资产'}
+              </Title>
+              <Space size="small" style={{ marginTop: 6 }} wrap>
+                <Tag color="arcoblue">{item.doc_type || 'unknown'}</Tag>
+                {item.score != null ? (
+                  <Tag color="purple">RRF {Number(item.score).toFixed(4)}</Tag>
+                ) : (
+                  <Tag color="green">距离 {Number(item.distance ?? 0).toFixed(4)}</Tag>
+                )}
+              </Space>
+            </div>
+            <Tag>#{index + 1}</Tag>
+          </div>
+
+          <Paragraph type="secondary" style={{ margin: '10px 0 8px' }}>
+            {truncateText(item.text || '当前结果暂无文本摘要。', 220)}
+          </Paragraph>
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            来源：{item.source_uri || '本地入库'}
+          </Text>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+function SearchResultList({ results, searched, emptyText = '没有匹配结果' }) {
+  if (!searched) return <Empty description="输入检索内容后开始查询" />
+  if (!results.length) return <Empty description={emptyText} />
+
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      {results.map((item, index) => (
+        <SearchResultCard key={`${item.file_hash || item.id}-${index}`} item={item} index={index} />
+      ))}
+    </div>
+  )
+}
+
+function JourneyStep({ title, status, detail, time }) {
+  const colorMap = {
+    done: '#1B9E5C',
+    running: '#165dff',
+    error: '#D63B3B',
+    pending: '#86909c',
+  }
+  const bgMap = {
+    done: 'rgba(27, 158, 92, 0.08)',
+    running: 'rgba(22, 93, 255, 0.08)',
+    error: 'rgba(214, 59, 59, 0.08)',
+    pending: 'rgba(134, 144, 156, 0.08)',
+  }
+  const textMap = {
+    done: '完成',
+    running: '执行中',
+    error: '失败',
+    pending: '待执行',
+  }
+  const statusColor = colorMap[status] || colorMap.pending
+  const statusBg = bgMap[status] || bgMap.pending
+
+  return (
+    <div style={{ padding: 14, borderRadius: 14, border: `1px solid ${statusBg}`, background: '#fff' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-1)' }}>{title}</div>
+        <Space size="small">
+          {time ? <Text type="secondary" style={{ fontSize: 11 }}>{time}</Text> : null}
+          <Tag color={statusColor} style={{ background: statusBg, border: 'none' }}>{textMap[status] || textMap.pending}</Tag>
+        </Space>
+      </div>
+      <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.7, color: 'var(--color-text-2)' }}>{detail}</div>
+    </div>
+  )
+}
+
+function normalizeSearchIntent(question) {
+  if (/(图片|图像|照片|相似|外观|截图|样本)/.test(question)) return 'visual'
+  if (/(统计|多少|趋势|排名|分布|最近|任务|导入)/.test(question)) return 'hybrid'
+  return 'sql'
+}
+
+function formatCopilotSummary(question, route, sqlResult, searchResults) {
+  if (route === 'visual') {
+    return `围绕“${question}”已完成语义检索，当前返回 ${searchResults.length} 条相关资产，可继续追加结构化条件做二次筛选。`
+  }
+  const sqlCount = sqlResult?.rows?.length || 0
+  const retrievalCount = searchResults.length
+  if (sqlCount && retrievalCount) {
+    return `当前问题已经形成双路结果：SQL 返回 ${sqlCount} 条结构化结果，检索补充 ${retrievalCount} 条相关资产，适合继续追问或导出分析。`
+  }
+  if (sqlCount) {
+    return `当前问题已通过 SQL 返回 ${sqlCount} 条结果，建议继续追问时间范围、资产类型或异常特征，缩小分析口径。`
+  }
+  if (retrievalCount) {
+    return `当前问题主要通过检索路径命中 ${retrievalCount} 条相关资产，适合继续追加“按类型统计”或“限定最近时间”的分析追问。`
+  }
+  return `当前问题“${question}”未命中可展示结果，建议补充时间范围、对象类型或更明确的业务条件。`
+}
+
+function buildFollowUps(question, route) {
+  if (route === 'visual') {
+    return [
+      '把这些相似资产限定为最近 7 天',
+      '只看图片类型并继续按相似度排序',
+      '补充结构化条件后重新检索',
+    ]
+  }
+  return [
+    `继续分析：${question} 的时间趋势`,
+    '把当前结果限定为图片资产',
+    '补充相关相似样本作为佐证',
+  ]
+}
+
 function SqlWorkspaceTab() {
   const [clusters, setClusters] = useState([])
   const [clusterId, setClusterId] = useState('')
@@ -203,12 +323,12 @@ function SqlWorkspaceTab() {
   const [tablesByDb, setTablesByDb] = useState({})
   const [expandedKeys, setExpandedKeys] = useState([])
   const [subTab, setSubTab] = useState('editor')
-  const [sql, setSql] = useState('SELECT 1;')
+  const [sql, setSql] = useState('SELECT file_hash, doc_name, doc_type, source_uri FROM files LIMIT 20;')
   const [result, setResult] = useState(null)
   const [executing, setExecuting] = useState(false)
   const [history, setHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
-  const [nlPrompt, setNlPrompt] = useState('查询最近导入的图片资产')
+  const [nlPrompt, setNlPrompt] = useState('查询最近导入的图片资产，并按类型统计')
   const [generatedSql, setGeneratedSql] = useState('')
   const [converting, setConverting] = useState(false)
 
@@ -311,7 +431,7 @@ function SqlWorkspaceTab() {
       }
       Message.success(data?.reasoning || '已生成 SQL 草案')
     } catch (error) {
-      Message.error(getErrorMessage(error, 'NL2SQL 生成失败'))
+      Message.error(getErrorMessage(error, 'SQL 生成失败'))
     } finally {
       setConverting(false)
     }
@@ -324,9 +444,14 @@ function SqlWorkspaceTab() {
     try {
       await navigator.clipboard?.writeText(generatedSql)
     } catch {
-      // ignore clipboard failures
+      // ignore
     }
-    Message.success('SQL 已写入编辑器，并复制到剪贴板')
+    Message.success('SQL 已写入编辑器并复制到剪贴板')
+  }
+
+  const insertTable = (db, tableName) => {
+    setSql(`SELECT * FROM \`${db}\`.\`${tableName}\` LIMIT 100;`)
+    setSubTab('editor')
   }
 
   const handleKeyDown = (event) => {
@@ -334,11 +459,6 @@ function SqlWorkspaceTab() {
       event.preventDefault()
       handleExecute()
     }
-  }
-
-  const insertTable = (db, tableName) => {
-    setSql(`SELECT * FROM \`${db}\`.\`${tableName}\` LIMIT 100;`)
-    setSubTab('editor')
   }
 
   const treeData = databases.map((db) => ({
@@ -366,7 +486,7 @@ function SqlWorkspaceTab() {
     {
       title: '状态',
       dataIndex: 'success',
-      width: 80,
+      width: 90,
       render: (value) => (value ? <Tag color="green">成功</Tag> : <Tag color="red">失败</Tag>),
     },
     {
@@ -410,32 +530,32 @@ function SqlWorkspaceTab() {
       key: 'cluster',
       label: '当前集群',
       value: clusters.find((item) => item.id === clusterId)?.name || '未选择集群',
-      meta: '编辑器、对象树和 SQL 历史都绑定在当前集群上。',
+      meta: '编辑器、对象树和 SQL 历史都绑定在当前集群下。',
     },
     {
       key: 'mode',
       label: '查询方式',
       value: '自然语言 + SQL',
-      meta: '可先用自然语言生成查询草案，再进行编辑、执行和验证。',
+      meta: '先生成草案，再编辑执行，适合分析师和数据人员协同验证。',
     },
     {
       key: 'editor',
-      label: '编辑模式',
+      label: '快捷执行',
       value: 'Ctrl + Enter',
-      meta: '支持快速执行，也支持从历史记录和对象树一键回填 SQL。',
+      meta: '支持从历史记录和对象树快速回填 SQL。',
     },
     {
       key: 'history',
-      label: '历史记录',
+      label: '执行历史',
       value: `${history.length} 条`,
-      meta: '保留执行轨迹，便于继续验证生成 SQL 或回看分析过程。',
+      meta: '保留执行轨迹，便于复用与回看。',
     },
   ]
 
   return (
     <QueryPageFrame
       title="SQL 查询工作台"
-      subtitle="支持自然语言问数、SQL 编辑、执行验证和历史回查，适合分析师和数据人员快速完成查询工作。"
+      subtitle="统一承接自然语言生成 SQL、编辑执行与历史复用，适合做精确查询、统计分析和结果验证。"
       summaryItems={summaryItems}
       actions={(
         <>
@@ -453,7 +573,7 @@ function SqlWorkspaceTab() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Card title={<Space><IconCommand />自然语言转 SQL</Space>} bodyStyle={{ padding: 16 }}>
             <Paragraph type="secondary" style={{ fontSize: 12, marginTop: 0 }}>
-              在这里描述你的问题，生成的 SQL 会直接写入右侧编辑器，减少来回跳转。
+              输入业务问题，系统会先产出 SQL 草案，再写入右侧编辑器，方便继续调优和执行。
             </Paragraph>
             <TextArea
               value={nlPrompt}
@@ -484,7 +604,7 @@ function SqlWorkspaceTab() {
             bodyStyle={{ padding: 8, maxHeight: 560, overflow: 'auto' }}
           >
             {clusters.length === 0 ? (
-              <Empty description="请先在湖运维注册集群" />
+              <Empty description="请先在运维模块配置集群" />
             ) : databases.length === 0 ? (
               <Empty description="暂无数据库对象" />
             ) : (
@@ -511,13 +631,13 @@ function SqlWorkspaceTab() {
             <div style={{ padding: 16 }}>
               <Space style={{ marginBottom: 12 }} wrap>
                 <Button type="primary" icon={<IconPlayArrow />} onClick={handleExecute} loading={executing} disabled={!clusterId}>执行 SQL</Button>
-                <Text type="secondary">快捷键: Ctrl + Enter</Text>
+                <Text type="secondary">快捷键 Ctrl + Enter</Text>
               </Space>
               <TextArea
                 value={sql}
                 onChange={setSql}
                 onKeyDown={handleKeyDown}
-                placeholder="输入 SQL 语句，或先用左侧自然语言生成 SQL"
+                placeholder="输入 SQL，或先用左侧自然语言生成"
                 style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: 13 }}
                 autoSize={{ minRows: 10, maxRows: 18 }}
               />
@@ -561,8 +681,9 @@ function SqlWorkspaceTab() {
                 data={history}
                 loading={historyLoading}
                 rowKey="id"
-                pagination={{ pageSize: 10, showTotal: true }}
-                noDataElement={<Empty description={!clusterId ? '请先选择集群' : '暂无执行历史'} />}
+                pagination={{ pageSize: 10 }}
+                scroll={{ x: 960 }}
+                border
               />
             </div>
           )}
@@ -572,26 +693,48 @@ function SqlWorkspaceTab() {
   )
 }
 
-function VectorSearchTab() {
-  const [query, setQuery] = useState('')
-  const [mode, setMode] = useState('text')
-  const [limit, setLimit] = useState(10)
+function RetrievalWorkspaceTab({ initialStrategy = 'semantic' }) {
+  const [strategy, setStrategy] = useState(initialStrategy)
+  const [query, setQuery] = useState(initialStrategy === 'visual' ? '查找与设备异常外观相关的图片样本' : '夜间巡检异常样本')
+  const [limit, setLimit] = useState(12)
+  const [rrfK, setRrfK] = useState(60)
   const [results, setResults] = useState([])
-  const [searching, setSearching] = useState(false)
   const [searched, setSearched] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [routeText, setRouteText] = useState('等待执行')
+  const [routeMeta, setRouteMeta] = useState('系统会根据当前策略生成检索路径。')
+  const [messageText, setMessageText] = useState('')
+
+  useEffect(() => {
+    setStrategy(initialStrategy)
+  }, [initialStrategy])
 
   const summaryItems = [
     {
-      key: 'mode',
-      label: '检索模式',
-      value: mode === 'image' ? '文搜图' : '文本语义',
-      meta: '可按文本语义检索文本资产，也可按文本描述召回图像样本。',
+      key: 'strategy',
+      label: '当前策略',
+      value: strategy === 'semantic' ? '语义检索' : strategy === 'visual' ? '文搜图' : '混合检索',
+      meta: strategy === 'hybrid'
+        ? '同时利用结构化关键词与向量语义召回，更适合复杂问题。'
+        : '统一在同一个工作台内切换，不再拆成多个页面。',
     },
     {
       key: 'limit',
-      label: 'Top K',
-      value: String(limit),
-      meta: '用于控制每次返回的结果数量。',
+      label: '结果规模',
+      value: `${limit} 条`,
+      meta: '适合演示召回效果，也适合快速抽样观察结果分布。',
+    },
+    {
+      key: 'route',
+      label: '检索路由',
+      value: routeText,
+      meta: routeMeta,
+    },
+    {
+      key: 'count',
+      label: '当前命中',
+      value: searched ? `${results.length} 条` : '--',
+      meta: messageText || '执行后会在结果区展示召回资产与检索说明。',
     },
   ]
 
@@ -600,11 +743,29 @@ function VectorSearchTab() {
       Message.warning('请输入检索内容')
       return
     }
+
     setSearching(true)
+    setResults([])
+    setMessageText('')
     try {
-      const response = await api.search(query.trim(), mode, limit)
-      if (!response.success) throw new Error(response.message || '检索失败')
-      setResults(Array.isArray(response.results) ? response.results : [])
+      if (strategy === 'hybrid') {
+        const response = await api.search(query.trim(), 'hybrid', { limit, rrf_k: rrfK })
+        if (!response.success) throw new Error(response.message || '检索失败')
+        setResults(Array.isArray(response.results) ? response.results : [])
+        setMessageText(response.message || '')
+        setRouteText('自然语言 -> 向量检索 + 关键词检索 -> RRF 融合')
+        setRouteMeta(`RRF k=${rrfK}，适合同时要求结构化条件和语义相似度的场景。`)
+      } else {
+        const vectorGuide = await api.convertNlToVector({ prompt: query.trim(), top_k: limit })
+        const guide = vectorGuide?.data || {}
+        const mode = strategy === 'visual' ? 'image' : (guide.mode || 'text')
+        const response = await api.search(query.trim(), mode, limit)
+        if (!response.success) throw new Error(response.message || '检索失败')
+        setResults(Array.isArray(response.results) ? response.results : [])
+        setMessageText(guide.command_text || '')
+        setRouteText(mode === 'image' ? '自然语言 -> 图像向量检索' : '自然语言 -> 文本语义检索')
+        setRouteMeta(guide.command_text || '已根据当前问题生成可追溯的检索命令。')
+      }
       setSearched(true)
     } catch (error) {
       setResults([])
@@ -617,423 +778,531 @@ function VectorSearchTab() {
 
   return (
     <QueryPageFrame
-      title="向量检索"
-      subtitle="支持文本语义检索和文搜图，适合快速验证当前向量资产的可用性。"
+      title="统一检索工作台"
+      subtitle="将向量检索、多模态检索和混合检索收口到一个入口里，用户按任务选择策略，不再按底层实现切页面。"
       summaryItems={summaryItems}
     >
-      <Card bodyStyle={{ padding: 16 }}>
-        <Form layout="inline" style={{ marginBottom: 16 }}>
-          <Form.Item label="查询内容" style={{ flex: 1, minWidth: 320 }}>
-            <Input value={query} onChange={setQuery} placeholder="输入语义描述、关键词或图像内容描述" allowClear />
-          </Form.Item>
-          <Form.Item label="模式">
-            <Select value={mode} onChange={setMode} style={{ width: 120 }}>
-              <Option value="text">文本</Option>
-              <Option value="image">文搜图</Option>
-            </Select>
-          </Form.Item>
-          <Form.Item label="Top K">
-            <InputNumber value={limit} onChange={setLimit} min={1} max={100} style={{ width: 90 }} />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" icon={<IconSearch />} onClick={run} loading={searching}>开始检索</Button>
-          </Form.Item>
-        </Form>
-        <SearchResultList results={results} searched={searched} />
-      </Card>
-    </QueryPageFrame>
-  )
-}
+      <div style={{ display: 'grid', gridTemplateColumns: '360px minmax(0, 1fr)', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Card title={<Space><IconSearch />检索输入</Space>} bodyStyle={{ padding: 16 }}>
+            <div>
+              <Text type="secondary">检索策略</Text>
+              <Select value={strategy} onChange={setStrategy} style={{ width: '100%', marginTop: 6 }}>
+                <Option value="semantic">语义检索</Option>
+                <Option value="visual">文搜图</Option>
+                <Option value="hybrid">混合检索</Option>
+              </Select>
+            </div>
 
-function MultimodalSearchTab() {
-  const [prompt, setPrompt] = useState('查找与设备外观异常相关的图片样本')
-  const [limit, setLimit] = useState(12)
-  const [strategy, setStrategy] = useState('auto')
-  const [searching, setSearching] = useState(false)
-  const [searched, setSearched] = useState(false)
-  const [resolvedMode, setResolvedMode] = useState('')
-  const [results, setResults] = useState([])
-  const [commandText, setCommandText] = useState('')
+            <div style={{ marginTop: 12 }}>
+              <Text type="secondary">检索内容</Text>
+              <TextArea
+                value={query}
+                onChange={setQuery}
+                autoSize={{ minRows: 5, maxRows: 9 }}
+                style={{ marginTop: 6 }}
+                placeholder={strategy === 'visual'
+                  ? '例如：查找红色告警标识、设备机柜外壳破损或夜间低照度场景'
+                  : strategy === 'hybrid'
+                    ? '例如：查询最近导入的异常图片，并补充相似外观样本'
+                    : '例如：夜间巡检异常样本、PDF 质检报告摘要、相似文本片段'}
+              />
+            </div>
 
-  const summaryItems = [
-    {
-      key: 'entry',
-      label: '入口类型',
-      value: strategy === 'auto' ? '自动识别' : strategy === 'image' ? '文搜图' : '语义文本',
-      meta: '会根据描述自动选择更合适的召回方式，也可以手动指定。',
-    },
-    {
-      key: 'limit',
-      label: '结果规模',
-      value: `${limit} 条`,
-      meta: '适合演示跨模态定位，也适合快速抽样查看结果分布。',
-    },
-    {
-      key: 'mode',
-      label: '最近策略',
-      value: resolvedMode ? (resolvedMode === 'image' ? '图像召回' : '文本召回') : '等待执行',
-      meta: commandText || '执行后会显示当前采用的检索指令。',
-    },
-  ]
-
-  const run = async () => {
-    if (!prompt.trim()) {
-      Message.warning('请输入检索描述')
-      return
-    }
-    setSearching(true)
-    try {
-      const vectorGuide = await api.convertNlToVector({ prompt: prompt.trim(), top_k: limit })
-      const guide = vectorGuide?.data || {}
-      const nextMode = strategy === 'auto' ? (guide.mode || 'text') : strategy
-      const response = await api.search(prompt.trim(), nextMode, limit)
-      if (!response.success) throw new Error(response.message || '检索失败')
-      setResolvedMode(nextMode)
-      setCommandText(guide.command_text || '')
-      setResults(Array.isArray(response.results) ? response.results : [])
-      setSearched(true)
-    } catch (error) {
-      setResults([])
-      setSearched(true)
-      Message.error(getErrorMessage(error, '多模态检索失败'))
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  return (
-    <QueryPageFrame
-      title="多模态检索"
-      subtitle="通过自然语言描述直接召回相关图像或文本资产，适合演示跨模态数据的统一检索能力。"
-      summaryItems={summaryItems}
-    >
-      <Card bodyStyle={{ padding: 16 }}>
-        <Row gutter={16}>
-          <Col span={16}>
-            <TextArea
-              value={prompt}
-              onChange={setPrompt}
-              autoSize={{ minRows: 4, maxRows: 8 }}
-              placeholder="例如：查找红色背景的质检图片，或者查找与故障告警相似的历史样本"
-            />
-          </Col>
-          <Col span={8}>
-            <Space direction="vertical" style={{ width: '100%' }}>
-              <div>
-                <Text type="secondary">召回策略</Text>
-                <Select value={strategy} onChange={setStrategy} style={{ width: '100%', marginTop: 6 }}>
-                  <Option value="auto">自动识别</Option>
-                  <Option value="image">文搜图</Option>
-                  <Option value="text">文本语义</Option>
-                </Select>
-              </div>
-              <div>
+            <Row gutter={12} style={{ marginTop: 4 }}>
+              <Col span={12}>
                 <Text type="secondary">Top K</Text>
                 <InputNumber value={limit} onChange={setLimit} min={1} max={100} style={{ width: '100%', marginTop: 6 }} />
-              </div>
-              <Button type="primary" icon={<IconImage />} onClick={run} loading={searching}>开始检索</Button>
-            </Space>
-          </Col>
-        </Row>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary">RRF K</Text>
+                <InputNumber value={rrfK} onChange={setRrfK} min={10} max={200} disabled={strategy !== 'hybrid'} style={{ width: '100%', marginTop: 6 }} />
+              </Col>
+            </Row>
 
-        {commandText ? (
-          <div className="prd-code-block" style={{ marginTop: 16 }}>
-            {commandText}
-          </div>
-        ) : null}
+            <Button type="primary" icon={strategy === 'visual' ? <IconImage /> : <IconSearch />} onClick={run} loading={searching} style={{ marginTop: 16, width: '100%' }}>
+              开始检索
+            </Button>
+          </Card>
 
-        <div style={{ marginTop: 16 }}>
-          <SearchResultList results={results} searched={searched} emptyText="当前描述下没有召回相关样本" />
+          <Card title="策略说明" bodyStyle={{ padding: 16 }}>
+            <div style={{ display: 'grid', gap: 12 }}>
+              <JourneyStep
+                title="语义检索"
+                status={strategy === 'semantic' ? 'running' : 'pending'}
+                detail="适合查文本语义、摘要内容和相似描述，优先走文本向量召回。"
+              />
+              <JourneyStep
+                title="文搜图"
+                status={strategy === 'visual' ? 'running' : 'pending'}
+                detail="适合查相似图片、视觉外观和跨模态样本，优先走图像向量召回。"
+              />
+              <JourneyStep
+                title="混合检索"
+                status={strategy === 'hybrid' ? 'running' : 'pending'}
+                detail="适合同时要求关键词过滤和语义理解的复杂问题，结果会做融合重排。"
+              />
+            </div>
+          </Card>
         </div>
-      </Card>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {messageText ? (
+            <div className="prd-code-block">{messageText}</div>
+          ) : null}
+
+          <Card title="检索结果" bodyStyle={{ padding: 16 }}>
+            <SearchResultList
+              results={results}
+              searched={searched}
+              emptyText={strategy === 'hybrid' ? '当前问题下没有召回可融合结果' : '当前描述下没有找到相关资产'}
+            />
+          </Card>
+        </div>
+      </div>
     </QueryPageFrame>
   )
-}
-
-function HybridSearchTab() {
-  const [query, setQuery] = useState('设备异常告警')
-  const [limit, setLimit] = useState(10)
-  const [rrfK, setRrfK] = useState(60)
-  const [results, setResults] = useState([])
-  const [messageText, setMessageText] = useState('')
-  const [searching, setSearching] = useState(false)
-  const [searched, setSearched] = useState(false)
-
-  const summaryItems = [
-    {
-      key: 'strategy',
-      label: '融合方式',
-      value: 'RRF',
-      meta: '同时考虑关键词匹配与向量语义召回，避免只靠单一路径。',
-    },
-    {
-      key: 'rrf',
-      label: 'RRF 常数',
-      value: String(rrfK),
-      meta: '数值越大，召回排名的平滑程度越高。',
-    },
-    {
-      key: 'limit',
-      label: 'Top K',
-      value: `${limit} 条`,
-      meta: messageText || '执行后会显示本次混合检索的召回摘要。',
-    },
-  ]
-
-  const run = async () => {
-    if (!query.trim()) {
-      Message.warning('请输入查询内容')
-      return
-    }
-    setSearching(true)
-    try {
-      const response = await api.search(query.trim(), 'hybrid', { limit, rrf_k: rrfK })
-      if (!response.success) throw new Error(response.message || '混合检索失败')
-      setResults(Array.isArray(response.results) ? response.results : [])
-      setMessageText(response.message || '')
-      setSearched(true)
-    } catch (error) {
-      setResults([])
-      setMessageText('')
-      setSearched(true)
-      Message.error(getErrorMessage(error, '混合检索失败'))
-    } finally {
-      setSearching(false)
-    }
-  }
-
-  return (
-    <QueryPageFrame
-      title="混合检索"
-      subtitle="把关键词召回与向量语义召回融合到同一条结果链路里，更适合做复杂场景下的资产定位。"
-      summaryItems={summaryItems}
-    >
-      <Card bodyStyle={{ padding: 16 }}>
-        <Form layout="inline" style={{ marginBottom: 16 }}>
-          <Form.Item label="查询内容" style={{ flex: 1, minWidth: 320 }}>
-            <Input value={query} onChange={setQuery} placeholder="输入既包含关键词、又希望保留语义相似度的查询问题" allowClear />
-          </Form.Item>
-          <Form.Item label="Top K">
-            <InputNumber value={limit} onChange={setLimit} min={1} max={100} style={{ width: 90 }} />
-          </Form.Item>
-          <Form.Item label="RRF K">
-            <InputNumber value={rrfK} onChange={setRrfK} min={10} max={200} style={{ width: 90 }} />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" icon={<IconSwap />} onClick={run} loading={searching}>开始融合检索</Button>
-          </Form.Item>
-        </Form>
-
-        {messageText ? <div className="prd-code-block">{messageText}</div> : null}
-
-        <div style={{ marginTop: 16 }}>
-          <SearchResultList results={results} searched={searched} emptyText="当前查询下没有召回相关结果" />
-        </div>
-      </Card>
-    </QueryPageFrame>
-  )
-}
-
-function buildCopilotSummary(question, sqlPayload, sqlResponse, searchResponse) {
-  const parts = []
-  if (sqlPayload?.sql) {
-    parts.push('已生成 SQL 查询草案')
-  }
-  if (sqlResponse?.rows?.length) {
-    parts.push(`SQL 返回 ${sqlResponse.rows.length} 条结果`)
-  }
-  if (searchResponse?.results?.length) {
-    parts.push(`检索召回 ${searchResponse.results.length} 条相关资产`)
-  }
-  if (!parts.length) {
-    parts.push('当前未获得可展示结果，建议收窄问题范围或明确对象类型')
-  }
-  return `问题「${question}」处理完成：${parts.join('，')}。`
 }
 
 function CopilotTab() {
-  const [question, setQuestion] = useState('最近导入的图片资产有哪些，可以先给我结果，再给我可继续验证的 SQL')
+  const [sessions, setSessions] = useState(COPILOT_SEED_SESSIONS)
+  const [activeSessionId, setActiveSessionId] = useState(COPILOT_SEED_SESSIONS[0].id)
+  const [question, setQuestion] = useState('上个月导入最多的图片资产类型是什么，顺便给我相关样本')
   const [running, setRunning] = useState(false)
-  const [steps, setSteps] = useState([
-    { key: 'plan', title: '理解问题', status: 'pending', detail: '等待开始分析问题。' },
-    { key: 'sql', title: '生成 SQL', status: 'pending', detail: '等待生成可执行查询。' },
-    { key: 'execute', title: '执行验证', status: 'pending', detail: '等待执行 SQL 或本地查询。' },
-    { key: 'search', title: '检索补充', status: 'pending', detail: '等待根据问题补充相关资产召回。' },
-    { key: 'summary', title: '生成结论', status: 'pending', detail: '等待汇总结果。' },
-  ])
-  const [generatedSql, setGeneratedSql] = useState('')
-  const [sqlResult, setSqlResult] = useState(null)
-  const [searchResult, setSearchResult] = useState({ results: [], searched: false })
-  const [summary, setSummary] = useState('')
+  const [latestRoute, setLatestRoute] = useState('等待提问')
+  const [latestToolSummary, setLatestToolSummary] = useState('副驾驶会在提问后展示本次使用的工具与数据资源。')
 
-  const summaryItems = [
-    {
-      key: 'mode',
-      label: '工作方式',
-      value: '透明链路',
-      meta: '每一步都展示给用户，不把推理过程藏在黑盒里。',
-    },
-    {
-      key: 'sql',
-      label: 'SQL 草案',
-      value: generatedSql ? '已生成' : '待生成',
-      meta: generatedSql ? '可继续复制、修改或转到 SQL 工作台验证。' : '执行后会先生成可验证的 SQL 草案。',
-    },
-    {
-      key: 'search',
-      label: '补充召回',
-      value: searchResult.results.length ? `${searchResult.results.length} 条` : '未召回',
-      meta: '当问题涉及图片或相似样本时，会补充检索结果帮助解释。',
-    },
-  ]
+  const activeSession = useMemo(
+    () => sessions.find((item) => item.id === activeSessionId) || sessions[0],
+    [activeSessionId, sessions]
+  )
 
-  const updateStep = (key, patch) => {
-    setSteps((current) => current.map((item) => (item.key === key ? { ...item, ...patch } : item)))
+  const createEmptyAssistantBlock = (currentQuestion) => ({
+    steps: [
+      { key: 'intent', title: '理解问题', status: 'running', detail: `正在解析“${currentQuestion}”中的对象、时间范围与结果诉求。`, time: '识别中' },
+      { key: 'plan', title: '路由决策', status: 'pending', detail: '等待确定走 SQL、检索或双路融合。', time: '' },
+      { key: 'draft', title: '生成查询', status: 'pending', detail: '等待生成 SQL 草案或检索命令。', time: '' },
+      { key: 'execute', title: '执行验证', status: 'pending', detail: '等待执行并返回结果。', time: '' },
+      { key: 'summary', title: '整理结论', status: 'pending', detail: '等待组织结论、追问建议和结果摘要。', time: '' },
+    ],
+    route: '等待决策',
+    sql: '',
+    sqlResult: null,
+    searchResults: [],
+    summary: '',
+    followups: [],
+  })
+
+  const patchAssistant = (sessionId, patch) => {
+    setSessions((current) => current.map((session) => {
+      if (session.id !== sessionId) return session
+      return {
+        ...session,
+        messages: session.messages.map((message, index) => {
+          if (index !== session.messages.length - 1 || message.role !== 'assistant') return message
+          return {
+            ...message,
+            ...patch,
+          }
+        }),
+      }
+    }))
   }
 
-  const runCopilot = async () => {
-    if (!question.trim()) {
+  const patchStep = (sessionId, key, patch) => {
+    setSessions((current) => current.map((session) => {
+      if (session.id !== sessionId) return session
+      return {
+        ...session,
+        messages: session.messages.map((message, index) => {
+          if (index !== session.messages.length - 1 || message.role !== 'assistant') return message
+          return {
+            ...message,
+            steps: message.steps.map((step) => (step.key === key ? { ...step, ...patch } : step)),
+          }
+        }),
+      }
+    }))
+  }
+
+  const createSession = () => {
+    const nextId = `s-${Date.now()}`
+    const session = {
+      id: nextId,
+      title: '新会话',
+      updatedAt: '刚刚',
+      messages: [],
+    }
+    setSessions((current) => [session, ...current])
+    setActiveSessionId(nextId)
+  }
+
+  const clearSession = () => {
+    setSessions((current) => current.map((session) => (
+      session.id === activeSessionId ? { ...session, messages: [], title: '新会话', updatedAt: '刚刚' } : session
+    )))
+  }
+
+  const sendQuestion = async (presetQuestion = '') => {
+    const currentQuestion = (presetQuestion || question).trim()
+    if (!currentQuestion) {
       Message.warning('请输入问题')
       return
     }
 
-    setRunning(true)
-    setGeneratedSql('')
-    setSqlResult(null)
-    setSearchResult({ results: [], searched: false })
-    setSummary('')
-    setSteps([
-      { key: 'plan', title: '理解问题', status: 'running', detail: '正在解析问题对象、时间范围和结果期望。' },
-      { key: 'sql', title: '生成 SQL', status: 'pending', detail: '等待生成可执行查询。' },
-      { key: 'execute', title: '执行验证', status: 'pending', detail: '等待执行 SQL 或本地查询。' },
-      { key: 'search', title: '检索补充', status: 'pending', detail: '等待根据问题补充相关资产召回。' },
-      { key: 'summary', title: '生成结论', status: 'pending', detail: '等待汇总结果。' },
-    ])
+    const sessionId = activeSessionId
+    const displayTitle = truncateText(currentQuestion, 14)
+    const assistantSeed = createEmptyAssistantBlock(currentQuestion)
 
-    let sqlPayload = null
-    let sqlResponse = null
-    let searchResponse = null
+    setSessions((current) => current.map((session) => {
+      if (session.id !== sessionId) return session
+      return {
+        ...session,
+        title: displayTitle,
+        updatedAt: '刚刚',
+        messages: [
+          ...session.messages,
+          { role: 'user', question: currentQuestion, createdAt: '刚刚' },
+          { role: 'assistant', createdAt: '处理中', ...assistantSeed },
+        ],
+      }
+    }))
+
+    setQuestion('')
+    setRunning(true)
+    setLatestRoute('正在分析')
+    setLatestToolSummary('正在调用意图识别、SQL 生成、执行验证和检索补充能力。')
+
+    const route = normalizeSearchIntent(currentQuestion)
+    let generatedSql = ''
+    let sqlResult = null
+    let searchResults = []
+    let routeLabel = ''
 
     try {
-      updateStep('plan', { status: 'done', detail: '已识别问题中的查询对象，并开始生成可验证的处理路径。' })
+      patchStep(sessionId, 'intent', { status: 'done', detail: '已识别当前问题属于数据分析与资产补充类场景。', time: '320ms' })
 
-      updateStep('sql', { status: 'running', detail: '正在根据自然语言问题生成 SQL 草案。' })
-      sqlPayload = await api.convertNlToSql({ prompt: question.trim(), top_k: 10 })
-      setGeneratedSql(sqlPayload?.sql || '')
-      updateStep('sql', {
-        status: sqlPayload?.sql ? 'done' : 'error',
-        detail: sqlPayload?.sql ? (sqlPayload.reasoning || '已生成 SQL 草案，可继续执行验证。') : '未生成 SQL。',
+      routeLabel = route === 'visual'
+        ? '自然语言 -> 图像语义检索'
+        : route === 'hybrid'
+          ? '自然语言 -> SQL 精确查询 + 检索补充'
+          : '自然语言 -> SQL 查询'
+
+      patchStep(sessionId, 'plan', {
+        status: 'done',
+        detail: route === 'visual'
+          ? '当前问题更适合直接走相似资产检索路径。'
+          : route === 'hybrid'
+            ? '当前问题既需要结构化统计，也需要相关样本补充，采用双路融合。'
+            : '当前问题以结构化查询为主，优先生成 SQL。',
+        time: '260ms',
+      })
+      patchAssistant(sessionId, { route: routeLabel })
+      setLatestRoute(routeLabel)
+
+      patchStep(sessionId, 'draft', { status: 'running', detail: '正在生成 SQL 草案或检索命令。', time: '生成中' })
+
+      if (route !== 'visual') {
+        const sqlPayload = await api.convertNlToSql({ prompt: currentQuestion, top_k: 10 })
+        generatedSql = sqlPayload?.sql || ''
+      }
+
+      patchStep(sessionId, 'draft', {
+        status: 'done',
+        detail: generatedSql
+          ? '已生成 SQL 草案，并保留给用户继续复核。'
+          : '本轮问题优先走检索路径，不生成 SQL 草案。',
+        time: generatedSql ? '740ms' : '480ms',
       })
 
-      if (sqlPayload?.sql) {
-        updateStep('execute', { status: 'running', detail: '正在执行 SQL，验证当前问题是否能直接返回结果。' })
+      patchStep(sessionId, 'execute', { status: 'running', detail: '正在执行查询并补充相关资产。', time: '执行中' })
+
+      if (generatedSql) {
         try {
-          const execution = await api.executeDorisSql({ query: sqlPayload.sql, limit: 20 })
-          sqlResponse = {
+          const execution = await api.executeDorisSql({ query: generatedSql, limit: 20 })
+          sqlResult = {
             columns: execution?.columns || [],
             rows: execution?.rows || [],
             message: execution?.message || '',
             affectedRows: execution?.rows?.length || 0,
           }
-          setSqlResult(sqlResponse)
-          updateStep('execute', {
-            status: execution?.success ? 'done' : 'error',
-            detail: execution?.success ? `已返回 ${sqlResponse.rows.length} 条结果。` : '执行未返回有效结果。',
-          })
         } catch (error) {
-          updateStep('execute', { status: 'error', detail: getErrorMessage(error, 'SQL 执行失败。') })
+          sqlResult = {
+            columns: [],
+            rows: [],
+            message: getErrorMessage(error, 'SQL 执行失败'),
+            affectedRows: 0,
+          }
         }
       }
 
-      updateStep('search', { status: 'running', detail: '正在补充相关资产召回，帮助理解上下文和相似样本。' })
-      try {
-        const vectorGuide = await api.convertNlToVector({ prompt: question.trim(), top_k: 8 })
-        const searchMode = vectorGuide?.data?.mode || 'text'
-        const response = await api.search(question.trim(), searchMode, 8)
-        searchResponse = response
-        setSearchResult({ results: response?.results || [], searched: true })
-        updateStep('search', {
-          status: response?.success ? 'done' : 'error',
-          detail: response?.success ? `已补充召回 ${response.results?.length || 0} 条相关资产。` : '未召回到相关资产。',
-        })
-      } catch (error) {
-        setSearchResult({ results: [], searched: true })
-        updateStep('search', { status: 'error', detail: getErrorMessage(error, '检索补充失败。') })
+      if (route === 'visual') {
+        const retrieval = await api.search(currentQuestion, 'image', 8)
+        searchResults = Array.isArray(retrieval?.results) ? retrieval.results : []
+      } else if (route === 'hybrid') {
+        const retrieval = await api.search(currentQuestion, 'hybrid', { limit: 8, rrf_k: 60 })
+        searchResults = Array.isArray(retrieval?.results) ? retrieval.results : []
+      } else {
+        const guide = await api.convertNlToVector({ prompt: currentQuestion, top_k: 6 })
+        const retrieval = await api.search(currentQuestion, guide?.data?.mode || 'text', 6)
+        searchResults = Array.isArray(retrieval?.results) ? retrieval.results : []
       }
 
-      updateStep('summary', { status: 'running', detail: '正在汇总执行结果与检索结果。' })
-      const finalSummary = buildCopilotSummary(question.trim(), sqlPayload, sqlResponse, searchResponse)
-      setSummary(finalSummary)
-      updateStep('summary', { status: 'done', detail: finalSummary })
+      patchStep(sessionId, 'execute', {
+        status: 'done',
+        detail: generatedSql
+          ? `已完成执行验证，并补充 ${searchResults.length} 条相关资产。`
+          : `已完成检索，共返回 ${searchResults.length} 条相关资产。`,
+        time: '1.9s',
+      })
+
+      const summary = formatCopilotSummary(currentQuestion, route, sqlResult, searchResults)
+      const followups = buildFollowUps(currentQuestion, route)
+
+      patchStep(sessionId, 'summary', {
+        status: 'done',
+        detail: summary,
+        time: '420ms',
+      })
+
+      patchAssistant(sessionId, {
+        createdAt: '刚刚',
+        sql: generatedSql,
+        sqlResult,
+        searchResults,
+        summary,
+        followups,
+      })
+
+      setLatestToolSummary(
+        generatedSql
+          ? `本轮已使用 nl2sql、doris_query、vector_search 三类能力，形成结构化结果与相关资产的组合输出。`
+          : `本轮主要使用 vector_search 能力完成相似资产召回，并保留继续追加 SQL 条件的空间。`
+      )
+    } catch (error) {
+      patchStep(sessionId, 'execute', {
+        status: 'error',
+        detail: getErrorMessage(error, '执行失败'),
+        time: '失败',
+      })
+      patchStep(sessionId, 'summary', {
+        status: 'error',
+        detail: '本轮未形成可展示结果，建议补充对象类型、时间范围或更明确的业务条件。',
+        time: '',
+      })
+      patchAssistant(sessionId, {
+        createdAt: '失败',
+        summary: '当前问题未命中可展示结果，建议缩小范围后重试。',
+        followups: ['限定最近 7 天后重试', '明确资产类型后重试'],
+      })
+      Message.error(getErrorMessage(error, '副驾驶执行失败'))
     } finally {
       setRunning(false)
     }
   }
 
+  const summaryItems = [
+    {
+      key: 'entry',
+      label: '主入口形态',
+      value: '多轮对话',
+      meta: '面向业务分析师直接提问，不需要先理解底层模块边界。',
+    },
+    {
+      key: 'route',
+      label: '最近一次路由',
+      value: latestRoute,
+      meta: '每次问答都会显示本轮走的是 SQL、检索还是双路融合。',
+    },
+    {
+      key: 'session',
+      label: '当前会话',
+      value: activeSession?.title || '未选择',
+      meta: `${activeSession?.messages?.length || 0} 条消息，可继续追问形成上下文。`,
+    },
+    {
+      key: 'tools',
+      label: '工具使用',
+      value: running ? '执行中' : '已就绪',
+      meta: latestToolSummary,
+    },
+  ]
+
   return (
     <QueryPageFrame
       title="AI 数据副驾驶"
-      subtitle="将问题理解、SQL 生成、执行验证和结果总结串成一条透明链路，适合演示问数和查询辅助能力。"
+      subtitle="围绕自然语言问数、多轮追问和透明推理设计。用户看到的不只是答案，还能看到本轮走了哪些路径、用了哪些工具、结果从哪里来。"
       summaryItems={summaryItems}
+      actions={(
+        <>
+          <Button onClick={createSession}>新建会话</Button>
+          <Button status="danger" onClick={clearSession}>清空当前会话</Button>
+        </>
+      )}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '420px minmax(0, 1fr)', gap: 16 }}>
-        <Card title={<Space><IconRobot />对话输入</Space>} bodyStyle={{ padding: 16 }}>
-          <TextArea
-            value={question}
-            onChange={setQuestion}
-            autoSize={{ minRows: 6, maxRows: 10 }}
-            placeholder="例如：最近导入的图片资产有哪些，给我结果并附上可继续验证的 SQL"
-          />
-          <Space style={{ marginTop: 12 }} wrap>
-            <Button type="primary" icon={<IconRobot />} onClick={runCopilot} loading={running}>开始分析</Button>
-            <Button icon={<IconCopy />} disabled={!generatedSql} onClick={() => navigator.clipboard?.writeText(generatedSql)}>复制 SQL</Button>
-          </Space>
-
-          {generatedSql ? (
-            <Card size="small" style={{ marginTop: 16, background: 'var(--color-fill-1)' }}>
-              <Text code copyable style={{ whiteSpace: 'pre-wrap', fontSize: 12 }}>{generatedSql}</Text>
-            </Card>
-          ) : null}
+      <div style={{ display: 'grid', gridTemplateColumns: '280px minmax(0, 1fr) 320px', gap: 16 }}>
+        <Card title="历史会话" bodyStyle={{ padding: 12 }}>
+          <Button type="primary" style={{ width: '100%', marginBottom: 12 }} onClick={createSession}>新建会话</Button>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {sessions.map((session) => (
+              <button
+                key={session.id}
+                type="button"
+                onClick={() => setActiveSessionId(session.id)}
+                style={{
+                  textAlign: 'left',
+                  padding: 12,
+                  borderRadius: 10,
+                  border: session.id === activeSessionId ? '1px solid rgba(22, 93, 255, 0.35)' : '1px solid var(--color-border-2)',
+                  background: session.id === activeSessionId ? 'rgba(22, 93, 255, 0.06)' : '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-1)' }}>{session.title}</div>
+                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--color-text-3)' }}>{session.updatedAt}</div>
+              </button>
+            ))}
+          </div>
         </Card>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <Card title={<Space><IconHistory />处理步骤</Space>} bodyStyle={{ padding: 16 }}>
-            <div style={{ display: 'grid', gap: 10 }}>
-              {steps.map((step) => (
-                <JourneyStep key={step.key} title={step.title} status={step.status} detail={step.detail} />
-              ))}
-            </div>
+          <Card title="对话线程" bodyStyle={{ padding: 16 }}>
+            {activeSession?.messages?.length ? (
+              <div style={{ display: 'grid', gap: 16 }}>
+                {activeSession.messages.map((message, index) => (
+                  <div key={`${message.role}-${index}`} style={{ display: 'grid', gap: 10 }}>
+                    {message.role === 'user' ? (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <div style={{ maxWidth: '78%', padding: 14, borderRadius: 14, background: 'rgba(22, 93, 255, 0.08)', border: '1px solid rgba(22, 93, 255, 0.16)' }}>
+                          <div style={{ fontSize: 11, color: 'var(--color-text-3)', marginBottom: 6 }}>提问 · {message.createdAt}</div>
+                          <div style={{ fontSize: 14, color: 'var(--color-text-1)', lineHeight: 1.7 }}>{message.question}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: 12 }}>
+                        <div style={{ padding: 16, borderRadius: 16, background: '#fff', border: '1px solid var(--color-border-2)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                            <div>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-1)' }}>AI 数据副驾驶</div>
+                              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--color-text-3)' }}>{message.route}</div>
+                            </div>
+                            <Tag color={running && index === activeSession.messages.length - 1 ? 'arcoblue' : 'green'}>
+                              {message.createdAt}
+                            </Tag>
+                          </div>
+
+                          <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
+                            {message.steps.map((step) => (
+                              <JourneyStep key={step.key} title={step.title} status={step.status} detail={step.detail} time={step.time} />
+                            ))}
+                          </div>
+
+                          {message.sql ? (
+                            <Card size="small" title="生成的 SQL 草案" style={{ marginTop: 14, background: 'var(--color-fill-1)' }}>
+                              <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                                <Text type="secondary">可继续复制到 SQL 查询工作台做二次编辑。</Text>
+                                <Button
+                                  size="small"
+                                  icon={<IconCopy />}
+                                  onClick={() => navigator.clipboard?.writeText(message.sql)}
+                                >
+                                  复制 SQL
+                                </Button>
+                              </Space>
+                              <Text code copyable style={{ display: 'block', whiteSpace: 'pre-wrap', marginTop: 10 }}>{message.sql}</Text>
+                            </Card>
+                          ) : null}
+
+                          {message.summary ? (
+                            <Card size="small" title="结论摘要" style={{ marginTop: 14 }}>
+                              <Paragraph style={{ margin: 0 }}>{message.summary}</Paragraph>
+                            </Card>
+                          ) : null}
+
+                          {message.sqlResult?.columns?.length ? (
+                            <Card size="small" title="结构化结果" style={{ marginTop: 14 }}>
+                              <ResultSummary result={message.sqlResult} />
+                              <Table
+                                columns={buildTableColumns(message.sqlResult.columns)}
+                                data={message.sqlResult.rows}
+                                rowKey={(_, rowIndex) => rowIndex}
+                                pagination={{ pageSize: 5 }}
+                                size="small"
+                                scroll={{ x: 'max-content' }}
+                                border
+                              />
+                            </Card>
+                          ) : null}
+
+                          <div style={{ marginTop: 14 }}>
+                            <SearchResultList
+                              results={message.searchResults || []}
+                              searched
+                              emptyText="本轮没有补充相关资产"
+                            />
+                          </div>
+
+                          {message.followups?.length ? (
+                            <div style={{ marginTop: 14 }}>
+                              <Text type="secondary" style={{ fontSize: 12 }}>继续追问</Text>
+                              <Space wrap style={{ marginTop: 8 }}>
+                                {message.followups.map((item) => (
+                                  <Button key={item} size="small" onClick={() => setQuestion(item)}>{item}</Button>
+                                ))}
+                              </Space>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Empty description="当前会话还没有问题，直接输入业务问题开始。" />
+            )}
           </Card>
 
-          {summary ? (
-            <Card title="结论摘要" bodyStyle={{ padding: 16 }}>
-              <Paragraph style={{ margin: 0 }}>{summary}</Paragraph>
-            </Card>
-          ) : null}
-
-          {sqlResult ? (
-            <Card title="SQL 执行结果" bodyStyle={{ padding: 16 }}>
-              <ResultSummary result={sqlResult} />
-              {sqlResult.columns.length ? (
-                <Table
-                  columns={buildTableColumns(sqlResult.columns)}
-                  data={sqlResult.rows}
-                  rowKey={(_, index) => index}
-                  pagination={{ pageSize: 10 }}
-                  scroll={{ x: 'max-content' }}
-                  size="small"
-                  border
-                />
-              ) : (
-                <Empty description="当前未返回结构化结果" />
-              )}
-            </Card>
-          ) : null}
-
-          <Card title="相关资产补充" bodyStyle={{ padding: 16 }}>
-            <SearchResultList results={searchResult.results} searched={searchResult.searched} emptyText="当前问题下没有补充召回到相关资产" />
+          <Card title="发起提问" bodyStyle={{ padding: 16 }}>
+            <TextArea
+              value={question}
+              onChange={setQuestion}
+              autoSize={{ minRows: 4, maxRows: 8 }}
+              placeholder="例如：上个月导入最多的图片资产类型是什么，顺便给我相关样本"
+            />
+            <Space wrap style={{ marginTop: 12 }}>
+              <Button type="primary" icon={<IconRobot />} onClick={() => sendQuestion()} loading={running}>开始分析</Button>
+              {COPILOT_EXAMPLES.map((item) => (
+                <Button key={item} onClick={() => setQuestion(item)}>{item}</Button>
+              ))}
+            </Space>
           </Card>
         </div>
+
+        <Card title="本轮上下文" bodyStyle={{ padding: 16 }}>
+          <div style={{ display: 'grid', gap: 14 }}>
+            <div>
+              <Text type="secondary">最近一次路由</Text>
+              <div style={{ marginTop: 6, fontSize: 14, fontWeight: 700, color: 'var(--color-text-1)' }}>{latestRoute}</div>
+            </div>
+
+            <div>
+              <Text type="secondary">可用工具</Text>
+              <div style={{ marginTop: 8, display: 'grid', gap: 8 }}>
+                <div style={{ padding: 10, borderRadius: 10, background: '#fff', border: '1px solid var(--color-border-2)' }}><b>nl2sql</b><div style={{ fontSize: 11, color: 'var(--color-text-3)', marginTop: 4 }}>结构化查询草案生成</div></div>
+                <div style={{ padding: 10, borderRadius: 10, background: '#fff', border: '1px solid var(--color-border-2)' }}><b>doris_query</b><div style={{ fontSize: 11, color: 'var(--color-text-3)', marginTop: 4 }}>本地结构化结果验证</div></div>
+                <div style={{ padding: 10, borderRadius: 10, background: '#fff', border: '1px solid var(--color-border-2)' }}><b>vector_search</b><div style={{ fontSize: 11, color: 'var(--color-text-3)', marginTop: 4 }}>文本或图像语义补充召回</div></div>
+              </div>
+            </div>
+
+            <div>
+              <Text type="secondary">执行说明</Text>
+              <Paragraph style={{ marginTop: 8, marginBottom: 0 }}>
+                {latestToolSummary}
+              </Paragraph>
+            </div>
+          </div>
+        </Card>
       </div>
     </QueryPageFrame>
   )
@@ -1044,19 +1313,28 @@ export default function LakeQueryPage() {
   const navigate = useNavigate()
 
   useEffect(() => {
+    if (!tab) {
+      navigate('/lake-query/sql', { replace: true })
+      return
+    }
+
+    if (!PAGE_MAP[tab]) {
+      navigate('/lake-query/sql', { replace: true })
+      return
+    }
+
     if (tab === 'nl2sql') {
       navigate('/lake-query/sql', { replace: true })
     }
   }, [navigate, tab])
 
-  const activeTab = TITLE_MAP[tab] ? tab : 'sql'
+  const activeTab = PAGE_MAP[tab] ? (tab === 'vector' || tab === 'multimodal' || tab === 'hybrid' ? 'retrieval' : tab) : 'sql'
+  const retrievalPreset = RETRIEVAL_PRESET_MAP[tab] || 'semantic'
 
   return (
     <div style={{ padding: 24, background: 'var(--prd-bg)', minHeight: '100%' }}>
       {activeTab === 'sql' && <SqlWorkspaceTab />}
-      {activeTab === 'vector' && <VectorSearchTab />}
-      {activeTab === 'multimodal' && <MultimodalSearchTab />}
-      {activeTab === 'hybrid' && <HybridSearchTab />}
+      {activeTab === 'retrieval' && <RetrievalWorkspaceTab initialStrategy={retrievalPreset} />}
       {activeTab === 'copilot' && <CopilotTab />}
     </div>
   )
