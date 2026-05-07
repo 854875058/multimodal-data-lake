@@ -208,6 +208,22 @@ const api = {
     return apiClient.get('/platform/assets/detail', { params: { catalog, schema, table, limit } })
   },
 
+  getVersionStats() {
+    return apiClient.get('/versions/stats')
+  },
+
+  getTableVersions(tableName) {
+    return apiClient.get(`/versions/${encodeURIComponent(tableName)}`)
+  },
+
+  rollbackTableVersion(payload) {
+    return apiClient.post('/versions/rollback', payload)
+  },
+
+  compactTableVersion(tableName) {
+    return apiClient.post(`/versions/compact/${encodeURIComponent(tableName)}`)
+  },
+
   getExternalTables() {
     return apiClient.get('/platform/doris/external-tables')
   },
