@@ -206,23 +206,35 @@ function AppShell({ authSession, onLogout }) {
         collapsed={collapsed}
         onCollapse={setCollapsed}
         collapsible
-        width={232}
+        width={248}
         style={{
           background: 'var(--color-bg-2)',
           borderRight: '1px solid var(--color-border-2)',
         }}
       >
         <div style={{
-          height: 60,
+          height: 68,
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
-          padding: collapsed ? '0 16px' : '0 20px',
+          gap: collapsed ? 0 : 12,
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          padding: collapsed ? '0 12px' : '0 18px',
           borderBottom: '1px solid var(--color-border-2)',
         }}>
-          <img src={boncLogo} alt="BONC" style={{ width: 28, height: 28, borderRadius: 6, flexShrink: 0 }} />
+          <img
+            src={boncLogo}
+            alt="BONC"
+            style={{
+              width: collapsed ? 34 : 88,
+              height: collapsed ? 34 : 'auto',
+              maxHeight: collapsed ? 34 : 36,
+              objectFit: 'contain',
+              borderRadius: 6,
+              flexShrink: 0,
+            }}
+          />
           {!collapsed && (
-            <div style={{ overflow: 'hidden' }}>
+            <div style={{ overflow: 'hidden', minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-1)' }}>湖仓控制台</div>
               <div style={{ fontSize: 11, color: 'var(--color-text-3)' }}>多模态数据湖</div>
             </div>
@@ -233,7 +245,7 @@ function AppShell({ authSession, onLogout }) {
           mode="vertical"
           selectedKeys={[currentNav.path]}
           defaultOpenKeys={navGroups.map(g => g.key)}
-          style={{ width: '100%', borderRight: 'none', height: 'calc(100% - 60px)', overflowY: 'auto' }}
+          style={{ width: '100%', borderRight: 'none', height: 'calc(100% - 68px)', overflowY: 'auto' }}
           onClickMenuItem={(key) => navigate(key)}
         >
           {visibleGroups.map(group => (
