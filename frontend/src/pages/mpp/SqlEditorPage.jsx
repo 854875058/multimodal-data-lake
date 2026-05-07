@@ -357,6 +357,33 @@ export default function SqlEditorPage() {
     return { slowCount, failedCount, maxElapsed, avgElapsed }
   }, [history, slowQueries])
 
+  const summaryItems = useMemo(() => [
+    {
+      key: 'cluster',
+      label: '分析集群',
+      value: clusters.find((item) => item.id === clusterId)?.name || '未选择集群',
+      meta: clusterId ? '当前慢 SQL 列表、执行阶段和编辑器上下文都绑定在这个集群上。' : '先选择集群，再进入慢 SQL 分析和执行历史。',
+    },
+    {
+      key: 'slow',
+      label: '慢查询压力',
+      value: `${formatNumber(stats.slowCount)} 条`,
+      meta: `当前阈值 ${minElapsed}s，平均耗时 ${stats.avgElapsed.toFixed(2)}s`,
+    },
+    {
+      key: 'focus',
+      label: '当前聚焦对象',
+      value: selectedRecord ? extractTableName(selectedRecord.sql) : '等待选择记录',
+      meta: selectedRecord ? `执行状态 ${selectedRecord.success ? '成功' : '失败'}，耗时 ${selectedRecord.elapsed ?? '--'}s` : '选中左侧一条记录后，右侧会同步给出阶段和建议。',
+    },
+    {
+      key: 'advice',
+      label: '优化建议数',
+      value: `${formatNumber(planAdvice.length)} 条`,
+      meta: planAdvice[0]?.title || '当前没有生成额外优化建议',
+    },
+  ], [clusterId, clusters, minElapsed, planAdvice, selectedRecord, stats.avgElapsed, stats.slowCount])
+
   const historyColumns = [
     {
       title: '时间',
@@ -418,12 +445,12 @@ export default function SqlEditorPage() {
 
   return (
     <div className="prd-page" style={{ padding: 24, background: 'var(--prd-bg)', minHeight: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <div>
+      <div className="prd-page-head">
+        <div className="prd-page-head-copy">
           <Title heading={5} style={{ margin: 0 }}>慢 SQL 分析与 SQL 编辑器</Title>
           <Text type="secondary">同一个入口同时承接慢 SQL 诊断、执行计划分析和日常 SQL 执行，避免 DBA 在多个页面来回切换。</Text>
         </div>
-        <Space>
+        <div className="prd-page-actions">
           <Text type="secondary">集群</Text>
           <Select placeholder="选择集群" value={clusterId || undefined} onChange={setClusterId} style={{ width: 220 }}>
             {clusters.map((cluster) => (
@@ -431,7 +458,17 @@ export default function SqlEditorPage() {
             ))}
           </Select>
           <Button icon={<IconRefresh />} onClick={() => loadHistory()} loading={historyLoading} disabled={!clusterId}>刷新</Button>
-        </Space>
+        </div>
+      </div>
+
+      <div className="prd-summary-band">
+        {summaryItems.map((item) => (
+          <div key={item.key} className="prd-summary-item">
+            <div className="k">{item.label}</div>
+            <div className="v">{item.value}</div>
+            <div className="m">{item.meta}</div>
+          </div>
+        ))}
       </div>
 
       <div className="prd-kpi-grid">

@@ -227,6 +227,33 @@ export default function InspectionPage() {
   const recommendations = useMemo(() => buildRecommendations(latestItems), [latestItems])
   const latestLevel = scoreLevel(Number(latest?.score || 0))
 
+  const summaryItems = useMemo(() => [
+    {
+      key: 'cluster',
+      label: '当前集群',
+      value: clusters.find((item) => item.id === clusterId)?.name || '未选择集群',
+      meta: clusterId ? '巡检历史、评分和定时调度都绑定在当前集群视角下。' : '先选择集群，再进入评分报告和巡检历史。',
+    },
+    {
+      key: 'health',
+      label: '健康判断',
+      value: latest ? `${latestLevel.label} ${Math.round(Number(latest.score || 0))}分` : '暂无评分结果',
+      meta: latest ? `最近一次巡检时间 ${latest.created_at || '--'}` : '运行一次巡检后，这里会形成可汇报的结论。',
+    },
+    {
+      key: 'issues',
+      label: '待处理问题',
+      value: `${formatNumber(recommendations.length)} 项`,
+      meta: recommendations[0]?.title || '当前没有待处理的失败项和预警项',
+    },
+    {
+      key: 'schedule',
+      label: '调度状态',
+      value: schedule.enabled ? `每 ${schedule.interval_minutes} 分钟` : '未开启定时',
+      meta: schedule.last_run_at ? `最近调度执行 ${schedule.last_run_at}` : '当前没有定时执行记录',
+    },
+  ], [clusterId, clusters, latest, latestLevel.label, recommendations, schedule.enabled, schedule.interval_minutes, schedule.last_run_at])
+
   const categorySummary = useMemo(() => {
     const groups = new Map()
     for (const item of latestItems) {
@@ -313,12 +340,12 @@ export default function InspectionPage() {
 
   return (
     <div className="prd-page" style={{ padding: 24, background: 'var(--prd-bg)', minHeight: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <div>
+      <div className="prd-page-head">
+        <div className="prd-page-head-copy">
           <Title heading={5} style={{ margin: 0 }}>自动巡检评分报告</Title>
           <Text type="secondary">将原来的巡检入口升级为评分报告页，强调整体健康分、分类结果、失败项和修复建议。</Text>
         </div>
-        <Space wrap>
+        <div className="prd-page-actions">
           <Text type="secondary">集群</Text>
           <Select placeholder="选择集群" value={clusterId || undefined} onChange={setClusterId} style={{ width: 220 }}>
             {clusters.map((cluster) => (
@@ -329,8 +356,20 @@ export default function InspectionPage() {
             立即巡检
           </Button>
           <Button icon={<IconRefresh />} onClick={loadHistory} loading={loading} disabled={!clusterId} />
-        </Space>
+        </div>
       </div>
+
+      {clusters.length > 0 ? (
+        <div className="prd-summary-band">
+          {summaryItems.map((item) => (
+            <div key={item.key} className="prd-summary-item">
+              <div className="k">{item.label}</div>
+              <div className="v">{item.value}</div>
+              <div className="m">{item.meta}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {clusters.length === 0 ? (
         <PrdCard title="自动巡检" sub="需要先完成集群接入">

@@ -369,6 +369,33 @@ export default function FilesPage() {
     }
   }, [datasets])
 
+  const summaryItems = useMemo(() => [
+    {
+      key: 'scope',
+      label: '当前目录范围',
+      value: selectedCatalog && selectedSchema ? `${selectedCatalog} / ${selectedSchema}` : '等待目录加载',
+      meta: '目录切换后，左侧数据集清单和右侧详情会同步刷新到当前 Catalog / Schema。',
+    },
+    {
+      key: 'dataset',
+      label: '当前数据集',
+      value: selectedDataset?.label || selectedDataset?.name || '未选择数据集',
+      meta: selectedDataset ? `${formatNumber(selectedDataset.rowCount)} 行样本，${selectedDataset.engine || 'Catalog View'}` : '从左侧目录选择一个数据集后，这里会显示当前聚焦对象。',
+    },
+    {
+      key: 'version',
+      label: '版本状态',
+      value: selectedDataset?.versioned ? `Lance v${selectedDataset.currentVersion ?? 0}` : '非版本托管数据集',
+      meta: selectedDataset?.versioned ? `当前可用版本 ${formatNumber(versionList.length)} 个，支持回滚与整理。` : '当前数据集仍保留详情、Schema 和样本视图，但不启用 Lance 版本能力。',
+    },
+    {
+      key: 'compare',
+      label: '对比就绪度',
+      value: compareData ? `v${compareData.base.version} -> v${compareData.target.version}` : '等待选择两个版本',
+      meta: compareData ? `行数变化 ${compareData.delta == null ? '--' : compareData.delta > 0 ? '+' : ''}${compareData.delta == null ? '--' : formatNumber(compareData.delta)}` : '在版本中心选择两个快照后，这里会生成摘要对比结果。',
+    },
+  ], [compareData, selectedCatalog, selectedDataset, selectedSchema, versionList.length])
+
   const versionColumns = [
     {
       title: '版本',
@@ -415,14 +442,14 @@ export default function FilesPage() {
 
   return (
     <div className="dataset-page">
-      <div className="dataset-header">
-        <div>
+      <div className="prd-page-head">
+        <div className="prd-page-head-copy">
           <Title heading={5} style={{ margin: 0 }}>数据集管理</Title>
           <Text type="secondary">
             以数据集为中心统一查看目录、结构、样本、版本与回滚状态，版本能力优先对齐 Lance Dataset 语义。
           </Text>
         </div>
-        <Space>
+        <div className="prd-page-actions">
           <Select value={selectedCatalog} onChange={setSelectedCatalog} style={{ width: 180 }}>
             {catalogs.map((item) => (
               <Option key={item.name} value={item.name}>{item.label}</Option>
@@ -434,7 +461,17 @@ export default function FilesPage() {
             ))}
           </Select>
           <Button icon={<IconRefresh />} loading={refreshing} onClick={refreshPage}>刷新</Button>
-        </Space>
+        </div>
+      </div>
+
+      <div className="prd-summary-band">
+        {summaryItems.map((item) => (
+          <div key={item.key} className="prd-summary-item">
+            <div className="k">{item.label}</div>
+            <div className="v">{item.value}</div>
+            <div className="m">{item.meta}</div>
+          </div>
+        ))}
       </div>
 
       <div className="dataset-hero">
@@ -605,6 +642,12 @@ export default function FilesPage() {
                   <TabPane key="versions" title="版本管理">
                     {selectedDataset.versioned ? (
                       <div className="dataset-version-layout">
+                        <div className="dataset-version-note">
+                          <div className="dataset-version-note-title">Lance 版本中心</div>
+                          <div className="dataset-version-note-copy">
+                            当前版本管理直接对齐 Lance Dataset 快照语义。这里优先解决汇报里最重要的三件事：当前生产版本、可回滚历史、以及两个版本之间的摘要差异。
+                          </div>
+                        </div>
                         <PrdCard
                           title="版本中心"
                           sub="当前接入的是 Lance 版本能力，适合做快照、回滚与存储整理"

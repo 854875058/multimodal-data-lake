@@ -269,6 +269,36 @@ export default function DashboardPage() {
 
   const recentActions = useMemo(() => buildRecentActions(stats, componentSummary), [componentSummary, stats])
 
+  const summaryItems = useMemo(() => {
+    const highestSlow = slowQueries[0]
+    return [
+      {
+        key: 'role',
+        label: '当前视角',
+        value: roleModes.find((item) => item.key === roleMode)?.label || '总览',
+        meta: '首页信息会随角色切换重新编排，优先展示当前角色最关心的内容。',
+      },
+      {
+        key: 'platform',
+        label: '平台状态',
+        value: componentSummary.offline > 0 ? `${componentSummary.offline} 个组件待关注` : '核心组件在线',
+        meta: `${componentSummary.online}/${componentSummary.total || 0} 个组件当前在线`,
+      },
+      {
+        key: 'dataset',
+        label: '数据资产',
+        value: `${formatNumber(stats.total_files)} 项`,
+        meta: `文本 ${formatNumber(stats.text_rows)} / 图像 ${formatNumber(stats.image_rows)} 已纳入当前资产池`,
+      },
+      {
+        key: 'slow',
+        label: '热点问题',
+        value: highestSlow ? `${highestSlow.elapsed}s 慢 SQL` : '暂无突出慢查询',
+        meta: highestSlow ? '建议直接进入慢 SQL 分析页查看执行计划和优化建议。' : '当前更适合继续查看趋势和巡检评分。',
+      },
+    ]
+  }, [componentSummary.offline, componentSummary.online, componentSummary.total, roleMode, slowQueries, stats.image_rows, stats.text_rows, stats.total_files])
+
   const trendOption = useMemo(() => ({
     tooltip: { trigger: 'axis' },
     legend: { data: ['接入文件', '成功任务'] },
@@ -644,17 +674,17 @@ export default function DashboardPage() {
 
   return (
     <div className="prd-page" style={{ padding: 24, background: 'var(--prd-bg)', minHeight: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div>
+      <div className="prd-page-head">
+        <div className="prd-page-head-copy">
           <Title heading={5} style={{ margin: 0 }}>首页看板</Title>
           <Text type="secondary">按角色切换首页内容，优先展示适合汇报和决策的控制面信息，而不是统一的大杂烩。</Text>
         </div>
-        <Space>
+        <div className="prd-page-actions">
           <button className="prd-btn-light" onClick={loadData} disabled={refreshing}>
             <IconRefresh style={{ marginRight: 6 }} />
             {refreshing ? '刷新中...' : '刷新状态'}
           </button>
-        </Space>
+        </div>
       </div>
 
       <div className="prd-role-switch">
@@ -667,6 +697,16 @@ export default function DashboardPage() {
           >
             {item.label}
           </button>
+        ))}
+      </div>
+
+      <div className="prd-summary-band">
+        {summaryItems.map((item) => (
+          <div key={item.key} className="prd-summary-item">
+            <div className="k">{item.label}</div>
+            <div className="v">{item.value}</div>
+            <div className="m">{item.meta}</div>
+          </div>
         ))}
       </div>
 
