@@ -82,8 +82,19 @@ const api = {
     })
   },
 
-  search(query, mode = 'text', limit = 10) {
-    return apiClient.post('/search/', { query, mode, limit })
+  search(query, mode = 'text', limitOrOptions = 10) {
+    const payload = {
+      query,
+      mode
+    }
+
+    if (typeof limitOrOptions === 'number') {
+      payload.limit = limitOrOptions
+    } else {
+      Object.assign(payload, limitOrOptions || {})
+    }
+
+    return apiClient.post('/search/', payload)
   },
 
   getFiles(page = 1, pageSize = 20, docType = 'all') {
