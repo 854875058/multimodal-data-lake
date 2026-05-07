@@ -1131,22 +1131,22 @@ export default function IngestionWorkbenchPage() {
   )
 
   return (
-    <div className="content-wrap">
-      <div className="page-header">
+    <div style={{ padding: 24, background: 'var(--prd-bg)', minHeight: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <h1 className="page-title">接入工作台</h1>
-          <p className="page-subtitle">
-            配置 SeaweedFS / S3 或 SFTP 来源，扫描待处理文件，并围绕 Lance 向量化与批量任务执行组织接入流程。本地文件或压缩包上传请前往"本地上传"。
+          <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--prd-ink)', margin: '0 0 4px 0' }}>接入工作台</h1>
+          <p style={{ fontSize: 13, color: 'var(--prd-ink-3)', margin: 0 }}>
+            S3/SFTP 远程来源接入 · 目录扫描 · 批量入湖 · 索引构建（本地文件请前往「本地上传」）
           </p>
         </div>
-        <div className="page-actions">
+        <div>
           <button type="button" className="button button-secondary" onClick={() => refreshAll(true)} disabled={loading || refreshing}>
             {refreshing ? '刷新中...' : '刷新状态'}
           </button>
         </div>
       </div>
 
-      <div className="ingest-entry-grid">
+      <div className="ingest-entry-grid" style={{ display: 'none' }}>
         <section className="glass-card ingest-entry-card is-current">
           <div className="card-header">
             <div>
@@ -1155,67 +1155,46 @@ export default function IngestionWorkbenchPage() {
             </div>
             <span className="badge">Workbench</span>
           </div>
-          <div className="ingest-entry-tags">
-            <span className="badge is-muted">S3 / SeaweedFS</span>
-            <span className="badge is-muted">SFTP</span>
-            <span className="badge is-muted">批量任务</span>
-          </div>
-          <div className="ingest-entry-list">
-            <div className="ingest-entry-item">适合：远程来源连接、目录扫描、批量入湖、索引构建与配置复用。</div>
-            <div className="ingest-entry-item">流程：先连来源，再扫描，再决定批量执行与索引策略。</div>
-            <div className="ingest-entry-item">优势：来源配置可保存，后续重复执行不用每次重新填参数。</div>
-          </div>
-        </section>
-
-        <section className="glass-card ingest-entry-card">
-          <div className="card-header">
-            <div>
-              <h2>什么情况不要用这里</h2>
-              <p>如果数据已经在本机，只想直接拖拽上传，就没必要绕到工作台。</p>
-            </div>
-            <span className="badge">Local</span>
-          </div>
-          <div className="ingest-entry-tags">
-            <span className="badge is-muted">本地文件</span>
-            <span className="badge is-muted">压缩包</span>
-            <span className="badge is-muted">快速入湖</span>
-          </div>
-          <div className="ingest-entry-list">
-            <div className="ingest-entry-item">适合：本地文件、离线材料、压缩包一次性上传。</div>
-            <div className="ingest-entry-item">本地上传页同样支持批量文件与压缩包，不需要先建远程来源。</div>
-            <div className="ingest-entry-item">如果只是把本机文件拖进去，直接去"本地上传"会更短更清楚。</div>
-          </div>
-          <div className="ingest-entry-actions">
-            <button type="button" className="button button-secondary" onClick={() => navigate('/upload')}>
-              前往本地上传
-            </button>
-          </div>
         </section>
       </div>
 
       {banner.message ? <div className={`${banner.type}-banner`}>{banner.message}</div> : null}
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <div className="workspace-switcher glass-card">
-        <div className="workspace-switcher-head">
-          <div>
-            <div className="section-title">工作区视图</div>
-            <div className="workbench-help">用分段工作区代替长滚动页面，降低信息堆叠感。</div>
-          </div>
-        </div>
-        <div className="workspace-segmented">
-          {workspaceSections.map((section) => (
-            <button
-              key={section.id}
-              type="button"
-              className={`workspace-segment${activeWorkspaceSection === section.id ? ' is-active' : ''}`}
-              onClick={() => setActiveWorkspaceSection(section.id)}
-            >
-              <span className="workspace-segment-label">{section.label}</span>
-              <span className="workspace-segment-hint">{section.hint}</span>
-            </button>
-          ))}
-        </div>
+      <div style={{
+        background: '#fff',
+        border: '1px solid var(--prd-line)',
+        borderRadius: 12,
+        padding: '4px 8px',
+        marginBottom: 12,
+        display: 'flex',
+        gap: 4,
+      }}>
+        {workspaceSections.map((section) => (
+          <button
+            key={section.id}
+            type="button"
+            onClick={() => setActiveWorkspaceSection(section.id)}
+            style={{
+              flex: 1,
+              padding: '10px 16px',
+              border: 'none',
+              background: activeWorkspaceSection === section.id ? 'var(--prd-brand-soft)' : 'transparent',
+              color: activeWorkspaceSection === section.id ? 'var(--prd-brand)' : 'var(--prd-ink-2)',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: activeWorkspaceSection === section.id ? 600 : 500,
+              transition: 'all 0.15s',
+              textAlign: 'left',
+            }}
+          >
+            <div>{section.label}</div>
+            <div style={{ fontSize: 11, color: 'var(--prd-ink-3)', marginTop: 2, fontWeight: 400 }}>
+              {section.hint}
+            </div>
+          </button>
+        ))}
       </div>
 
       {activeWorkspaceSection === 'overview' ? (
