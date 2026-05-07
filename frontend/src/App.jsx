@@ -206,7 +206,7 @@ function AppShell({ authSession, onLogout }) {
         collapsed={collapsed}
         onCollapse={setCollapsed}
         collapsible
-        width={262}
+        width={272}
         style={{
           background: 'var(--color-bg-2)',
           borderRight: '1px solid var(--color-border-2)',
@@ -216,9 +216,9 @@ function AppShell({ authSession, onLogout }) {
           height: 84,
           display: 'flex',
           alignItems: 'center',
-          gap: collapsed ? 0 : 14,
+          gap: collapsed ? 0 : 16,
           justifyContent: collapsed ? 'center' : 'flex-start',
-          padding: collapsed ? '0 14px' : '0 16px',
+          padding: collapsed ? '0 14px' : '0 18px',
           borderBottom: '1px solid var(--color-border-2)',
         }}>
           <img
@@ -226,8 +226,8 @@ function AppShell({ authSession, onLogout }) {
             alt="BONC"
             style={{
               width: collapsed ? 38 : 'auto',
-              height: collapsed ? 38 : 54,
-              maxWidth: collapsed ? 38 : 78,
+              height: collapsed ? 38 : 58,
+              maxWidth: collapsed ? 38 : 96,
               objectFit: 'contain',
               borderRadius: 6,
               flexShrink: 0,
