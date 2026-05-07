@@ -71,7 +71,8 @@ export function ClusterTopology({ feNodes = [], beNodes = [] }) {
           className={`node fe ${n.status === 'warn' ? 'warn' : ''} ${n.status === 'dead' ? 'dead' : ''}`}
           style={{ left: `${feLefts[i]}%`, top: `${feY}px` }}
           title={n.label}>
-          {n.label}<br />{n.master ? 'Leader' : 'Follower'}
+          <span className="node-title">{n.label}</span>
+          <span className="node-meta">{n.master ? 'Leader' : 'Follower'}</span>
         </div>
       ))}
       {beNodes.map((n, i) => (
@@ -79,7 +80,7 @@ export function ClusterTopology({ feNodes = [], beNodes = [] }) {
           className={`node be ${n.status === 'warn' ? 'warn' : ''} ${n.status === 'dead' ? 'dead' : ''}`}
           style={{ left: `${beLefts[i]}%`, top: `${beY}px` }}
           title={n.label}>
-          {n.label}
+          <span className="node-title">{n.label}</span>
         </div>
       ))}
     </div>

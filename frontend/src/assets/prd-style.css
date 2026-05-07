@@ -232,6 +232,7 @@
   border-radius: 14px;
   display: grid;
   place-items: center;
+  align-content: center;
   font-size: 11px;
   font-weight: 700;
   color: #f8fbff;
@@ -241,6 +242,21 @@
   line-height: 1.4;
   text-shadow: 0 1px 2px rgba(7, 15, 33, 0.24);
   padding: 6px;
+}
+.prd-topo .node .node-title {
+  display: block;
+  color: #ffffff !important;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.prd-topo .node .node-meta {
+  display: block;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.96) !important;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 .prd-topo .node.fe {
   background: linear-gradient(135deg, #2f63ea, #1538b8);
