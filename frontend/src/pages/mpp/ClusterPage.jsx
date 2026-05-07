@@ -7,6 +7,7 @@ import {
   IconPlus, IconRefresh, IconEdit, IconDelete, IconCheckCircle,
   IconCloseCircle, IconStorage, IconSync
 } from '@arco-design/web-react/icon'
+import { ClusterTopology, HealthRing, PrdTag } from '@/components/PrdWidgets.jsx'
 
 const { Row, Col } = Grid
 const { Title, Text } = Typography
@@ -344,6 +345,70 @@ export default function ClusterPage() {
           <Card>
             <Tabs activeTab={activeTab} onChange={setActiveTab}>
               <TabPane key="overview" title="集群概览">
+                {/* PRD 风格 hero：拓扑 + 健康评分 */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 20,
+                }}>
+                  <div className="prd-card" style={{ padding: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--prd-ink)' }}>集群拓扑</div>
+                        <div style={{ fontSize: 11, color: 'var(--prd-ink-3)', marginTop: 2 }}>
+                          FE {feNodes.length} · BE {beNodes.length} · 实时心跳
+                        </div>
+                      </div>
+                      {status?.connected
+                        ? <PrdTag kind="ok" led>已连接</PrdTag>
+                        : <PrdTag kind="bad" led>未连接</PrdTag>}
+                    </div>
+                    {(feNodes.length + beNodes.length) === 0 ? (
+                      <Empty description={statusLoading ? '加载节点中...' : '暂无节点数据'} />
+                    ) : (
+                      <ClusterTopology
+                        feNodes={feNodes.map((n, i) => ({
+                          id: i, label: `FE-${i+1}`, status: n.alive ? 'ok' : 'dead', master: n.is_master,
+                        }))}
+                        beNodes={beNodes.map((n, i) => ({
+                          id: i, label: `BE-${i+1}`, status: n.alive ? 'ok' : 'dead',
+                        }))}
+                      />
+                    )}
+                  </div>
+
+                  <div className="prd-card" style={{ padding: 16 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--prd-ink)', marginBottom: 12 }}>
+                      集群健康评分
+                    </div>
+                    {(() => {
+                      const totalNodes = feNodes.length + beNodes.length
+                      const aliveNodes = feNodes.filter(n => n.alive).length + beNodes.filter(n => n.alive).length
+                      const score = totalNodes > 0 ? Math.round((aliveNodes / totalNodes) * 100) : 0
+                      return (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                            <HealthRing percent={score} />
+                          </div>
+                          <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--prd-ink-3)' }}>
+                            {totalNodes === 0 ? '等待连接' :
+                              aliveNodes === totalNodes ? `${totalNodes} 个节点全部存活` :
+                              `${aliveNodes} / ${totalNodes} 节点存活`}
+                          </div>
+                          <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                            <div style={{ padding: '8px 10px', background: 'var(--prd-brand-soft)', borderRadius: 6, textAlign: 'center' }}>
+                              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--prd-brand)' }}>{feNodes.length}</div>
+                              <div style={{ fontSize: 10, color: 'var(--prd-ink-3)' }}>FE 节点</div>
+                            </div>
+                            <div style={{ padding: '8px 10px', background: '#E2F7F8', borderRadius: 6, textAlign: 'center' }}>
+                              <div style={{ fontSize: 18, fontWeight: 700, color: '#00897B' }}>{beNodes.length}</div>
+                              <div style={{ fontSize: 10, color: 'var(--prd-ink-3)' }}>BE 节点</div>
+                            </div>
+                          </div>
+                        </>
+                      )
+                    })()}
+                  </div>
+                </div>
+
                 <Descriptions
                   column={2}
                   size="medium"
