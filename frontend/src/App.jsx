@@ -1,36 +1,60 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Layout, Menu, Avatar, Dropdown, Button, Typography, Tag, Space, Breadcrumb
+  Avatar,
+  Breadcrumb,
+  Button,
+  Dropdown,
+  Layout,
+  Menu,
+  Space,
+  Tag,
+  Typography,
 } from '@arco-design/web-react'
 import {
-  IconDashboard, IconStorage, IconSearch, IconCommand, IconCalendarClock,
-  IconCloudDownload, IconUpload, IconCommon, IconRobot, IconNotification,
-  IconBug, IconSettings, IconUser, IconUserGroup, IconLock, IconFile,
-  IconExport, IconCaretDown, IconLayout, IconLanguage
+  IconBug,
+  IconCalendarClock,
+  IconCaretDown,
+  IconCloudDownload,
+  IconCommand,
+  IconCommon,
+  IconDashboard,
+  IconExport,
+  IconFile,
+  IconLanguage,
+  IconLayout,
+  IconLock,
+  IconNotification,
+  IconRobot,
+  IconSearch,
+  IconSettings,
+  IconStorage,
+  IconUpload,
+  IconUser,
+  IconUserGroup,
 } from '@arco-design/web-react/icon'
 import { clearAuthSession, loadAuthSession, saveAuthSession, subscribeAuthSession } from '@/auth/session'
 import boncLogo from '@/assets/bonc.jpg'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import ConfigCenterPage from './pages/ConfigCenterPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
-import ErrorBoundary from './components/ErrorBoundary.jsx'
 import FilesPage from './pages/FilesPage.jsx'
+import IngestionCenterPage from './pages/IngestionCenterPage.jsx'
 import IngestionWorkbenchPage from './pages/IngestionWorkbenchPage.jsx'
+import LakeQueryPage from './pages/LakeQueryPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import LogsPage from './pages/LogsPage.jsx'
 import PermissionManagementPage from './pages/PermissionManagementPage.jsx'
-import SearchPage from './pages/SearchPage.jsx'
+import RayJobsPage from './pages/RayJobsPage.jsx'
+import TaskCenterPage from './pages/TaskCenterPage.jsx'
 import TaskGovernancePage from './pages/TaskGovernancePage.jsx'
 import UploadPage from './pages/UploadPage.jsx'
 import UserManagementPage from './pages/UserManagementPage.jsx'
 import WorkflowCenterPage from './pages/WorkflowCenterPage.jsx'
-import ClusterPage from './pages/mpp/ClusterPage.jsx'
-import SqlEditorPage from './pages/mpp/SqlEditorPage.jsx'
 import AlertPage from './pages/mpp/AlertPage.jsx'
+import ClusterPage from './pages/mpp/ClusterPage.jsx'
 import InspectionPage from './pages/mpp/InspectionPage.jsx'
-import RayJobsPage from './pages/RayJobsPage.jsx'
-import TaskCenterPage from './pages/TaskCenterPage.jsx'
-import LakeQueryPage from './pages/LakeQueryPage.jsx'
+import SqlEditorPage from './pages/mpp/SqlEditorPage.jsx'
 
 const { Sider, Header, Content } = Layout
 const { SubMenu, Item: MenuItem } = Menu
@@ -39,16 +63,16 @@ const { Title, Text } = Typography
 const navGroups = [
   {
     key: 'lake-overview',
-    title: '湖总览',
+    title: '湖仓总览',
     icon: <IconDashboard />,
     items: [
-      { path: '/dashboard', label: '湖总览', icon: <IconDashboard /> },
+      { path: '/dashboard', label: '湖仓总览', icon: <IconDashboard /> },
       { path: '/files', label: '资产目录', icon: <IconFile /> },
     ],
   },
   {
     key: 'lake-query',
-    title: '湖查询',
+    title: '湖仓查询',
     icon: <IconSearch />,
     items: [
       { path: '/lake-query/sql', label: 'SQL 查询', icon: <IconCommand /> },
@@ -59,26 +83,21 @@ const navGroups = [
     ],
   },
   {
-    key: 'lake-compute',
-    title: '湖计算',
-    icon: <IconCommand />,
+    key: 'lake-ingestion',
+    title: '接入治理',
+    icon: <IconCloudDownload />,
     items: [
-      { path: '/workflow', label: '工作流编排', icon: <IconLayout /> },
-      { path: '/task-center', label: '任务中心', icon: <IconCalendarClock /> },
-    ],
-  },
-  {
-    key: 'lake-storage',
-    title: '湖存储',
-    icon: <IconStorage />,
-    items: [
-      { path: '/workbench', label: '接入工作台', icon: <IconCloudDownload /> },
-      { path: '/upload', label: '本地上传', icon: <IconUpload /> },
+      { path: '/ingestion', label: '接入任务中心', icon: <IconCloudDownload /> },
+      { path: '/workbench', label: '来源接入', icon: <IconCloudDownload />, hidden: true },
+      { path: '/upload', label: '本地上传', icon: <IconUpload />, hidden: true },
+      { path: '/workflow', label: '工作流编排', icon: <IconLayout />, hidden: true },
+      { path: '/task-center', label: '任务中心', icon: <IconCalendarClock />, hidden: true },
+      { path: '/governance', label: '任务治理', icon: <IconCalendarClock />, hidden: true },
     ],
   },
   {
     key: 'mpp-database',
-    title: '湖运维',
+    title: '湖仓运维',
     icon: <IconCommon />,
     items: [
       { path: '/mpp/cluster', label: '集群管理', icon: <IconCommon /> },
@@ -108,8 +127,8 @@ const navGroups = [
   },
 ]
 
-const allNavItems = navGroups.flatMap(g =>
-  g.items.map(item => ({ ...item, groupKey: g.key, groupTitle: g.title }))
+const allNavItems = navGroups.flatMap((group) =>
+  group.items.map((item) => ({ ...item, groupKey: group.key, groupTitle: group.title }))
 )
 
 function buildIntentPath(location) {
@@ -136,10 +155,10 @@ function RequireAuth({ isAuthenticated, children }) {
 }
 
 function AccessDeniedPage({ user }) {
-  const roleLabel = user?.is_admin ? '系统管理员' : '普通用户'
+  const roleLabel = user?.is_admin ? '系统管理员' : '平台用户'
   return (
     <div style={{ padding: 64, textAlign: 'center' }}>
-      <Title heading={4}>当前账号无该管理入口权限</Title>
+      <Title heading={4}>当前账号无权访问管理入口</Title>
       <Text type="secondary">
         当前身份：<Tag color="orange">{roleLabel}</Tag>，请使用管理员账号登录。
       </Text>
@@ -166,7 +185,13 @@ function AppShell({ authSession, onLogout }) {
 
   const currentUser = authSession.user
   const showAdminLinks = Boolean(currentUser?.is_admin)
-  const visibleGroups = navGroups.filter(g => !g.requiresAdmin || showAdminLinks)
+  const visibleGroups = navGroups
+    .filter((group) => !group.requiresAdmin || showAdminLinks)
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.hidden && (!item.requiresAdmin || showAdminLinks)),
+    }))
+    .filter((group) => group.items.length > 0)
   const [collapsed, setCollapsed] = useState(false)
 
   const handleLogoutClick = () => {
@@ -175,9 +200,11 @@ function AppShell({ authSession, onLogout }) {
   }
 
   const userMenu = (
-    <Menu onClickMenuItem={(key) => {
-      if (key === 'logout') handleLogoutClick()
-    }}>
+    <Menu
+      onClickMenuItem={(key) => {
+        if (key === 'logout') handleLogoutClick()
+      }}
+    >
       <Menu.Item key="profile" disabled>
         <Space>
           <IconUser />
@@ -211,15 +238,17 @@ function AppShell({ authSession, onLogout }) {
           borderRight: '1px solid var(--color-border-2)',
         }}
       >
-        <div style={{
-          height: 76,
-          display: 'flex',
-          alignItems: 'center',
-          gap: collapsed ? 0 : 16,
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          padding: collapsed ? '0 14px' : '0 18px',
-          borderBottom: '1px solid var(--color-border-2)',
-        }}>
+        <div
+          style={{
+            height: 76,
+            display: 'flex',
+            alignItems: 'center',
+            gap: collapsed ? 0 : 16,
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            padding: collapsed ? '0 14px' : '0 18px',
+            borderBottom: '1px solid var(--color-border-2)',
+          }}
+        >
           <img
             src={boncLogo}
             alt="BONC"
@@ -232,31 +261,47 @@ function AppShell({ authSession, onLogout }) {
               flexShrink: 0,
             }}
           />
-          {!collapsed && (
-            <div style={{ overflow: 'hidden', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div style={{ fontSize: 16, fontWeight: 700, lineHeight: '22px', color: 'var(--color-text-1)' }}>湖仓控制台</div>
-              <div style={{ marginTop: 3, fontSize: 12, lineHeight: '18px', color: 'var(--color-text-3)' }}>多模态数据湖</div>
+          {!collapsed ? (
+            <div
+              style={{
+                overflow: 'hidden',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+              }}
+            >
+              <div style={{ fontSize: 16, fontWeight: 700, lineHeight: '22px', color: 'var(--color-text-1)' }}>
+                湖仓控制台
+              </div>
+              <div style={{ marginTop: 3, fontSize: 12, lineHeight: '18px', color: 'var(--color-text-3)' }}>
+                多模态数据湖
+              </div>
             </div>
-          )}
+          ) : null}
         </div>
 
         <Menu
           mode="vertical"
           selectedKeys={[currentNav.path]}
-          defaultOpenKeys={navGroups.map(g => g.key)}
+          defaultOpenKeys={visibleGroups.map((group) => group.key)}
           style={{ width: '100%', borderRight: 'none', height: 'calc(100% - 76px)', overflowY: 'auto' }}
           onClickMenuItem={(key) => navigate(key)}
         >
-          {visibleGroups.map(group => (
+          {visibleGroups.map((group) => (
             <SubMenu
               key={group.key}
               title={
-                <span><span style={{ marginRight: 8 }}>{group.icon}</span>{group.title}</span>
+                <span>
+                  <span style={{ marginRight: 8 }}>{group.icon}</span>
+                  {group.title}
+                </span>
               }
             >
-              {group.items.map(item => (
+              {group.items.map((item) => (
                 <MenuItem key={item.path}>
-                  <span style={{ marginRight: 8 }}>{item.icon}</span>{item.label}
+                  <span style={{ marginRight: 8 }}>{item.icon}</span>
+                  {item.label}
                 </MenuItem>
               ))}
             </SubMenu>
@@ -265,21 +310,32 @@ function AppShell({ authSession, onLogout }) {
       </Sider>
 
       <Layout>
-        <Header style={{
-          height: 56,
-          background: 'var(--color-bg-2)',
-          borderBottom: '1px solid var(--color-border-2)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 24px',
-        }}>
+        <Header
+          style={{
+            height: 56,
+            background: 'var(--color-bg-2)',
+            borderBottom: '1px solid var(--color-border-2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0 24px',
+          }}
+        >
           <Breadcrumb>
             <Breadcrumb.Item>{currentNav.groupTitle}</Breadcrumb.Item>
             <Breadcrumb.Item>{currentNav.label}</Breadcrumb.Item>
           </Breadcrumb>
           <Dropdown droplist={userMenu} trigger="click" position="br">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 8px', borderRadius: 6 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                cursor: 'pointer',
+                padding: '4px 8px',
+                borderRadius: 6,
+              }}
+            >
               <Avatar size={28} style={{ backgroundColor: currentUser?.is_admin ? '#165dff' : '#7bc616' }}>
                 {getUserInitials(currentUser)}
               </Avatar>
@@ -298,14 +354,37 @@ function AppShell({ authSession, onLogout }) {
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/workbench" element={<ErrorBoundary pageName="接入工作台"><IngestionWorkbenchPage /></ErrorBoundary>} />
+            <Route path="/ingestion" element={<IngestionCenterPage />} />
+            <Route path="/ingestion/:tab" element={<IngestionCenterPage />} />
+            <Route
+              path="/workbench"
+              element={
+                <ErrorBoundary pageName="来源接入">
+                  <IngestionWorkbenchPage />
+                </ErrorBoundary>
+              }
+            />
             <Route path="/workflow" element={<WorkflowCenterPage />} />
             <Route path="/task-center" element={<TaskCenterPage />} />
             <Route path="/governance" element={<TaskGovernancePage />} />
             <Route path="/settings" element={<Navigate to="/settings/access" replace />} />
             <Route path="/settings/access" element={<ConfigCenterPage />} />
-            <Route path="/settings/users" element={<RequireAdmin user={currentUser}><UserManagementPage /></RequireAdmin>} />
-            <Route path="/settings/permissions" element={<RequireAdmin user={currentUser}><PermissionManagementPage /></RequireAdmin>} />
+            <Route
+              path="/settings/users"
+              element={(
+                <RequireAdmin user={currentUser}>
+                  <UserManagementPage />
+                </RequireAdmin>
+              )}
+            />
+            <Route
+              path="/settings/permissions"
+              element={(
+                <RequireAdmin user={currentUser}>
+                  <PermissionManagementPage />
+                </RequireAdmin>
+              )}
+            />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/lake-query" element={<Navigate to="/lake-query/sql" replace />} />
             <Route path="/lake-query/:tab" element={<LakeQueryPage />} />
@@ -327,6 +406,7 @@ function AppShell({ authSession, onLogout }) {
 
 export default function App() {
   const [authSession, setAuthSession] = useState(() => loadAuthSession())
+
   useEffect(() => subscribeAuthSession(setAuthSession), [])
 
   const handleLoginSuccess = (payload) => setAuthSession(saveAuthSession(payload))
@@ -337,15 +417,17 @@ export default function App() {
     <Routes>
       <Route
         path="/login"
-        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage onLoginSuccess={handleLoginSuccess} />}
+        element={
+          isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage onLoginSuccess={handleLoginSuccess} />
+        }
       />
       <Route
         path="*"
-        element={
+        element={(
           <RequireAuth isAuthenticated={isAuthenticated}>
             <AppShell authSession={authSession} onLogout={handleLogout} />
           </RequireAuth>
-        }
+        )}
       />
     </Routes>
   )
