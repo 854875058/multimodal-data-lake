@@ -97,7 +97,11 @@ const navGroups = [
     title: '湖存储',
     icon: <IconStorage />,
     items: [
-      { path: '/ingestion', label: '接入任务中心', icon: <IconCloudDownload /> },
+      { path: '/ingestion', label: '总览', icon: <IconStorage /> },
+      { path: '/ingestion/source', label: '来源接入', icon: <IconCloudDownload /> },
+      { path: '/ingestion/upload', label: '本地上传', icon: <IconUpload /> },
+      { path: '/ingestion/workflow', label: '工作流编排', icon: <IconLayout /> },
+      { path: '/ingestion/tasks', label: '任务治理', icon: <IconCalendarClock /> },
       { path: '/workbench', label: '来源接入', icon: <IconCloudDownload />, hidden: true },
       { path: '/upload', label: '本地上传', icon: <IconUpload />, hidden: true },
       { path: '/workflow', label: '工作流编排', icon: <IconLayout />, hidden: true },
@@ -189,9 +193,9 @@ function RequireAdmin({ user, children }) {
 function AppShell({ authSession, onLogout }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const currentNav = allNavItems.find(
-    (item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)
-  ) || allNavItems[0]
+  const currentNav = allNavItems
+    .filter((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`))
+    .sort((left, right) => right.path.length - left.path.length)[0] || allNavItems[0]
 
   const currentUser = authSession.user
   const showAdminLinks = Boolean(currentUser?.is_admin)
