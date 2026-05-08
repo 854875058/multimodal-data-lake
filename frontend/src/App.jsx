@@ -63,16 +63,16 @@ const { Title, Text } = Typography
 const navGroups = [
   {
     key: 'lake-overview',
-    title: '湖仓总览',
+    title: '湖总览',
     icon: <IconDashboard />,
     items: [
-      { path: '/dashboard', label: '湖仓总览', icon: <IconDashboard /> },
+      { path: '/dashboard', label: '湖总览', icon: <IconDashboard /> },
       { path: '/files', label: '资产目录', icon: <IconFile /> },
     ],
   },
   {
     key: 'lake-query',
-    title: '湖仓查询',
+    title: '湖查询',
     icon: <IconSearch />,
     items: [
       { path: '/lake-query/sql', label: 'SQL 查询', icon: <IconCommand /> },
@@ -84,9 +84,18 @@ const navGroups = [
     ],
   },
   {
-    key: 'lake-ingestion',
-    title: '接入治理',
-    icon: <IconCloudDownload />,
+    key: 'lake-compute',
+    title: '湖计算',
+    icon: <IconCommand />,
+    items: [
+      { path: '/workflow', label: '工作流编排', icon: <IconLayout /> },
+      { path: '/task-center', label: '任务中心', icon: <IconCalendarClock /> },
+    ],
+  },
+  {
+    key: 'lake-storage',
+    title: '湖存储',
+    icon: <IconStorage />,
     items: [
       { path: '/ingestion', label: '接入任务中心', icon: <IconCloudDownload /> },
       { path: '/workbench', label: '来源接入', icon: <IconCloudDownload />, hidden: true },
@@ -98,7 +107,7 @@ const navGroups = [
   },
   {
     key: 'mpp-database',
-    title: '湖仓运维',
+    title: '湖运维',
     icon: <IconCommon />,
     items: [
       { path: '/mpp/cluster', label: '集群管理', icon: <IconCommon /> },
