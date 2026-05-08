@@ -4994,6 +4994,135 @@ pre {
   font-weight: 700;
 }
 
+.governance-stat-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.governance-directory-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 320px;
+  gap: 14px;
+  align-items: start;
+}
+
+.governance-directory-side,
+.governance-directory-main,
+.governance-directory-rail {
+  display: grid;
+  gap: 14px;
+}
+
+.governance-filter-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.governance-kv-list,
+.governance-access-list,
+.governance-action-list,
+.governance-version-list,
+.governance-lineage {
+  display: grid;
+  gap: 10px;
+}
+
+.governance-kv-item,
+.governance-access-item,
+.governance-action-item,
+.governance-version-item {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(86, 68, 47, 0.08);
+  background: rgba(24, 30, 38, 0.02);
+}
+
+.governance-kv-label {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.governance-kv-value {
+  margin-top: 6px;
+  font-size: 0.94rem;
+  line-height: 1.65;
+  color: var(--ink-strong);
+  font-weight: 700;
+}
+
+.governance-version-head,
+.governance-access-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.governance-version-badge,
+.governance-access-role {
+  font-size: 0.82rem;
+  color: var(--ink-strong);
+  font-weight: 800;
+}
+
+.governance-version-meta,
+.governance-access-copy {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+
+.governance-lineage-item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.governance-lineage-dot {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(22, 93, 255, 0.1);
+  color: var(--accent-strong);
+}
+
+.governance-lineage-item.is-done .governance-lineage-dot {
+  background: rgba(18, 184, 134, 0.12);
+  color: #12b886;
+}
+
+.governance-lineage-item.is-pending .governance-lineage-dot {
+  background: rgba(245, 159, 0, 0.12);
+  color: #d97706;
+}
+
+.governance-lineage-title {
+  font-size: 0.88rem;
+  color: var(--ink-strong);
+  font-weight: 800;
+}
+
+.governance-lineage-copy {
+  margin-top: 5px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.68;
+}
+
+.governance-action-item {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.72;
+}
+
 .mpp-slow-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.18fr) minmax(340px, 0.82fr);
@@ -5213,6 +5342,7 @@ pre {
   .prd-summary-band,
   .dataset-metric-grid,
   .dataset-preview-grid,
+  .governance-stat-grid,
   .inspection-category-grid,
   .mpp-plan-metrics {
     grid-template-columns: 1fr;
@@ -5225,6 +5355,24 @@ pre {
 
   .prd-hello-cta {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 1280px) {
+  .governance-directory-layout {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
+  .governance-directory-rail {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .governance-directory-layout,
+  .governance-directory-rail {
+    grid-template-columns: 1fr;
   }
 }
 

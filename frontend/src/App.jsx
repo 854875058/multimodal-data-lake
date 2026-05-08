@@ -37,6 +37,7 @@ import { clearAuthSession, loadAuthSession, saveAuthSession, subscribeAuthSessio
 import boncLogo from '@/assets/bonc.jpg'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import ConfigCenterPage from './pages/ConfigCenterPage.jsx'
+import DataGovernancePage from './pages/DataGovernancePage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import FilesPage from './pages/FilesPage.jsx'
 import IngestionCenterPage from './pages/IngestionCenterPage.jsx'
@@ -47,7 +48,6 @@ import LogsPage from './pages/LogsPage.jsx'
 import PermissionManagementPage from './pages/PermissionManagementPage.jsx'
 import RayJobsPage from './pages/RayJobsPage.jsx'
 import TaskCenterPage from './pages/TaskCenterPage.jsx'
-import TaskGovernancePage from './pages/TaskGovernancePage.jsx'
 import UploadPage from './pages/UploadPage.jsx'
 import UserManagementPage from './pages/UserManagementPage.jsx'
 import WorkflowCenterPage from './pages/WorkflowCenterPage.jsx'
@@ -102,7 +102,7 @@ const navGroups = [
       { path: '/upload', label: '本地上传', icon: <IconUpload />, hidden: true },
       { path: '/workflow', label: '工作流编排', icon: <IconLayout />, hidden: true },
       { path: '/task-center', label: '任务中心', icon: <IconCalendarClock />, hidden: true },
-      { path: '/governance', label: '任务治理', icon: <IconCalendarClock />, hidden: true },
+      { path: '/governance', label: '数据治理', icon: <IconCalendarClock /> },
     ],
   },
   {
@@ -376,7 +376,7 @@ function AppShell({ authSession, onLogout }) {
             />
             <Route path="/workflow" element={<WorkflowCenterPage />} />
             <Route path="/task-center" element={<TaskCenterPage />} />
-            <Route path="/governance" element={<TaskGovernancePage />} />
+            <Route path="/governance" element={<DataGovernancePage />} />
             <Route path="/settings" element={<Navigate to="/settings/access" replace />} />
             <Route path="/settings/access" element={<ConfigCenterPage />} />
             <Route
