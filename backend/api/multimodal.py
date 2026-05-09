@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Multimodal detection data import and copilot query APIs."""
+"""Multimodal detection data import, query, and media APIs."""
 
 import logging
+from pathlib import Path
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from config import TOWER_EYE_ROOT
 from multimodal_store import (
     get_dataset_overview_text,
     get_multimodal_summary,
@@ -40,14 +43,43 @@ def _build_followups(question: str, route: str) -> List[str]:
     if "统计" in route:
         return [
             f"{question}，按类型再细分一下",
-            "把时间范围限制到近7天再看一次",
+            "把时间范围限制到最近7天再看一次",
             "给我几条对应的图片样本",
         ]
     return [
-        "只看近7天的数据",
+        "只看最近7天的数据",
         "按事件类型汇总一下",
         "把相同目标类别的样本继续列出来",
     ]
+
+
+def _resolve_media_file(media_path: str, media_kind: str) -> Path:
+    raw = str(media_path or "").strip()
+    if not raw:
+        raise FileNotFoundError("empty media path")
+
+    first_path = raw.split(",")[0].strip()
+    candidate = Path(first_path)
+    base_root = Path(TOWER_EYE_ROOT)
+    subdir = "warning_file" if media_kind == "video" else "warning_img"
+
+    candidates = []
+    if candidate.is_absolute():
+        candidates.append(candidate)
+    candidates.extend([
+        base_root / first_path,
+        base_root / subdir / candidate.name,
+        base_root / subdir / first_path,
+        base_root / "data" / first_path,
+        base_root / "data" / subdir / candidate.name,
+        base_root / "data" / subdir / first_path,
+    ])
+
+    for path in candidates:
+        if path.exists() and path.is_file():
+            return path.resolve()
+
+    raise FileNotFoundError(first_path)
 
 
 @router.get("/summary", response_model=GenericResponse)
@@ -94,7 +126,7 @@ async def query_multimodal_agent(payload: MultimodalQueryPayload):
             "tool_summary": result.get("tool_summary", ""),
             "followups": _build_followups(question, route),
             "steps": [
-                {"key": "intent", "title": "识别问题", "status": "done", "detail": f"已识别问题并切换到「{route}」路径。", "time": "120ms"},
+                {"key": "intent", "title": "识别问题", "status": "done", "detail": f"已识别当前问题并切换到“{route}”路径。", "time": "120ms"},
                 {"key": "plan", "title": "选择数据源", "status": "done", "detail": "读取 multimodal_assets、multimodal_events、multimodal_detections、multimodal_annotations。", "time": "90ms"},
                 {"key": "draft", "title": "构造查询", "status": "done", "detail": "根据时间范围、事件类型、检测标签和关键词组装查询条件。", "time": "140ms"},
                 {"key": "execute", "title": "执行查询", "status": "done", "detail": summary_text, "time": "220ms"},
@@ -106,3 +138,13 @@ async def query_multimodal_agent(payload: MultimodalQueryPayload):
     except Exception as error:
         logger.error("多模态检测副驾驶查询失败: %s", error, exc_info=True)
         raise HTTPException(status_code=500, detail="多模态检测副驾驶查询失败") from error
+
+
+@router.get("/media")
+async def get_multimodal_media(path: str, kind: str = "image"):
+    media_kind = "video" if str(kind or "").lower() == "video" else "image"
+    try:
+        resolved = _resolve_media_file(path, media_kind)
+        return FileResponse(resolved)
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=404, detail=f"media not found: {error}") from error

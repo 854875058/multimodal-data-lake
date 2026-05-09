@@ -186,12 +186,23 @@ function DetailField({ label, value, copyable = false }) {
   )
 }
 
+function getFirstMediaPath(value) {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .find(Boolean) || ''
+}
+
 function SearchResultCard({ item, index }) {
   const isMultimodalCard = Boolean(
     item.event_type || item.alarm_time || item.address || item.device_name || item.img_src_path || item.video_path
   )
   const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'image'].includes(String(item.doc_type || '').toLowerCase())
-  const thumbnailUrl = item.file_hash && isImage ? api.getFileContentUrl(item.file_hash) : ''
+  const imagePath = getFirstMediaPath(item.img_src_path || item.source_uri)
+  const videoPath = getFirstMediaPath(item.video_path)
+  const thumbnailUrl = isMultimodalCard
+    ? (imagePath ? api.getMultimodalMediaUrl(imagePath, 'image') : '')
+    : (item.file_hash && isImage ? api.getFileContentUrl(item.file_hash) : '')
   const previewText = item.summary || item.description || item.text || '当前结果暂无文本摘要。'
 
   return (
@@ -273,6 +284,26 @@ function SearchResultCard({ item, index }) {
               <DetailField label="告警地址" value={item.address} />
               <DetailField label="图片路径" value={item.img_src_path || item.source_uri} copyable />
               <DetailField label="视频路径" value={item.video_path} copyable />
+              <Space size="small" wrap>
+                {imagePath ? (
+                  <Button
+                    size="small"
+                    icon={<IconImage />}
+                    onClick={() => window.open(api.getMultimodalMediaUrl(imagePath, 'image'), '_blank', 'noopener,noreferrer')}
+                  >
+                    查看图片
+                  </Button>
+                ) : null}
+                {videoPath ? (
+                  <Button
+                    size="small"
+                    icon={<IconPlayArrow />}
+                    onClick={() => window.open(api.getMultimodalMediaUrl(videoPath, 'video'), '_blank', 'noopener,noreferrer')}
+                  >
+                    播放视频
+                  </Button>
+                ) : null}
+              </Space>
             </div>
           ) : null}
           <Text type="secondary" style={{ fontSize: 11, marginTop: 10, display: 'block' }}>

@@ -34,6 +34,7 @@ DB_PATH = os.path.join(BASE_DIR, "user_data.db")
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 LOG_PATH = os.path.join(LOG_DIR, "app.log")
+TOWER_EYE_ROOT = os.getenv("TOWER_EYE_ROOT", r"E:\工作\国信\AI数据集项目\Tower-Eye")
 
 # --- Web 服务 ---
 CORS_ALLOW_ORIGINS = [

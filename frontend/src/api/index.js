@@ -279,6 +279,13 @@ const api = {
     return apiClient.post('/multimodal/agent/query', payload)
   },
 
+  getMultimodalMediaUrl(path, kind = 'image') {
+    const params = new URLSearchParams()
+    params.set('path', path || '')
+    params.set('kind', kind || 'image')
+    return `/api/multimodal/media?${params.toString()}`
+  },
+
   // --- 用户管理 ---
   getUsers(skip = 0, limit = 100) {
     return apiClient.get('/users/list', { params: { skip, limit } })
