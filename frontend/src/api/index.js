@@ -267,6 +267,18 @@ const api = {
     return apiClient.post('/platform/workflow/build-job', payload)
   },
 
+  getMultimodalSummary(datasetName = '') {
+    return apiClient.get('/multimodal/summary', { params: datasetName ? { dataset_name: datasetName } : {} })
+  },
+
+  importTowerDb(payload) {
+    return apiClient.post('/multimodal/import/tower-db', payload)
+  },
+
+  queryMultimodalAgent(payload) {
+    return apiClient.post('/multimodal/agent/query', payload)
+  },
+
   // --- 用户管理 ---
   getUsers(skip = 0, limit = 100) {
     return apiClient.get('/users/list', { params: { skip, limit } })

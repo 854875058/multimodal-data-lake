@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from backend.api import agents, dashboard, files, platform, search, system, upload, workbench, users, permissions, ray_compute, mpp_proxy, versions, doris
+from backend.api import agents, dashboard, files, multimodal, platform, search, system, upload, workbench, users, permissions, ray_compute, mpp_proxy, versions, doris
 from config import BACKEND_RELOAD, CORS_ALLOW_CREDENTIALS, CORS_ALLOW_ORIGINS
 
 _log_dir = ROOT_DIR / 'logs'
@@ -56,9 +56,12 @@ async def lifespan(app: FastAPI):
 
     from database import init_db
     from backend.api.users import init_users_table
+    from multimodal_store import init_multimodal_tables
 
     init_db()
     logger.info('SQLite 数据库初始化完成')
+    init_multimodal_tables()
+    logger.info('多模态检测治理表初始化完成')
 
     init_users_table()
     logger.info('用户表初始化完成')
@@ -97,6 +100,7 @@ app.include_router(files.router, prefix='/api/files', tags=['文件管理'])
 app.include_router(dashboard.router, prefix='/api/dashboard', tags=['仪表盘'])
 app.include_router(system.router, prefix='/api/system', tags=['系统监控'])
 app.include_router(agents.router, prefix='/api/agents', tags=['Agent Team'])
+app.include_router(multimodal.router, prefix='/api/multimodal', tags=['多模态检测复现'])
 app.include_router(workbench.router, prefix='/api/workbench', tags=['接入工作台'])
 app.include_router(platform.router, prefix='/api/platform', tags=['平台能力'])
 app.include_router(users.router, prefix='/api/users', tags=['用户管理'])

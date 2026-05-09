@@ -973,112 +973,29 @@ function CopilotTab() {
     setLatestRoute('正在分析')
     setLatestToolSummary('正在调用意图识别、SQL 生成、执行验证和检索补充能力。')
 
-    const route = normalizeSearchIntent(currentQuestion)
-    let generatedSql = ''
-    let sqlResult = null
-    let searchResults = []
-    let routeLabel = ''
-
     try {
-      patchStep(sessionId, 'intent', { status: 'done', detail: '已识别当前问题属于数据分析与资产补充类场景。', time: '320ms' })
-
-      routeLabel = route === 'visual'
-        ? '自然语言 -> 图像语义检索'
-        : route === 'hybrid'
-          ? '自然语言 -> SQL 精确查询 + 检索补充'
-          : '自然语言 -> SQL 查询'
-
-      patchStep(sessionId, 'plan', {
-        status: 'done',
-        detail: route === 'visual'
-          ? '当前问题更适合直接走相似资产检索路径。'
-          : route === 'hybrid'
-            ? '当前问题既需要结构化统计，也需要相关样本补充，采用双路融合。'
-            : '当前问题以结构化查询为主，优先生成 SQL。',
-        time: '260ms',
-      })
-      patchAssistant(sessionId, { route: routeLabel })
-      setLatestRoute(routeLabel)
-
-      patchStep(sessionId, 'draft', { status: 'running', detail: '正在生成 SQL 草案或检索命令。', time: '生成中' })
-
-      if (route !== 'visual') {
-        const sqlPayload = await api.convertNlToSql({ prompt: currentQuestion, top_k: 10 })
-        generatedSql = sqlPayload?.sql || ''
-      }
-
-      patchStep(sessionId, 'draft', {
-        status: 'done',
-        detail: generatedSql
-          ? '已生成 SQL 草案，并保留给用户继续复核。'
-          : '本轮问题优先走检索路径，不生成 SQL 草案。',
-        time: generatedSql ? '740ms' : '480ms',
-      })
-
-      patchStep(sessionId, 'execute', { status: 'running', detail: '正在执行查询并补充相关资产。', time: '执行中' })
-
-      if (generatedSql) {
-        try {
-          const execution = await api.executeDorisSql({ query: generatedSql, limit: 20 })
-          sqlResult = {
-            columns: execution?.columns || [],
-            rows: execution?.rows || [],
-            message: execution?.message || '',
-            affectedRows: execution?.rows?.length || 0,
-          }
-        } catch (error) {
-          sqlResult = {
-            columns: [],
-            rows: [],
-            message: getErrorMessage(error, 'SQL 执行失败'),
-            affectedRows: 0,
-          }
-        }
-      }
-
-      if (route === 'visual') {
-        const retrieval = await api.search(currentQuestion, 'image', 8)
-        searchResults = Array.isArray(retrieval?.results) ? retrieval.results : []
-      } else if (route === 'hybrid') {
-        const retrieval = await api.search(currentQuestion, 'hybrid', { limit: 8, rrf_k: 60 })
-        searchResults = Array.isArray(retrieval?.results) ? retrieval.results : []
-      } else {
-        const guide = await api.convertNlToVector({ prompt: currentQuestion, top_k: 6 })
-        const retrieval = await api.search(currentQuestion, guide?.data?.mode || 'text', 6)
-        searchResults = Array.isArray(retrieval?.results) ? retrieval.results : []
-      }
-
-      patchStep(sessionId, 'execute', {
-        status: 'done',
-        detail: generatedSql
-          ? `已完成执行验证，并补充 ${searchResults.length} 条相关资产。`
-          : `已完成检索，共返回 ${searchResults.length} 条相关资产。`,
-        time: '1.9s',
-      })
-
-      const summary = formatCopilotSummary(currentQuestion, route, sqlResult, searchResults)
-      const followups = buildFollowUps(currentQuestion, route)
-
-      patchStep(sessionId, 'summary', {
-        status: 'done',
-        detail: summary,
-        time: '420ms',
-      })
+      const response = await api.queryMultimodalAgent({ question: currentQuestion, dataset_name: 'tower_eye', limit: 8 })
+      const data = response?.data || {}
+      const routeLabel = data.route || '多模态检测副驾驶'
+      const sqlResult = data.sql_result || null
+      const searchResults = Array.isArray(data.search_results) ? data.search_results : []
+      const summary = data.summary || ''
+      const followups = Array.isArray(data.followups) ? data.followups : []
+      const steps = Array.isArray(data.steps) ? data.steps : []
 
       patchAssistant(sessionId, {
         createdAt: '刚刚',
-        sql: generatedSql,
+        route: routeLabel,
+        steps: steps.length ? steps : assistantSeed.steps,
+        sql: data.sql || '',
         sqlResult,
         searchResults,
         summary,
         followups,
       })
 
-      setLatestToolSummary(
-        generatedSql
-          ? `本轮已使用 nl2sql、doris_query、vector_search 三类能力，形成结构化结果与相关资产的组合输出。`
-          : `本轮主要使用 vector_search 能力完成相似资产召回，并保留继续追加 SQL 条件的空间。`
-      )
+      setLatestRoute(routeLabel)
+      setLatestToolSummary(data.tool_summary || '已切换到真实多模态检测数据查询链路。')
     } catch (error) {
       patchStep(sessionId, 'execute', {
         status: 'error',
