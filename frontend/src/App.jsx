@@ -81,6 +81,7 @@ const navGroups = [
       { path: '/lake-query/multimodal', label: '多模态检索', icon: <IconLayout />, hidden: true },
       { path: '/lake-query/hybrid', label: '混合检索', icon: <IconCommon />, hidden: true },
       { path: '/lake-query/copilot', label: 'AI 数据副驾驶', icon: <IconRobot /> },
+      { path: '/lake-query/annotation', label: '自动化标注', icon: <IconExport /> },
     ],
   },
   {

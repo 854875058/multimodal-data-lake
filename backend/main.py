@@ -57,11 +57,14 @@ async def lifespan(app: FastAPI):
     from database import init_db
     from backend.api.users import init_users_table
     from multimodal_store import init_multimodal_tables
+    from multimodal_trace import init_multimodal_trace_db
 
     init_db()
     logger.info('SQLite 数据库初始化完成')
     init_multimodal_tables()
     logger.info('多模态检测治理表初始化完成')
+    init_multimodal_trace_db()
+    logger.info('多模态检测追踪表初始化完成')
 
     init_users_table()
     logger.info('用户表初始化完成')

@@ -361,14 +361,63 @@ def _build_common_filters(
     dataset_name: str,
     labels: Sequence[str],
     event_types: Sequence[str],
+    filters: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, List[Any], Dict[str, Any]]:
     clauses: List[str] = []
     params: List[Any] = []
-    info: Dict[str, Any] = {"matched_labels": [], "matched_event_types": [], "time_range": ""}
+    filters = filters or {}
+    info: Dict[str, Any] = {"matched_labels": [], "matched_event_types": [], "time_range": "", "applied_filters": {}}
 
     if dataset_name:
         clauses.append("a.dataset_name = ?")
         params.append(dataset_name)
+
+    exact_field_map = {
+        "event_type": "e.event_type",
+        "alarm_level": "e.alarm_level",
+        "order_status": "e.order_status",
+        "city_name": "e.city_name",
+        "county_name": "e.county_name",
+        "town_name": "e.town_name",
+    }
+    for key, column in exact_field_map.items():
+        value = str(filters.get(key) or "").strip()
+        if value:
+            clauses.append(f"{column} = ?")
+            params.append(value)
+            info["applied_filters"][key] = value
+
+    like_field_map = {
+        "device_name": "e.device_name",
+        "algorithm_name": "e.algorithm_name",
+    }
+    for key, column in like_field_map.items():
+        value = str(filters.get(key) or "").strip()
+        if value:
+            clauses.append(f"COALESCE({column}, '') LIKE ?")
+            params.append(f"%{value}%")
+            info["applied_filters"][key] = value
+
+    confidence_min = _coerce_float(filters.get("confidence_min"))
+    confidence_max = _coerce_float(filters.get("confidence_max"))
+    if confidence_min is not None:
+        clauses.append("COALESCE(d.confidence, e.confidence_level, e.confidence_level_max, 0) >= ?")
+        params.append(confidence_min)
+        info["applied_filters"]["confidence_min"] = confidence_min
+    if confidence_max is not None:
+        clauses.append("COALESCE(d.confidence, e.confidence_level, e.confidence_level_max, 0) <= ?")
+        params.append(confidence_max)
+        info["applied_filters"]["confidence_max"] = confidence_max
+
+    lat = _coerce_float(filters.get("lat"))
+    lon = _coerce_float(filters.get("lon"))
+    radius_km = _coerce_float(filters.get("radius_km"))
+    if lat is not None and lon is not None and radius_km is not None and radius_km > 0:
+        delta = radius_km / 111.0
+        clauses.append("COALESCE(e.lat, a.lat, 0) BETWEEN ? AND ?")
+        clauses.append("COALESCE(e.lon, a.lon, 0) BETWEEN ? AND ?")
+        params.extend([lat - delta, lat + delta, lon - delta, lon + delta])
+        info["applied_filters"]["geo"] = {"lat": lat, "lon": lon, "radius_km": radius_km}
 
     start_time, end_time, time_label = _extract_time_range(question)
     if start_time and end_time:
@@ -418,12 +467,17 @@ def _build_common_filters(
     return where, params, info
 
 
-def search_multimodal_assets(question: str, limit: int = 10, dataset_name: str = "") -> Dict[str, Any]:
+def search_multimodal_assets(
+    question: str,
+    limit: int = 10,
+    dataset_name: str = "",
+    filters: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     con = _get_duckdb_connection()
     try:
         label_vocab = _load_vocab(con, "multimodal_detections", "label")
         event_vocab = _load_vocab(con, "multimodal_events", "event_type")
-        where, params, info = _build_common_filters(question, dataset_name, label_vocab, event_vocab)
+        where, params, info = _build_common_filters(question, dataset_name, label_vocab, event_vocab, filters=filters)
 
         is_count = any(token in question for token in ["多少", "几条", "统计", "数量", "总数", "分布"])
         wants_group = any(token in question for token in ["按类型", "分类", "排行", "排名", "TOP"])
@@ -493,6 +547,7 @@ def search_multimodal_assets(question: str, limit: int = 10, dataset_name: str =
             "SELECT "
             "a.asset_id, a.dataset_name, a.file_name, a.file_path, a.media_type, a.captured_at, "
             "e.event_type, e.alarm_time, e.summary, e.description, e.address, e.device_name, "
+            "e.alarm_level, e.order_status, e.algorithm_name, e.city_name, e.county_name, e.town_name, "
             "e.img_src_path, e.img_icon_path, e.video_path, "
             "string_agg(DISTINCT NULLIF(d.label, ''), ', ') AS labels, "
             "MAX(d.confidence) AS max_confidence "
@@ -503,6 +558,7 @@ def search_multimodal_assets(question: str, limit: int = 10, dataset_name: str =
             "GROUP BY "
             "a.asset_id, a.dataset_name, a.file_name, a.file_path, a.media_type, a.captured_at, "
             "e.event_type, e.alarm_time, e.summary, e.description, e.address, e.device_name, "
+            "e.alarm_level, e.order_status, e.algorithm_name, e.city_name, e.county_name, e.town_name, "
             "e.img_src_path, e.img_icon_path, e.video_path "
             "ORDER BY COALESCE(e.alarm_time, a.captured_at, '') DESC LIMIT ?"
         )
@@ -537,6 +593,13 @@ def search_multimodal_assets(question: str, limit: int = 10, dataset_name: str =
                 "description": item.get("description") or "",
                 "address": item.get("address") or "",
                 "device_name": item.get("device_name") or "",
+                "alarm_level": item.get("alarm_level") or "",
+                "order_status": item.get("order_status") or "",
+                "algorithm_name": item.get("algorithm_name") or "",
+                "city_name": item.get("city_name") or "",
+                "county_name": item.get("county_name") or "",
+                "town_name": item.get("town_name") or "",
+                "confidence": item.get("max_confidence"),
                 "img_src_path": item.get("img_src_path") or "",
                 "img_icon_path": item.get("img_icon_path") or "",
                 "video_path": item.get("video_path") or "",

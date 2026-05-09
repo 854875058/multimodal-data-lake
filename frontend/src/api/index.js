@@ -287,6 +287,18 @@ const api = {
     return apiClient.post('/multimodal/review/import', payload)
   },
 
+  listMultimodalTraces(payload) {
+    return apiClient.post('/multimodal/traces', payload)
+  },
+
+  getMultimodalTraceStats() {
+    return apiClient.get('/multimodal/traces/stats')
+  },
+
+  getMultimodalTraceDetail(traceId) {
+    return apiClient.get(`/multimodal/traces/${encodeURIComponent(traceId)}`)
+  },
+
   getMultimodalMediaUrl(path, kind = 'image') {
     const params = new URLSearchParams()
     params.set('path', path || '')
