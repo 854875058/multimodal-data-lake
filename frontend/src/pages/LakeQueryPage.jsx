@@ -170,9 +170,29 @@ function QueryPageFrame({ title, subtitle, summaryItems, children, actions = nul
   )
 }
 
+function DetailField({ label, value, copyable = false }) {
+  if (!value) return null
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '76px minmax(0, 1fr)', gap: 8, alignItems: 'start' }}>
+      <Text type="secondary" style={{ fontSize: 11 }}>{label}</Text>
+      <Text
+        style={{ fontSize: 12, lineHeight: 1.6, wordBreak: 'break-all' }}
+        copyable={copyable ? { text: String(value) } : false}
+      >
+        {String(value)}
+      </Text>
+    </div>
+  )
+}
+
 function SearchResultCard({ item, index }) {
+  const isMultimodalCard = Boolean(
+    item.event_type || item.alarm_time || item.address || item.device_name || item.img_src_path || item.video_path
+  )
   const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'image'].includes(String(item.doc_type || '').toLowerCase())
   const thumbnailUrl = item.file_hash && isImage ? api.getFileContentUrl(item.file_hash) : ''
+  const previewText = item.summary || item.description || item.text || '当前结果暂无文本摘要。'
 
   return (
     <Card bodyStyle={{ padding: 14 }} hoverable>
@@ -194,7 +214,21 @@ function SearchResultCard({ item, index }) {
                 alt={item.doc_name || 'preview'}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
               />
-            ) : null}
+            ) : (
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--color-text-3)',
+                  background: 'linear-gradient(135deg, rgba(22,93,255,0.08), rgba(54,207,201,0.12))',
+                }}
+              >
+                <IconImage style={{ fontSize: 24 }} />
+              </div>
+            )}
           </div>
         ) : null}
 
@@ -206,6 +240,8 @@ function SearchResultCard({ item, index }) {
               </Title>
               <Space size="small" style={{ marginTop: 6 }} wrap>
                 <Tag color="arcoblue">{item.doc_type || 'unknown'}</Tag>
+                {item.event_type ? <Tag color="orangered">{item.event_type}</Tag> : null}
+                {item.labels ? <Tag color="gold">{item.labels}</Tag> : null}
                 {item.score != null ? (
                   <Tag color="purple">RRF {Number(item.score).toFixed(4)}</Tag>
                 ) : (
@@ -217,9 +253,29 @@ function SearchResultCard({ item, index }) {
           </div>
 
           <Paragraph type="secondary" style={{ margin: '10px 0 8px' }}>
-            {truncateText(item.text || '当前结果暂无文本摘要。', 220)}
+            {truncateText(previewText, isMultimodalCard ? 160 : 220)}
           </Paragraph>
-          <Text type="secondary" style={{ fontSize: 11 }}>
+          {isMultimodalCard ? (
+            <div
+              style={{
+                display: 'grid',
+                gap: 8,
+                marginTop: 10,
+                padding: 12,
+                borderRadius: 10,
+                background: 'var(--color-fill-1)',
+                border: '1px solid var(--color-border-2)',
+              }}
+            >
+              <DetailField label="告警时间" value={item.alarm_time} />
+              <DetailField label="采集时间" value={item.captured_at} />
+              <DetailField label="设备点位" value={item.device_name} />
+              <DetailField label="告警地址" value={item.address} />
+              <DetailField label="图片路径" value={item.img_src_path || item.source_uri} copyable />
+              <DetailField label="视频路径" value={item.video_path} copyable />
+            </div>
+          ) : null}
+          <Text type="secondary" style={{ fontSize: 11, marginTop: 10, display: 'block' }}>
             来源：{item.source_uri || '本地入库'}
           </Text>
         </div>
