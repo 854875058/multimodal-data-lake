@@ -3,7 +3,9 @@
 
 import duckdb
 import logging
+import json
 import sqlite3
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -315,6 +317,45 @@ def _matched_terms(question: str, candidates: Sequence[str]) -> List[str]:
     return [item for item in candidates if item and item in question]
 
 
+def _first_media_path(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    return next((part.strip() for part in raw.split(",") if part.strip()), "")
+
+
+def _find_related_image_paths(
+    con: duckdb.DuckDBPyConnection,
+    dataset_name: str,
+    video_path: str,
+    current_image_path: str,
+    limit: int = 12,
+) -> List[str]:
+    stem = Path(_first_media_path(video_path)).stem
+    if not stem:
+        return []
+
+    current_name = Path(_first_media_path(current_image_path)).name
+    sql = (
+        "SELECT DISTINCT img_src_path, file_path FROM multimodal_events "
+        "WHERE dataset_name = ? AND video_path LIKE ? LIMIT ?"
+    )
+    rows = con.execute(sql, [dataset_name, f"%{stem}%", limit * 3]).fetchall()
+    related: List[str] = []
+    seen = set()
+    for img_src_path, file_path in rows:
+        for candidate in (_first_media_path(img_src_path), _first_media_path(file_path)):
+            if not candidate:
+                continue
+            name = Path(candidate).name
+            if name and name != current_name and name not in seen:
+                seen.add(name)
+                related.append(candidate)
+                if len(related) >= limit:
+                    return related
+    return related
+
+
 def _build_common_filters(
     question: str,
     dataset_name: str,
@@ -471,6 +512,12 @@ def search_multimodal_assets(question: str, limit: int = 10, dataset_name: str =
 
         cards = []
         for item in records:
+            related_image_paths = _find_related_image_paths(
+                con,
+                item.get("dataset_name") or "",
+                item.get("video_path") or "",
+                item.get("img_src_path") or item.get("file_path") or "",
+            )
             cards.append({
                 "id": item["asset_id"],
                 "doc_name": item.get("file_name") or item.get("asset_id"),
@@ -493,6 +540,7 @@ def search_multimodal_assets(question: str, limit: int = 10, dataset_name: str =
                 "img_src_path": item.get("img_src_path") or "",
                 "img_icon_path": item.get("img_icon_path") or "",
                 "video_path": item.get("video_path") or "",
+                "related_image_paths": related_image_paths,
             })
 
         summary = f"已返回 {len(records)} 条检测资产记录，可继续追问时间范围、事件类型或目标类别。"
@@ -523,3 +571,94 @@ def get_dataset_overview_text(dataset_name: str = "") -> str:
         f"{summary['detections']} 条检测框、{summary['annotations']} 条人工标注。"
         f"高频检测类别为 {top_label}，高频事件类型为 {top_event}。"
     )
+
+
+def export_review_manifest(dataset_name: str = "tower_eye", limit: int = 0) -> List[Dict[str, Any]]:
+    con = _get_duckdb_connection()
+    try:
+        limit_clause = " LIMIT ?" if limit and limit > 0 else ""
+        params: List[Any] = [dataset_name]
+        if limit and limit > 0:
+            params.append(limit)
+        assets_sql = (
+            "SELECT asset_id, media_type, file_path, file_name, lat, lon, captured_at "
+            "FROM multimodal_assets WHERE dataset_name = ? "
+            "ORDER BY COALESCE(captured_at, created_at, imported_at) DESC"
+            f"{limit_clause}"
+        )
+        asset_rows = con.execute(assets_sql, params).fetchall()
+        manifest: List[Dict[str, Any]] = []
+        for asset_id, media_type, file_path, file_name, lat, lon, captured_at in asset_rows:
+            detection_rows = con.execute(
+                "SELECT label, confidence, bbox_x, bbox_y, bbox_w, bbox_h, frame_index, timestamp_sec "
+                "FROM multimodal_detections WHERE dataset_name = ? AND asset_id = ?",
+                [dataset_name, asset_id],
+            ).fetchall()
+            predictions = [
+                {
+                    "label": row[0],
+                    "confidence": row[1],
+                    "bbox": [row[2], row[3], row[4], row[5]],
+                    "frame_index": row[6],
+                    "timestamp_sec": row[7],
+                }
+                for row in detection_rows
+            ]
+            manifest.append({
+                "asset_id": asset_id,
+                "media_type": media_type,
+                "file_path": file_path,
+                "file_name": file_name,
+                "lat": lat,
+                "lon": lon,
+                "captured_at": captured_at,
+                "predictions": predictions,
+            })
+        return manifest
+    finally:
+        con.close()
+
+
+def import_review_manifest(
+    records: List[Dict[str, Any]],
+    dataset_name: str = "tower_eye",
+    reviewer: str = "reviewer",
+    origin: str = "review",
+) -> Dict[str, Any]:
+    init_multimodal_tables()
+    _, _, _, tbl_annotations = get_multimodal_lancedb_tables()
+    imported_at = datetime.now().isoformat(sep=" ", timespec="seconds")
+    rows: List[Dict[str, Any]] = []
+    for record in records:
+        asset_id = str(record.get("asset_id") or "").strip()
+        if not asset_id:
+            continue
+        annotations = record.get("annotations") or []
+        for ann in annotations:
+            bbox = ann.get("bbox") or [None, None, None, None]
+            rows.append({
+                "annotation_id": uuid.uuid4().hex,
+                "asset_id": asset_id,
+                "dataset_name": dataset_name,
+                "label": str(ann.get("label") or ""),
+                "bbox_x": bbox[0],
+                "bbox_y": bbox[1],
+                "bbox_w": bbox[2],
+                "bbox_h": bbox[3],
+                "origin": origin,
+                "reviewer": reviewer,
+                "reviewed_at": imported_at,
+                "created_at": imported_at,
+                "imported_at": imported_at,
+            })
+
+    if rows:
+        _add_rows(tbl_annotations, rows, tbl_annotations.schema)
+
+    return {
+        "dataset_name": dataset_name,
+        "reviewer": reviewer,
+        "origin": origin,
+        "annotations": len(rows),
+        "imported_at": imported_at,
+    }

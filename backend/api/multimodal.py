@@ -11,8 +11,10 @@ from pydantic import BaseModel, Field
 
 from config import TOWER_EYE_ROOT
 from multimodal_store import (
+    export_review_manifest,
     get_dataset_overview_text,
     get_multimodal_summary,
+    import_review_manifest,
     import_tower_metadata_db,
     search_multimodal_assets,
 )
@@ -37,6 +39,18 @@ class MultimodalQueryPayload(BaseModel):
     question: str
     dataset_name: str = "tower_eye"
     limit: int = 8
+
+
+class ReviewExportPayload(BaseModel):
+    dataset_name: str = "tower_eye"
+    limit: int = 0
+
+
+class ReviewImportPayload(BaseModel):
+    dataset_name: str = "tower_eye"
+    reviewer: str = "reviewer"
+    origin: str = "review"
+    records: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 def _build_followups(question: str, route: str) -> List[str]:
@@ -148,3 +162,36 @@ async def get_multimodal_media(path: str, kind: str = "image"):
         return FileResponse(resolved)
     except FileNotFoundError as error:
         raise HTTPException(status_code=404, detail=f"media not found: {error}") from error
+
+
+@router.post("/review/export", response_model=GenericResponse)
+async def export_multimodal_review(payload: ReviewExportPayload):
+    try:
+        records = export_review_manifest(payload.dataset_name, payload.limit)
+        return GenericResponse(
+            success=True,
+            message="ok",
+            data={
+                "dataset_name": payload.dataset_name,
+                "count": len(records),
+                "records": records,
+            },
+        )
+    except Exception as error:
+        logger.error("导出标注复核清单失败: %s", error, exc_info=True)
+        raise HTTPException(status_code=500, detail="导出标注复核清单失败") from error
+
+
+@router.post("/review/import", response_model=GenericResponse)
+async def import_multimodal_review(payload: ReviewImportPayload):
+    try:
+        result = import_review_manifest(
+            payload.records,
+            dataset_name=payload.dataset_name,
+            reviewer=payload.reviewer,
+            origin=payload.origin,
+        )
+        return GenericResponse(success=True, message="ok", data=result)
+    except Exception as error:
+        logger.error("导入标注复核清单失败: %s", error, exc_info=True)
+        raise HTTPException(status_code=500, detail="导入标注复核清单失败") from error

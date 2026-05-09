@@ -199,6 +199,7 @@ function SearchResultCard({ item, index }) {
   )
   const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'image'].includes(String(item.doc_type || '').toLowerCase())
   const imagePath = getFirstMediaPath(item.img_src_path || item.source_uri)
+  const iconPath = getFirstMediaPath(item.img_icon_path)
   const videoPath = getFirstMediaPath(item.video_path)
   const thumbnailUrl = isMultimodalCard
     ? (imagePath ? api.getMultimodalMediaUrl(imagePath, 'image') : '')
@@ -283,6 +284,7 @@ function SearchResultCard({ item, index }) {
               <DetailField label="设备点位" value={item.device_name} />
               <DetailField label="告警地址" value={item.address} />
               <DetailField label="图片路径" value={item.img_src_path || item.source_uri} copyable />
+              <DetailField label="标注图路径" value={item.img_icon_path} copyable />
               <DetailField label="视频路径" value={item.video_path} copyable />
               <Space size="small" wrap>
                 {imagePath ? (
@@ -292,6 +294,14 @@ function SearchResultCard({ item, index }) {
                     onClick={() => window.open(api.getMultimodalMediaUrl(imagePath, 'image'), '_blank', 'noopener,noreferrer')}
                   >
                     查看图片
+                  </Button>
+                ) : null}
+                {iconPath ? (
+                  <Button
+                    size="small"
+                    onClick={() => window.open(api.getMultimodalMediaUrl(iconPath, 'image'), '_blank', 'noopener,noreferrer')}
+                  >
+                    查看标注图
                   </Button>
                 ) : null}
                 {videoPath ? (
@@ -304,6 +314,30 @@ function SearchResultCard({ item, index }) {
                   </Button>
                 ) : null}
               </Space>
+              {Array.isArray(item.related_image_paths) && item.related_image_paths.length ? (
+                <div style={{ display: 'grid', gap: 6 }}>
+                  <Text type="secondary" style={{ fontSize: 11 }}>同源关联图</Text>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {item.related_image_paths.slice(0, 6).map((path) => (
+                      <img
+                        key={path}
+                        src={api.getMultimodalMediaUrl(path, 'image')}
+                        alt="related"
+                        onClick={() => window.open(api.getMultimodalMediaUrl(path, 'image'), '_blank', 'noopener,noreferrer')}
+                        style={{
+                          width: 56,
+                          height: 42,
+                          objectFit: 'cover',
+                          borderRadius: 8,
+                          border: '1px solid var(--color-border-2)',
+                          cursor: 'pointer',
+                          background: 'var(--color-bg-2)',
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
           <Text type="secondary" style={{ fontSize: 11, marginTop: 10, display: 'block' }}>
