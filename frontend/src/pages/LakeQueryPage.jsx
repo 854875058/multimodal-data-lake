@@ -193,14 +193,45 @@ function getFirstMediaPath(value) {
     .find(Boolean) || ''
 }
 
+function openMultimodalMedia(path, kind = 'image') {
+  const mediaPath = getFirstMediaPath(path)
+  if (!mediaPath) return
+  window.open(api.getMultimodalMediaUrl(mediaPath, kind), '_blank', 'noopener,noreferrer')
+}
+
+function MediaThumb({ path, alt = 'preview', kind = 'image', width = 84, height = 64 }) {
+  const mediaPath = getFirstMediaPath(path)
+  if (!mediaPath) return null
+
+  return (
+    <img
+      src={api.getMultimodalMediaUrl(mediaPath, kind)}
+      alt={alt}
+      onClick={() => openMultimodalMedia(mediaPath, kind)}
+      style={{
+        width,
+        height,
+        objectFit: 'cover',
+        borderRadius: 8,
+        border: '1px solid var(--color-border-2)',
+        cursor: 'pointer',
+        background: 'var(--color-bg-2)',
+        display: 'block',
+      }}
+    />
+  )
+}
+
 function SearchResultCard({ item, index }) {
+  const [detailVisible, setDetailVisible] = useState(false)
   const isMultimodalCard = Boolean(
     item.event_type || item.alarm_time || item.address || item.device_name || item.img_src_path || item.video_path
   )
-  const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'image'].includes(String(item.doc_type || '').toLowerCase())
+  const isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'image'].includes(String(item.doc_type || '').toLowerCase()) || isMultimodalCard
   const imagePath = getFirstMediaPath(item.img_src_path || item.source_uri)
   const iconPath = getFirstMediaPath(item.img_icon_path)
   const videoPath = getFirstMediaPath(item.video_path)
+  const relatedImages = Array.isArray(item.related_image_paths) ? item.related_image_paths.filter(Boolean) : []
   const thumbnailUrl = isMultimodalCard
     ? (imagePath ? api.getMultimodalMediaUrl(imagePath, 'image') : '')
     : (item.file_hash && isImage ? api.getFileContentUrl(item.file_hash) : '')
@@ -291,7 +322,7 @@ function SearchResultCard({ item, index }) {
                   <Button
                     size="small"
                     icon={<IconImage />}
-                    onClick={() => window.open(api.getMultimodalMediaUrl(imagePath, 'image'), '_blank', 'noopener,noreferrer')}
+                    onClick={() => openMultimodalMedia(imagePath, 'image')}
                   >
                     查看图片
                   </Button>
@@ -299,7 +330,7 @@ function SearchResultCard({ item, index }) {
                 {iconPath ? (
                   <Button
                     size="small"
-                    onClick={() => window.open(api.getMultimodalMediaUrl(iconPath, 'image'), '_blank', 'noopener,noreferrer')}
+                    onClick={() => openMultimodalMedia(iconPath, 'image')}
                   >
                     查看标注图
                   </Button>
@@ -308,34 +339,92 @@ function SearchResultCard({ item, index }) {
                   <Button
                     size="small"
                     icon={<IconPlayArrow />}
-                    onClick={() => window.open(api.getMultimodalMediaUrl(videoPath, 'video'), '_blank', 'noopener,noreferrer')}
+                    onClick={() => openMultimodalMedia(videoPath, 'video')}
                   >
                     播放视频
                   </Button>
                 ) : null}
               </Space>
-              {Array.isArray(item.related_image_paths) && item.related_image_paths.length ? (
+              {(imagePath || iconPath || videoPath || relatedImages.length) ? (
+                <Button size="small" type="outline" onClick={() => setDetailVisible((value) => !value)}>
+                  {detailVisible ? '收起详情' : '展开详情'}
+                </Button>
+              ) : null}
+              {relatedImages.length ? (
                 <div style={{ display: 'grid', gap: 6 }}>
                   <Text type="secondary" style={{ fontSize: 11 }}>同源关联图</Text>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {item.related_image_paths.slice(0, 6).map((path) => (
-                      <img
-                        key={path}
-                        src={api.getMultimodalMediaUrl(path, 'image')}
-                        alt="related"
-                        onClick={() => window.open(api.getMultimodalMediaUrl(path, 'image'), '_blank', 'noopener,noreferrer')}
-                        style={{
-                          width: 56,
-                          height: 42,
-                          objectFit: 'cover',
-                          borderRadius: 8,
-                          border: '1px solid var(--color-border-2)',
-                          cursor: 'pointer',
-                          background: 'var(--color-bg-2)',
-                        }}
-                      />
+                    {relatedImages.slice(0, 6).map((path) => (
+                      <MediaThumb key={path} path={path} alt="related" width={56} height={42} />
                     ))}
                   </div>
+                </div>
+              ) : null}
+              {detailVisible ? (
+                <div
+                  style={{
+                    marginTop: 4,
+                    borderRadius: 10,
+                    overflow: 'hidden',
+                    background: '#fff',
+                    border: '1px solid var(--color-border-2)',
+                  }}
+                >
+                  <Tabs
+                    type="rounded"
+                    defaultActiveTab={imagePath ? 'origin' : iconPath ? 'icon' : videoPath ? 'video' : 'related'}
+                    size="small"
+                    style={{ padding: 10 }}
+                  >
+                    {imagePath ? (
+                      <TabPane key="origin" title="原图">
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          <MediaThumb path={imagePath} alt="origin" width="100%" height={220} />
+                          <Button size="small" icon={<IconImage />} style={{ width: 'fit-content' }} onClick={() => openMultimodalMedia(imagePath, 'image')}>
+                            打开原图
+                          </Button>
+                        </div>
+                      </TabPane>
+                    ) : null}
+                    {iconPath ? (
+                      <TabPane key="icon" title="标注图">
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          <MediaThumb path={iconPath} alt="annotation" width="100%" height={220} />
+                          <Button size="small" style={{ width: 'fit-content' }} onClick={() => openMultimodalMedia(iconPath, 'image')}>
+                            打开标注图
+                          </Button>
+                        </div>
+                      </TabPane>
+                    ) : null}
+                    {videoPath ? (
+                      <TabPane key="video" title="视频">
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          <video
+                            src={api.getMultimodalMediaUrl(videoPath, 'video')}
+                            controls
+                            style={{ width: '100%', maxHeight: 260, borderRadius: 8, background: '#000' }}
+                          />
+                          <Button size="small" icon={<IconPlayArrow />} style={{ width: 'fit-content' }} onClick={() => openMultimodalMedia(videoPath, 'video')}>
+                            打开视频
+                          </Button>
+                        </div>
+                      </TabPane>
+                    ) : null}
+                    {relatedImages.length ? (
+                      <TabPane key="related" title={`关联图 (${relatedImages.length})`}>
+                        <div style={{ display: 'grid', gap: 10 }}>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            同源视频关联样本
+                          </Text>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {relatedImages.slice(0, 12).map((path) => (
+                              <MediaThumb key={path} path={path} alt="related" width={88} height={66} />
+                            ))}
+                          </div>
+                        </div>
+                      </TabPane>
+                    ) : null}
+                  </Tabs>
                 </div>
               ) : null}
             </div>
@@ -992,6 +1081,11 @@ function CopilotTab() {
   const [running, setRunning] = useState(false)
   const [latestRoute, setLatestRoute] = useState('等待提问')
   const [latestToolSummary, setLatestToolSummary] = useState('副驾驶会在提问后展示本次使用的工具与数据资源。')
+  const [reviewBusy, setReviewBusy] = useState(false)
+  const [reviewManifest, setReviewManifest] = useState('')
+  const [reviewStats, setReviewStats] = useState(null)
+  const [reviewer, setReviewer] = useState('reviewer')
+  const [reviewOrigin, setReviewOrigin] = useState('review')
 
   const activeSession = useMemo(
     () => sessions.find((item) => item.id === activeSessionId) || sessions[0],
@@ -1062,6 +1156,49 @@ function CopilotTab() {
     setSessions((current) => current.map((session) => (
       session.id === activeSessionId ? { ...session, messages: [], title: '新会话', updatedAt: '刚刚' } : session
     )))
+  }
+
+  const exportReviewManifest = async () => {
+    setReviewBusy(true)
+    try {
+      const response = await api.exportMultimodalReview({ dataset_name: 'tower_eye', limit: 50 })
+      const payload = response?.data || {}
+      const records = Array.isArray(payload.records) ? payload.records : []
+      setReviewManifest(JSON.stringify(records, null, 2))
+      setReviewStats({ count: payload.count || records.length, mode: 'export' })
+      Message.success(`已导出 ${payload.count || records.length} 条评审样本`)
+    } catch (error) {
+      Message.error(getErrorMessage(error, '导出评审清单失败'))
+    } finally {
+      setReviewBusy(false)
+    }
+  }
+
+  const importReviewManifest = async () => {
+    let records = []
+    try {
+      records = JSON.parse(reviewManifest || '[]')
+    } catch (error) {
+      Message.error('评审清单 JSON 格式不正确')
+      return
+    }
+
+    setReviewBusy(true)
+    try {
+      const response = await api.importMultimodalReview({
+        dataset_name: 'tower_eye',
+        reviewer,
+        origin: reviewOrigin,
+        records,
+      })
+      const payload = response?.data || {}
+      setReviewStats({ count: payload.annotations || 0, mode: 'import' })
+      Message.success(`已导入 ${payload.annotations || 0} 条人工标注`)
+    } catch (error) {
+      Message.error(getErrorMessage(error, '导入评审清单失败'))
+    } finally {
+      setReviewBusy(false)
+    }
   }
 
   const sendQuestion = async (presetQuestion = '') => {
@@ -1338,6 +1475,60 @@ function CopilotTab() {
               <Paragraph style={{ marginTop: 8, marginBottom: 0 }}>
                 {latestToolSummary}
               </Paragraph>
+            </div>
+
+            <div style={{ display: 'grid', gap: 10, paddingTop: 4, borderTop: '1px solid var(--color-border-2)' }}>
+              <div>
+                <Text type="secondary">评审回流</Text>
+                <Paragraph style={{ marginTop: 8, marginBottom: 0 }}>
+                  从 Lance 中导出评审清单，补齐人工标注后再导回 `multimodal_annotations`。
+                </Paragraph>
+              </div>
+
+              <Input
+                size="small"
+                value={reviewer}
+                onChange={setReviewer}
+                placeholder="reviewer"
+              />
+              <Input
+                size="small"
+                value={reviewOrigin}
+                onChange={setReviewOrigin}
+                placeholder="review"
+              />
+
+              <Space wrap>
+                <Button size="small" loading={reviewBusy} onClick={exportReviewManifest}>
+                  导出评审样本
+                </Button>
+                <Button size="small" type="primary" loading={reviewBusy} onClick={importReviewManifest}>
+                  导入人工标注
+                </Button>
+                <Button
+                  size="small"
+                  icon={<IconCopy />}
+                  disabled={!reviewManifest}
+                  onClick={() => navigator.clipboard?.writeText(reviewManifest)}
+                >
+                  复制 JSON
+                </Button>
+              </Space>
+
+              {reviewStats ? (
+                <div style={{ padding: 10, borderRadius: 10, background: 'var(--color-fill-1)', border: '1px solid var(--color-border-2)' }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {reviewStats.mode === 'import' ? `本次已写入 ${reviewStats.count} 条标注` : `本次已导出 ${reviewStats.count} 条样本`}
+                  </Text>
+                </div>
+              ) : null}
+
+              <TextArea
+                value={reviewManifest}
+                onChange={setReviewManifest}
+                autoSize={{ minRows: 10, maxRows: 18 }}
+                placeholder='[{ "asset_id": "...", "annotations": [{ "label": "车辆", "bbox": [0.1, 0.2, 0.3, 0.4] }] }]'
+              />
             </div>
           </div>
         </Card>

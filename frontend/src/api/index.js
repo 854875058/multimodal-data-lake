@@ -279,6 +279,14 @@ const api = {
     return apiClient.post('/multimodal/agent/query', payload)
   },
 
+  exportMultimodalReview(payload) {
+    return apiClient.post('/multimodal/review/export', payload)
+  },
+
+  importMultimodalReview(payload) {
+    return apiClient.post('/multimodal/review/import', payload)
+  },
+
   getMultimodalMediaUrl(path, kind = 'image') {
     const params = new URLSearchParams()
     params.set('path', path || '')
