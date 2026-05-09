@@ -9,6 +9,7 @@ python-multipart>=0.0.6
 # --- 数据库 ---
 lancedb>=0.4.0
 pyarrow>=14.0.0
+duckdb>=1.0.0
 
 # --- AI 模型 ---
 sentence-transformers>=2.2.0

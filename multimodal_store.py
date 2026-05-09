@@ -1,149 +1,77 @@
 # -*- coding: utf-8 -*-
-"""Storage helpers for multimodal detection assets imported from Tower-Eye."""
+"""LanceDB + DuckDB storage helpers for Tower-Eye multimodal detection data."""
 
-import json
+import duckdb
 import logging
 import sqlite3
-from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from config import DB_PATH
+import pyarrow as pa
+
+from models_loader import get_multimodal_lancedb_tables
 
 logger = logging.getLogger(__name__)
 
 
-def _ensure_parent() -> None:
-    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-
-
-def _get_conn() -> sqlite3.Connection:
-    _ensure_parent()
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
 def init_multimodal_tables() -> None:
-    conn = _get_conn()
+    """Ensure multimodal Lance tables exist."""
+    get_multimodal_lancedb_tables()
+
+
+def _coerce_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _coerce_float(value: Any) -> Optional[float]:
+    if value in (None, ""):
+        return None
     try:
-        conn.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS multimodal_assets (
-              asset_id TEXT PRIMARY KEY,
-              dataset_name TEXT NOT NULL,
-              media_type TEXT NOT NULL,
-              file_path TEXT NOT NULL,
-              file_name TEXT,
-              sha256 TEXT,
-              width INTEGER,
-              height INTEGER,
-              duration_sec REAL,
-              captured_at TEXT,
-              lat REAL,
-              lon REAL,
-              source TEXT,
-              created_at TEXT,
-              imported_at TEXT DEFAULT CURRENT_TIMESTAMP
-            );
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
-            CREATE INDEX IF NOT EXISTS idx_mm_assets_dataset ON multimodal_assets(dataset_name);
-            CREATE INDEX IF NOT EXISTS idx_mm_assets_media_type ON multimodal_assets(media_type);
-            CREATE INDEX IF NOT EXISTS idx_mm_assets_captured_at ON multimodal_assets(captured_at);
 
-            CREATE TABLE IF NOT EXISTS multimodal_events (
-              event_id TEXT PRIMARY KEY,
-              asset_id TEXT NOT NULL,
-              dataset_name TEXT NOT NULL,
-              event_type TEXT,
-              alarm_level TEXT,
-              alarm_source TEXT,
-              alarm_time TEXT,
-              lat REAL,
-              lon REAL,
-              region TEXT,
-              extra_json TEXT,
-              summary TEXT,
-              description TEXT,
-              address TEXT,
-              device_name TEXT,
-              confidence_level REAL,
-              province_name TEXT,
-              city_name TEXT,
-              county_name TEXT,
-              town_code TEXT,
-              town_name TEXT,
-              device_code TEXT,
-              channel_code TEXT,
-              channel_name TEXT,
-              warning_order_id TEXT,
-              warning_type_id TEXT,
-              alarm_body TEXT,
-              algorithm_code TEXT,
-              algorithm_name TEXT,
-              emergency_level TEXT,
-              importance_level TEXT,
-              order_status TEXT,
-              confidence_level_max REAL,
-              tenant_name TEXT,
-              video_path TEXT,
-              img_src_path TEXT,
-              img_icon_path TEXT,
-              created_at TEXT,
-              imported_at TEXT DEFAULT CURRENT_TIMESTAMP
-            );
+def _coerce_int(value: Any) -> Optional[int]:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
-            CREATE INDEX IF NOT EXISTS idx_mm_events_asset ON multimodal_events(asset_id);
-            CREATE INDEX IF NOT EXISTS idx_mm_events_dataset ON multimodal_events(dataset_name);
-            CREATE INDEX IF NOT EXISTS idx_mm_events_type ON multimodal_events(event_type);
-            CREATE INDEX IF NOT EXISTS idx_mm_events_alarm_time ON multimodal_events(alarm_time);
 
-            CREATE TABLE IF NOT EXISTS multimodal_detections (
-              detection_id TEXT PRIMARY KEY,
-              asset_id TEXT NOT NULL,
-              dataset_name TEXT NOT NULL,
-              model_name TEXT,
-              label TEXT,
-              confidence REAL,
-              bbox_x REAL,
-              bbox_y REAL,
-              bbox_w REAL,
-              bbox_h REAL,
-              frame_index INTEGER,
-              timestamp_sec REAL,
-              created_at TEXT,
-              imported_at TEXT DEFAULT CURRENT_TIMESTAMP
-            );
+def _dataset_filter_expr(dataset_name: str) -> str:
+    escaped = dataset_name.replace("\\", "\\\\").replace("'", "\\'")
+    return f"dataset_name = '{escaped}'"
 
-            CREATE INDEX IF NOT EXISTS idx_mm_detections_asset ON multimodal_detections(asset_id);
-            CREATE INDEX IF NOT EXISTS idx_mm_detections_label ON multimodal_detections(label);
-            CREATE INDEX IF NOT EXISTS idx_mm_detections_dataset ON multimodal_detections(dataset_name);
 
-            CREATE TABLE IF NOT EXISTS multimodal_annotations (
-              annotation_id TEXT PRIMARY KEY,
-              asset_id TEXT NOT NULL,
-              dataset_name TEXT NOT NULL,
-              label TEXT,
-              bbox_x REAL,
-              bbox_y REAL,
-              bbox_w REAL,
-              bbox_h REAL,
-              origin TEXT,
-              reviewer TEXT,
-              reviewed_at TEXT,
-              created_at TEXT,
-              imported_at TEXT DEFAULT CURRENT_TIMESTAMP
-            );
+def _add_rows(table, rows: List[Dict[str, Any]], schema: pa.Schema, batch_size: int = 2000) -> None:
+    if not rows:
+        return
+    for start in range(0, len(rows), batch_size):
+        chunk = rows[start:start + batch_size]
+        arrow_table = pa.Table.from_pylist(chunk, schema=schema)
+        table.add(arrow_table)
 
-            CREATE INDEX IF NOT EXISTS idx_mm_annotations_asset ON multimodal_annotations(asset_id);
-            CREATE INDEX IF NOT EXISTS idx_mm_annotations_label ON multimodal_annotations(label);
-            CREATE INDEX IF NOT EXISTS idx_mm_annotations_dataset ON multimodal_annotations(dataset_name);
-            """
-        )
-        conn.commit()
-    finally:
-        conn.close()
+
+def _register_arrow_table(con: duckdb.DuckDBPyConnection, name: str, table) -> None:
+    arrow_table = table.to_arrow()
+    con.register(name, arrow_table)
+
+
+def _get_duckdb_connection() -> duckdb.DuckDBPyConnection:
+    init_multimodal_tables()
+    tbl_assets, tbl_events, tbl_detections, tbl_annotations = get_multimodal_lancedb_tables()
+    con = duckdb.connect(":memory:")
+    _register_arrow_table(con, "multimodal_assets", tbl_assets)
+    _register_arrow_table(con, "multimodal_events", tbl_events)
+    _register_arrow_table(con, "multimodal_detections", tbl_detections)
+    _register_arrow_table(con, "multimodal_annotations", tbl_annotations)
+    return con
 
 
 def _select_table_rows(
@@ -169,172 +97,141 @@ def import_tower_metadata_db(source_db_path: str, dataset_name: str = "tower_eye
     init_multimodal_tables()
     source = sqlite3.connect(str(src_path))
     source.row_factory = sqlite3.Row
-    target = _get_conn()
+    tbl_assets, tbl_events, tbl_detections, tbl_annotations = get_multimodal_lancedb_tables()
+    imported_at = datetime.now().isoformat(sep=" ", timespec="seconds")
+
     try:
-      assets_sql = "SELECT * FROM assets ORDER BY created_at DESC"
-      if limit and limit > 0:
-          assets_sql += f" LIMIT {int(limit)}"
-      asset_rows = source.execute(assets_sql).fetchall()
-      asset_ids = [str(row["asset_id"]) for row in asset_rows]
-      event_rows = _select_table_rows(source, "events", "asset_id", asset_ids)
-      detection_rows = _select_table_rows(source, "detections", "asset_id", asset_ids)
-      annotation_rows = _select_table_rows(source, "annotations", "asset_id", asset_ids)
+        assets_sql = "SELECT * FROM assets ORDER BY created_at DESC"
+        if limit and limit > 0:
+            assets_sql += f" LIMIT {int(limit)}"
 
-      target.executemany(
-          """
-          INSERT OR REPLACE INTO multimodal_assets (
-            asset_id, dataset_name, media_type, file_path, file_name, sha256, width, height,
-            duration_sec, captured_at, lat, lon, source, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          """,
-          [
-              (
-                  str(row["asset_id"]),
-                  dataset_name,
-                  str(row["media_type"] or ""),
-                  str(row["file_path"] or ""),
-                  str(row["file_name"] or ""),
-                  str(row["sha256"] or ""),
-                  row["width"],
-                  row["height"],
-                  row["duration_sec"],
-                  row["captured_at"],
-                  row["lat"],
-                  row["lon"],
-                  str(row["source"] or ""),
-                  row["created_at"],
-              )
-              for row in asset_rows
-          ],
-      )
+        asset_rows = source.execute(assets_sql).fetchall()
+        asset_ids = [str(row["asset_id"]) for row in asset_rows]
+        event_rows = _select_table_rows(source, "events", "asset_id", asset_ids)
+        detection_rows = _select_table_rows(source, "detections", "asset_id", asset_ids)
+        annotation_rows = _select_table_rows(source, "annotations", "asset_id", asset_ids)
 
-      target.executemany(
-          """
-          INSERT OR REPLACE INTO multimodal_events (
-            event_id, asset_id, dataset_name, event_type, alarm_level, alarm_source, alarm_time,
-            lat, lon, region, extra_json, summary, description, address, device_name, confidence_level,
-            province_name, city_name, county_name, town_code, town_name, device_code, channel_code,
-            channel_name, warning_order_id, warning_type_id, alarm_body, algorithm_code, algorithm_name,
-            emergency_level, importance_level, order_status, confidence_level_max, tenant_name,
-            video_path, img_src_path, img_icon_path, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          """,
-          [
-              (
-                  str(row["event_id"]),
-                  str(row["asset_id"] or ""),
-                  dataset_name,
-                  row["event_type"],
-                  row["alarm_level"],
-                  row["alarm_source"],
-                  row["alarm_time"],
-                  row["lat"],
-                  row["lon"],
-                  row["region"],
-                  row["extra_json"],
-                  row["summary"],
-                  row["description"],
-                  row["address"],
-                  row["device_name"],
-                  row["confidence_level"],
-                  row["province_name"],
-                  row["city_name"],
-                  row["county_name"],
-                  row["town_code"],
-                  row["town_name"],
-                  row["device_code"],
-                  row["channel_code"],
-                  row["channel_name"],
-                  row["warning_order_id"],
-                  row["warning_type_id"],
-                  row["alarm_body"],
-                  row["algorithm_code"],
-                  row["algorithm_name"],
-                  row["emergency_level"],
-                  row["importance_level"],
-                  row["order_status"],
-                  row["confidence_level_max"],
-                  row["tenant_name"],
-                  row["video_path"],
-                  row["img_src_path"],
-                  row["img_icon_path"],
-                  row["created_at"],
-              )
-              for row in event_rows
-          ],
-      )
+        dataset_expr = _dataset_filter_expr(dataset_name)
+        for table in (tbl_assets, tbl_events, tbl_detections, tbl_annotations):
+            try:
+                table.delete(dataset_expr)
+            except Exception:
+                logger.warning("failed to delete existing dataset rows from %s", getattr(table, "name", "table"), exc_info=True)
 
-      target.executemany(
-          """
-          INSERT OR REPLACE INTO multimodal_detections (
-            detection_id, asset_id, dataset_name, model_name, label, confidence, bbox_x, bbox_y,
-            bbox_w, bbox_h, frame_index, timestamp_sec, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          """,
-          [
-              (
-                  str(row["detection_id"]),
-                  str(row["asset_id"] or ""),
-                  dataset_name,
-                  row["model_name"],
-                  row["label"],
-                  row["confidence"],
-                  row["bbox_x"],
-                  row["bbox_y"],
-                  row["bbox_w"],
-                  row["bbox_h"],
-                  row["frame_index"],
-                  row["timestamp_sec"],
-                  row["created_at"],
-              )
-              for row in detection_rows
-          ],
-      )
+        asset_docs = [{
+            "asset_id": _coerce_text(row["asset_id"]),
+            "dataset_name": dataset_name,
+            "media_type": _coerce_text(row["media_type"]),
+            "file_path": _coerce_text(row["file_path"]),
+            "file_name": _coerce_text(row["file_name"]),
+            "sha256": _coerce_text(row["sha256"]),
+            "width": _coerce_int(row["width"]),
+            "height": _coerce_int(row["height"]),
+            "duration_sec": _coerce_float(row["duration_sec"]),
+            "captured_at": _coerce_text(row["captured_at"]),
+            "lat": _coerce_float(row["lat"]),
+            "lon": _coerce_float(row["lon"]),
+            "source": _coerce_text(row["source"]),
+            "created_at": _coerce_text(row["created_at"]),
+            "imported_at": imported_at,
+        } for row in asset_rows]
 
-      target.executemany(
-          """
-          INSERT OR REPLACE INTO multimodal_annotations (
-            annotation_id, asset_id, dataset_name, label, bbox_x, bbox_y, bbox_w, bbox_h,
-            origin, reviewer, reviewed_at, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          """,
-          [
-              (
-                  str(row["annotation_id"]),
-                  str(row["asset_id"] or ""),
-                  dataset_name,
-                  row["label"],
-                  row["bbox_x"],
-                  row["bbox_y"],
-                  row["bbox_w"],
-                  row["bbox_h"],
-                  row["origin"],
-                  row["reviewer"],
-                  row["reviewed_at"],
-                  row["created_at"],
-              )
-              for row in annotation_rows
-          ],
-      )
+        event_docs = [{
+            "event_id": _coerce_text(row["event_id"]),
+            "asset_id": _coerce_text(row["asset_id"]),
+            "dataset_name": dataset_name,
+            "event_type": _coerce_text(row["event_type"]),
+            "alarm_level": _coerce_text(row["alarm_level"]),
+            "alarm_source": _coerce_text(row["alarm_source"]),
+            "alarm_time": _coerce_text(row["alarm_time"]),
+            "lat": _coerce_float(row["lat"]),
+            "lon": _coerce_float(row["lon"]),
+            "region": _coerce_text(row["region"]),
+            "extra_json": _coerce_text(row["extra_json"]),
+            "summary": _coerce_text(row["summary"]),
+            "description": _coerce_text(row["description"]),
+            "address": _coerce_text(row["address"]),
+            "device_name": _coerce_text(row["device_name"]),
+            "confidence_level": _coerce_float(row["confidence_level"]),
+            "province_name": _coerce_text(row["province_name"]),
+            "city_name": _coerce_text(row["city_name"]),
+            "county_name": _coerce_text(row["county_name"]),
+            "town_code": _coerce_text(row["town_code"]),
+            "town_name": _coerce_text(row["town_name"]),
+            "device_code": _coerce_text(row["device_code"]),
+            "channel_code": _coerce_text(row["channel_code"]),
+            "channel_name": _coerce_text(row["channel_name"]),
+            "warning_order_id": _coerce_text(row["warning_order_id"]),
+            "warning_type_id": _coerce_text(row["warning_type_id"]),
+            "alarm_body": _coerce_text(row["alarm_body"]),
+            "algorithm_code": _coerce_text(row["algorithm_code"]),
+            "algorithm_name": _coerce_text(row["algorithm_name"]),
+            "emergency_level": _coerce_text(row["emergency_level"]),
+            "importance_level": _coerce_text(row["importance_level"]),
+            "order_status": _coerce_text(row["order_status"]),
+            "confidence_level_max": _coerce_float(row["confidence_level_max"]),
+            "tenant_name": _coerce_text(row["tenant_name"]),
+            "video_path": _coerce_text(row["video_path"]),
+            "img_src_path": _coerce_text(row["img_src_path"]),
+            "img_icon_path": _coerce_text(row["img_icon_path"]),
+            "created_at": _coerce_text(row["created_at"]),
+            "imported_at": imported_at,
+        } for row in event_rows]
 
-      target.commit()
+        detection_docs = [{
+            "detection_id": _coerce_text(row["detection_id"]),
+            "asset_id": _coerce_text(row["asset_id"]),
+            "dataset_name": dataset_name,
+            "model_name": _coerce_text(row["model_name"]),
+            "label": _coerce_text(row["label"]),
+            "confidence": _coerce_float(row["confidence"]),
+            "bbox_x": _coerce_float(row["bbox_x"]),
+            "bbox_y": _coerce_float(row["bbox_y"]),
+            "bbox_w": _coerce_float(row["bbox_w"]),
+            "bbox_h": _coerce_float(row["bbox_h"]),
+            "frame_index": _coerce_int(row["frame_index"]),
+            "timestamp_sec": _coerce_float(row["timestamp_sec"]),
+            "created_at": _coerce_text(row["created_at"]),
+            "imported_at": imported_at,
+        } for row in detection_rows]
 
-      return {
-          "dataset_name": dataset_name,
-          "source_db_path": str(src_path),
-          "assets": len(asset_rows),
-          "events": len(event_rows),
-          "detections": len(detection_rows),
-          "annotations": len(annotation_rows),
-      }
+        annotation_docs = [{
+            "annotation_id": _coerce_text(row["annotation_id"]),
+            "asset_id": _coerce_text(row["asset_id"]),
+            "dataset_name": dataset_name,
+            "label": _coerce_text(row["label"]),
+            "bbox_x": _coerce_float(row["bbox_x"]),
+            "bbox_y": _coerce_float(row["bbox_y"]),
+            "bbox_w": _coerce_float(row["bbox_w"]),
+            "bbox_h": _coerce_float(row["bbox_h"]),
+            "origin": _coerce_text(row["origin"]),
+            "reviewer": _coerce_text(row["reviewer"]),
+            "reviewed_at": _coerce_text(row["reviewed_at"]),
+            "created_at": _coerce_text(row["created_at"]),
+            "imported_at": imported_at,
+        } for row in annotation_rows]
+
+        _add_rows(tbl_assets, asset_docs, tbl_assets.schema)
+        _add_rows(tbl_events, event_docs, tbl_events.schema)
+        _add_rows(tbl_detections, detection_docs, tbl_detections.schema)
+        _add_rows(tbl_annotations, annotation_docs, tbl_annotations.schema)
+
+        return {
+            "dataset_name": dataset_name,
+            "source_db_path": str(src_path),
+            "assets": len(asset_docs),
+            "events": len(event_docs),
+            "detections": len(detection_docs),
+            "annotations": len(annotation_docs),
+            "storage": "lancedb+duckdb",
+            "imported_at": imported_at,
+        }
     finally:
-      source.close()
-      target.close()
+        source.close()
 
 
 def get_multimodal_summary(dataset_name: str = "") -> Dict[str, Any]:
-    init_multimodal_tables()
-    conn = _get_conn()
+    con = _get_duckdb_connection()
     try:
         where = ""
         params: List[Any] = []
@@ -342,33 +239,35 @@ def get_multimodal_summary(dataset_name: str = "") -> Dict[str, Any]:
             where = " WHERE dataset_name = ?"
             params.append(dataset_name)
 
-        assets = conn.execute(f"SELECT COUNT(*) FROM multimodal_assets{where}", params).fetchone()[0]
-        events = conn.execute(f"SELECT COUNT(*) FROM multimodal_events{where}", params).fetchone()[0]
-        detections = conn.execute(f"SELECT COUNT(*) FROM multimodal_detections{where}", params).fetchone()[0]
-        annotations = conn.execute(f"SELECT COUNT(*) FROM multimodal_annotations{where}", params).fetchone()[0]
+        assets = con.execute(f"SELECT COUNT(*) FROM multimodal_assets{where}", params).fetchone()[0]
+        events = con.execute(f"SELECT COUNT(*) FROM multimodal_events{where}", params).fetchone()[0]
+        detections = con.execute(f"SELECT COUNT(*) FROM multimodal_detections{where}", params).fetchone()[0]
+        annotations = con.execute(f"SELECT COUNT(*) FROM multimodal_annotations{where}", params).fetchone()[0]
+
         datasets = [
-            dict(row)
-            for row in conn.execute(
-                "SELECT dataset_name, COUNT(*) AS asset_count FROM multimodal_assets GROUP BY dataset_name ORDER BY asset_count DESC"
+            {"dataset_name": row[0], "asset_count": row[1]}
+            for row in con.execute(
+                "SELECT dataset_name, COUNT(*) AS asset_count "
+                "FROM multimodal_assets GROUP BY dataset_name ORDER BY asset_count DESC"
             ).fetchall()
         ]
         labels = [
-            dict(row)
-            for row in conn.execute(
+            {"label": row[0], "count": row[1]}
+            for row in con.execute(
                 f"SELECT label, COUNT(*) AS count FROM multimodal_detections{where} "
-                "AND label IS NOT NULL AND TRIM(label) != '' GROUP BY label ORDER BY count DESC LIMIT 10"
-                if where
-                else "SELECT label, COUNT(*) AS count FROM multimodal_detections WHERE label IS NOT NULL AND TRIM(label) != '' GROUP BY label ORDER BY count DESC LIMIT 10",
+                + (" AND " if where else " WHERE ")
+                + "label IS NOT NULL AND TRIM(label) <> '' "
+                "GROUP BY label ORDER BY count DESC LIMIT 10",
                 params,
             ).fetchall()
         ]
         event_types = [
-            dict(row)
-            for row in conn.execute(
+            {"event_type": row[0], "count": row[1]}
+            for row in con.execute(
                 f"SELECT event_type, COUNT(*) AS count FROM multimodal_events{where} "
-                "AND event_type IS NOT NULL AND TRIM(event_type) != '' GROUP BY event_type ORDER BY count DESC LIMIT 10"
-                if where
-                else "SELECT event_type, COUNT(*) AS count FROM multimodal_events WHERE event_type IS NOT NULL AND TRIM(event_type) != '' GROUP BY event_type ORDER BY count DESC LIMIT 10",
+                + (" AND " if where else " WHERE ")
+                + "event_type IS NOT NULL AND TRIM(event_type) <> '' "
+                "GROUP BY event_type ORDER BY count DESC LIMIT 10",
                 params,
             ).fetchall()
         ]
@@ -380,9 +279,10 @@ def get_multimodal_summary(dataset_name: str = "") -> Dict[str, Any]:
             "datasets": datasets,
             "top_labels": labels,
             "top_event_types": event_types,
+            "storage": "lancedb+duckdb",
         }
     finally:
-        conn.close()
+        con.close()
 
 
 def _extract_time_range(question: str) -> Tuple[Optional[str], Optional[str], str]:
@@ -392,10 +292,10 @@ def _extract_time_range(question: str) -> Tuple[Optional[str], Optional[str], st
         return start.isoformat(sep=" "), now.isoformat(sep=" "), "今天"
     if "近7天" in question or "最近7天" in question:
         start = now - timedelta(days=7)
-        return start.isoformat(sep=" "), now.isoformat(sep=" "), "近7天"
+        return start.isoformat(sep=" "), now.isoformat(sep=" "), "最近7天"
     if "近30天" in question or "最近30天" in question:
         start = now - timedelta(days=30)
-        return start.isoformat(sep=" "), now.isoformat(sep=" "), "近30天"
+        return start.isoformat(sep=" "), now.isoformat(sep=" "), "最近30天"
     if "本周" in question:
         start = now - timedelta(days=now.weekday())
         start = datetime(start.year, start.month, start.day)
@@ -403,11 +303,12 @@ def _extract_time_range(question: str) -> Tuple[Optional[str], Optional[str], st
     return None, None, ""
 
 
-def _load_vocab(conn: sqlite3.Connection, table: str, column: str) -> List[str]:
-    rows = conn.execute(
-        f"SELECT DISTINCT {column} FROM {table} WHERE {column} IS NOT NULL AND TRIM({column}) != '' LIMIT 200"
+def _load_vocab(con: duckdb.DuckDBPyConnection, table: str, column: str) -> List[str]:
+    rows = con.execute(
+        f'SELECT DISTINCT "{column}" FROM {table} '
+        f'WHERE "{column}" IS NOT NULL AND TRIM(CAST("{column}" AS VARCHAR)) <> \'\' LIMIT 200'
     ).fetchall()
-    return [str(row[0]) for row in rows if row[0]]
+    return [str(row[0]) for row in rows if row and row[0]]
 
 
 def _matched_terms(question: str, candidates: Sequence[str]) -> List[str]:
@@ -430,7 +331,7 @@ def _build_common_filters(
 
     start_time, end_time, time_label = _extract_time_range(question)
     if start_time and end_time:
-        clauses.append("(e.alarm_time >= ? OR a.captured_at >= ?)")
+        clauses.append("(COALESCE(e.alarm_time, '') >= ? OR COALESCE(a.captured_at, '') >= ?)")
         params.extend([start_time, start_time])
         info["time_range"] = time_label
 
@@ -446,44 +347,59 @@ def _build_common_filters(
         clauses.append("(" + " OR ".join(["e.event_type = ?"] * len(matched_event_types)) + ")")
         params.extend(matched_event_types)
 
-    keywords = [token for token in question.replace("，", " ").replace("。", " ").split() if token]
-    if not matched_labels and not matched_event_types and keywords:
-        like_clauses = []
+    keywords = [
+        token for token in
+        question.replace("，", " ").replace("。", " ").replace(",", " ").split()
+        if token
+    ]
+    should_use_keywords = bool(keywords)
+    if len(keywords) == 1 and len(keywords[0]) > 8:
+        should_use_keywords = False
+    if any(token in question for token in ["哪些", "样本", "记录", "图片", "告警"]) and not matched_labels and not matched_event_types:
+        should_use_keywords = False
+
+    if not matched_labels and not matched_event_types and should_use_keywords:
+        keyword_clauses = []
         for token in keywords[:4]:
-            like_clauses.append(
-                "(COALESCE(e.summary,'') LIKE ? OR COALESCE(e.description,'') LIKE ? OR "
-                "COALESCE(e.address,'') LIKE ? OR COALESCE(e.device_name,'') LIKE ? OR COALESCE(a.file_name,'') LIKE ?)"
+            keyword_clauses.append(
+                "("
+                "COALESCE(e.summary, '') LIKE ? OR "
+                "COALESCE(e.description, '') LIKE ? OR "
+                "COALESCE(e.address, '') LIKE ? OR "
+                "COALESCE(e.device_name, '') LIKE ? OR "
+                "COALESCE(a.file_name, '') LIKE ?"
+                ")"
             )
             params.extend([f"%{token}%"] * 5)
-        clauses.append("(" + " AND ".join(like_clauses) + ")")
+        clauses.append("(" + " AND ".join(keyword_clauses) + ")")
 
     where = " AND ".join(clauses) if clauses else "1=1"
     return where, params, info
 
 
 def search_multimodal_assets(question: str, limit: int = 10, dataset_name: str = "") -> Dict[str, Any]:
-    init_multimodal_tables()
-    conn = _get_conn()
+    con = _get_duckdb_connection()
     try:
-        label_vocab = _load_vocab(conn, "multimodal_detections", "label")
-        event_vocab = _load_vocab(conn, "multimodal_events", "event_type")
+        label_vocab = _load_vocab(con, "multimodal_detections", "label")
+        event_vocab = _load_vocab(con, "multimodal_events", "event_type")
         where, params, info = _build_common_filters(question, dataset_name, label_vocab, event_vocab)
 
         is_count = any(token in question for token in ["多少", "几条", "统计", "数量", "总数", "分布"])
-        is_list = any(token in question for token in ["哪些", "列出", "查看", "样本", "图片", "告警", "记录"])
+        wants_group = any(token in question for token in ["按类型", "分类", "排行", "排名", "TOP"])
 
-        if is_count and "按类型" in question:
+        if is_count and wants_group:
             sql = (
-                "SELECT COALESCE(e.event_type, '未分类') AS event_type, COUNT(DISTINCT a.asset_id) AS asset_count "
+                "SELECT COALESCE(e.event_type, '未分类') AS event_type, "
+                "COUNT(DISTINCT a.asset_id) AS asset_count "
                 "FROM multimodal_assets a "
-                "LEFT JOIN multimodal_events e ON e.asset_id = a.asset_id "
-                "LEFT JOIN multimodal_detections d ON d.asset_id = a.asset_id "
+                "LEFT JOIN multimodal_events e ON e.asset_id = a.asset_id AND e.dataset_name = a.dataset_name "
+                "LEFT JOIN multimodal_detections d ON d.asset_id = a.asset_id AND d.dataset_name = a.dataset_name "
                 f"WHERE {where} "
                 "GROUP BY COALESCE(e.event_type, '未分类') "
                 "ORDER BY asset_count DESC LIMIT ?"
             )
-            rows = [dict(row) for row in conn.execute(sql, params + [limit]).fetchall()]
-            summary = f"已按事件类型汇总 {len(rows)} 个分组。"
+            rows_raw = con.execute(sql, params + [limit]).fetchall()
+            rows = [{"event_type": row[0], "asset_count": row[1]} for row in rows_raw]
             return {
                 "route": "检测统计聚合",
                 "sql": sql,
@@ -491,87 +407,111 @@ def search_multimodal_assets(question: str, limit: int = 10, dataset_name: str =
                 "columns": ["event_type", "asset_count"],
                 "rows": rows,
                 "cards": [],
-                "summary": summary,
-                "tool_summary": "读取 multimodal_assets / multimodal_events / multimodal_detections 做聚合统计。",
+                "summary": f"已按事件类型汇总 {len(rows)} 个分组。",
+                "tool_summary": "通过 DuckDB 联查 Lance 中的 multimodal_assets、multimodal_events、multimodal_detections。",
                 "context": info,
             }
 
         if is_count:
-            row = conn.execute(
-                "SELECT COUNT(DISTINCT a.asset_id) AS asset_count, COUNT(DISTINCT e.event_id) AS event_count, "
-                "COUNT(d.detection_id) AS detection_count, COUNT(an.annotation_id) AS annotation_count "
+            sql = (
+                "SELECT COUNT(DISTINCT a.asset_id) AS asset_count, "
+                "COUNT(DISTINCT e.event_id) AS event_count, "
+                "COUNT(DISTINCT d.detection_id) AS detection_count, "
+                "COUNT(DISTINCT an.annotation_id) AS annotation_count "
                 "FROM multimodal_assets a "
-                "LEFT JOIN multimodal_events e ON e.asset_id = a.asset_id "
-                "LEFT JOIN multimodal_detections d ON d.asset_id = a.asset_id "
-                "LEFT JOIN multimodal_annotations an ON an.asset_id = a.asset_id "
-                f"WHERE {where}",
-                params,
-            ).fetchone()
-            rows = [dict(row)] if row else []
-            summary = (
-                f"命中资产 {row['asset_count'] if row else 0} 条，"
-                f"事件 {row['event_count'] if row else 0} 条，"
-                f"检测 {row['detection_count'] if row else 0} 条。"
+                "LEFT JOIN multimodal_events e ON e.asset_id = a.asset_id AND e.dataset_name = a.dataset_name "
+                "LEFT JOIN multimodal_detections d ON d.asset_id = a.asset_id AND d.dataset_name = a.dataset_name "
+                "LEFT JOIN multimodal_annotations an ON an.asset_id = a.asset_id AND an.dataset_name = a.dataset_name "
+                f"WHERE {where}"
             )
+            row = con.execute(sql, params).fetchone()
+            result_row = {
+                "asset_count": row[0] if row else 0,
+                "event_count": row[1] if row else 0,
+                "detection_count": row[2] if row else 0,
+                "annotation_count": row[3] if row else 0,
+            }
             return {
                 "route": "检测统计聚合",
-                "sql": f"SELECT COUNT ... FROM multimodal_* WHERE {where}",
+                "sql": sql,
                 "sql_params": params,
-                "columns": ["asset_count", "event_count", "detection_count", "annotation_count"],
-                "rows": rows,
+                "columns": list(result_row.keys()),
+                "rows": [result_row],
                 "cards": [],
-                "summary": summary,
-                "tool_summary": "围绕检测资产、事件和标注表做聚合统计。",
+                "summary": (
+                    f"命中资产 {result_row['asset_count']} 条，"
+                    f"事件 {result_row['event_count']} 条，"
+                    f"检测 {result_row['detection_count']} 条，"
+                    f"标注 {result_row['annotation_count']} 条。"
+                ),
+                "tool_summary": "围绕 Lance 表中的资产、事件、检测和标注数据完成聚合统计。",
                 "context": info,
             }
 
         sql = (
-            "SELECT a.asset_id, a.file_name, a.file_path, a.media_type, a.captured_at, "
+            "SELECT "
+            "a.asset_id, a.dataset_name, a.file_name, a.file_path, a.media_type, a.captured_at, "
             "e.event_type, e.alarm_time, e.summary, e.description, e.address, e.device_name, "
-            "GROUP_CONCAT(DISTINCT d.label) AS labels, MAX(d.confidence) AS max_confidence "
+            "e.img_src_path, e.img_icon_path, e.video_path, "
+            "string_agg(DISTINCT NULLIF(d.label, ''), ', ') AS labels, "
+            "MAX(d.confidence) AS max_confidence "
             "FROM multimodal_assets a "
-            "LEFT JOIN multimodal_events e ON e.asset_id = a.asset_id "
-            "LEFT JOIN multimodal_detections d ON d.asset_id = a.asset_id "
+            "LEFT JOIN multimodal_events e ON e.asset_id = a.asset_id AND e.dataset_name = a.dataset_name "
+            "LEFT JOIN multimodal_detections d ON d.asset_id = a.asset_id AND d.dataset_name = a.dataset_name "
             f"WHERE {where} "
-            "GROUP BY a.asset_id, a.file_name, a.file_path, a.media_type, a.captured_at, "
-            "e.event_type, e.alarm_time, e.summary, e.description, e.address, e.device_name "
-            "ORDER BY COALESCE(e.alarm_time, a.captured_at, a.imported_at) DESC LIMIT ?"
+            "GROUP BY "
+            "a.asset_id, a.dataset_name, a.file_name, a.file_path, a.media_type, a.captured_at, "
+            "e.event_type, e.alarm_time, e.summary, e.description, e.address, e.device_name, "
+            "e.img_src_path, e.img_icon_path, e.video_path "
+            "ORDER BY COALESCE(e.alarm_time, a.captured_at, '') DESC LIMIT ?"
         )
-        records = [dict(row) for row in conn.execute(sql, params + [limit]).fetchall()]
-        cards = [
-            {
+        rows_raw = con.execute(sql, params + [limit]).fetchall()
+        columns = [desc[0] for desc in con.description]
+        records = [dict(zip(columns, row)) for row in rows_raw]
+
+        cards = []
+        for item in records:
+            cards.append({
                 "id": item["asset_id"],
                 "doc_name": item.get("file_name") or item.get("asset_id"),
                 "doc_type": item.get("media_type") or "image",
-                "source_uri": item.get("file_path") or "",
+                "source_uri": item.get("file_path") or item.get("img_src_path") or "",
                 "distance": 0,
                 "file_hash": item.get("asset_id") or "",
-                "text": " | ".join(
-                    [
-                        str(item.get("event_type") or "").strip(),
-                        str(item.get("summary") or item.get("description") or "").strip(),
-                        str(item.get("labels") or "").strip(),
-                    ]
-                ).strip(" | "),
-            }
-            for item in records
-        ]
+                "text": " | ".join(part for part in [
+                    item.get("event_type") or "",
+                    item.get("summary") or item.get("description") or "",
+                    item.get("labels") or "",
+                ] if part),
+                "event_type": item.get("event_type") or "",
+                "alarm_time": item.get("alarm_time") or "",
+                "labels": item.get("labels") or "",
+                "summary": item.get("summary") or "",
+                "description": item.get("description") or "",
+                "address": item.get("address") or "",
+                "device_name": item.get("device_name") or "",
+                "img_src_path": item.get("img_src_path") or "",
+                "img_icon_path": item.get("img_icon_path") or "",
+                "video_path": item.get("video_path") or "",
+            })
+
         summary = f"已返回 {len(records)} 条检测资产记录，可继续追问时间范围、事件类型或目标类别。"
-        if not records and is_list:
-            summary = "当前条件下没有命中检测资产，建议缩小时间范围或换一个目标类别。"
+        if not records:
+            summary = "当前条件下没有命中检测资产，建议缩小时间范围或更换目标类别。"
+
         return {
             "route": "检测资产检索",
             "sql": sql,
             "sql_params": params + [limit],
-            "columns": list(records[0].keys()) if records else [],
+            "columns": columns,
             "rows": records,
             "cards": cards,
             "summary": summary,
-            "tool_summary": "读取 multimodal_assets / multimodal_events / multimodal_detections 做列表检索与样本补充。",
+            "tool_summary": "通过 DuckDB 读取 Lance 表，完成事件联查、标签聚合和样本返回。",
             "context": info,
         }
     finally:
-        conn.close()
+        con.close()
 
 
 def get_dataset_overview_text(dataset_name: str = "") -> str:
@@ -579,7 +519,7 @@ def get_dataset_overview_text(dataset_name: str = "") -> str:
     top_label = summary["top_labels"][0]["label"] if summary["top_labels"] else "暂无"
     top_event = summary["top_event_types"][0]["event_type"] if summary["top_event_types"] else "暂无"
     return (
-        f"当前已承接 {summary['assets']} 条检测资产、{summary['events']} 条事件、"
+        f"当前已接入 {summary['assets']} 条检测资产、{summary['events']} 条事件、"
         f"{summary['detections']} 条检测框、{summary['annotations']} 条人工标注。"
         f"高频检测类别为 {top_label}，高频事件类型为 {top_event}。"
     )

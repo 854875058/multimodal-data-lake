@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""AI 模型与 LanceDB 连接"""
+"""Model loading and LanceDB table helpers."""
 
 import logging
 from functools import lru_cache
@@ -11,13 +11,12 @@ from config import DEFAULT_AWS_REGION, LANCE_DB_URI, S3_CONFIG
 
 logger = logging.getLogger(__name__)
 
-try:
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-except ImportError:
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
-
 
 def get_text_splitter(chunk_size=500, chunk_overlap=50):
+    try:
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
+    except ImportError:
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
     return RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -25,9 +24,10 @@ def get_text_splitter(chunk_size=500, chunk_overlap=50):
 
 
 def _load_models():
+    import os
+
     from sentence_transformers import SentenceTransformer
     import whisper
-    import os
 
     os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
@@ -45,7 +45,7 @@ def _load_models():
         try:
             return SentenceTransformer(name, local_files_only=True)
         except Exception:
-            logger.info(f"本地缓存未命中，联网加载模型: {name}")
+            logger.info("local cache miss, loading model online: %s", name)
             return SentenceTransformer(name)
 
     return {
@@ -58,7 +58,7 @@ def _load_models():
 
 @lru_cache(maxsize=1)
 def load_models_cached():
-    """加载 AI 模型并缓存，避免重复重载。"""
+    """Load AI models once and reuse them."""
     return _load_models()
 
 
@@ -85,7 +85,7 @@ def _open_or_create_table(db, table_name: str, schema: pa.Schema, required_colum
 
     fallback_name = f"{table_name}_v2"
     logger.warning(
-        "检测到旧表 %s 缺失列 %s，启用兼容表 %s，避免自动删表导致数据丢失",
+        "table %s is missing columns %s, using compatibility table %s",
         table_name,
         [col for col in required_columns if col not in schema_names],
         fallback_name,
@@ -94,12 +94,12 @@ def _open_or_create_table(db, table_name: str, schema: pa.Schema, required_colum
 
     fallback_schema_names = set(getattr(fallback_table.schema, "names", []))
     if not all(col in fallback_schema_names for col in required_columns):
-        raise RuntimeError(f"表 {fallback_name} 结构异常，缺少必需列")
+        raise RuntimeError(f"invalid schema for fallback table {fallback_name}")
     return fallback_table
 
 
 def get_lancedb_tables():
-    """打开或创建 LanceDB 业务表（安全兼容模式）。"""
+    """Open or create the existing business tables in LanceDB."""
     db = lancedb.connect(LANCE_DB_URI, storage_options=_storage_options())
 
     text_schema = pa.schema([
@@ -146,12 +146,11 @@ def get_lancedb_tables():
         files_schema,
         required_columns=["file_hash", "doc_name", "doc_type", "source_uri", "file_bytes", "text_full"],
     )
-
     return tbl_text, tbl_image, tbl_files
 
 
 def get_file_entities_table():
-    """打开或创建 file_entities 表。"""
+    """Open or create the file_entities table."""
     db = lancedb.connect(LANCE_DB_URI, storage_options=_storage_options())
     entities_schema = pa.schema([
         pa.field("file_hash", pa.string()),
@@ -159,3 +158,124 @@ def get_file_entities_table():
         pa.field("entity_type", pa.string()),
     ])
     return db.create_table("file_entities", schema=entities_schema, exist_ok=True)
+
+
+def get_multimodal_lancedb_tables():
+    """Open or create Lance tables used by the multimodal detection demo."""
+    db = lancedb.connect(LANCE_DB_URI, storage_options=_storage_options())
+
+    assets_schema = pa.schema([
+        pa.field("asset_id", pa.string()),
+        pa.field("dataset_name", pa.string()),
+        pa.field("media_type", pa.string()),
+        pa.field("file_path", pa.string()),
+        pa.field("file_name", pa.string()),
+        pa.field("sha256", pa.string()),
+        pa.field("width", pa.int64()),
+        pa.field("height", pa.int64()),
+        pa.field("duration_sec", pa.float64()),
+        pa.field("captured_at", pa.string()),
+        pa.field("lat", pa.float64()),
+        pa.field("lon", pa.float64()),
+        pa.field("source", pa.string()),
+        pa.field("created_at", pa.string()),
+        pa.field("imported_at", pa.string()),
+    ])
+    events_schema = pa.schema([
+        pa.field("event_id", pa.string()),
+        pa.field("asset_id", pa.string()),
+        pa.field("dataset_name", pa.string()),
+        pa.field("event_type", pa.string()),
+        pa.field("alarm_level", pa.string()),
+        pa.field("alarm_source", pa.string()),
+        pa.field("alarm_time", pa.string()),
+        pa.field("lat", pa.float64()),
+        pa.field("lon", pa.float64()),
+        pa.field("region", pa.string()),
+        pa.field("extra_json", pa.string()),
+        pa.field("summary", pa.string()),
+        pa.field("description", pa.string()),
+        pa.field("address", pa.string()),
+        pa.field("device_name", pa.string()),
+        pa.field("confidence_level", pa.float64()),
+        pa.field("province_name", pa.string()),
+        pa.field("city_name", pa.string()),
+        pa.field("county_name", pa.string()),
+        pa.field("town_code", pa.string()),
+        pa.field("town_name", pa.string()),
+        pa.field("device_code", pa.string()),
+        pa.field("channel_code", pa.string()),
+        pa.field("channel_name", pa.string()),
+        pa.field("warning_order_id", pa.string()),
+        pa.field("warning_type_id", pa.string()),
+        pa.field("alarm_body", pa.string()),
+        pa.field("algorithm_code", pa.string()),
+        pa.field("algorithm_name", pa.string()),
+        pa.field("emergency_level", pa.string()),
+        pa.field("importance_level", pa.string()),
+        pa.field("order_status", pa.string()),
+        pa.field("confidence_level_max", pa.float64()),
+        pa.field("tenant_name", pa.string()),
+        pa.field("video_path", pa.string()),
+        pa.field("img_src_path", pa.string()),
+        pa.field("img_icon_path", pa.string()),
+        pa.field("created_at", pa.string()),
+        pa.field("imported_at", pa.string()),
+    ])
+    detections_schema = pa.schema([
+        pa.field("detection_id", pa.string()),
+        pa.field("asset_id", pa.string()),
+        pa.field("dataset_name", pa.string()),
+        pa.field("model_name", pa.string()),
+        pa.field("label", pa.string()),
+        pa.field("confidence", pa.float64()),
+        pa.field("bbox_x", pa.float64()),
+        pa.field("bbox_y", pa.float64()),
+        pa.field("bbox_w", pa.float64()),
+        pa.field("bbox_h", pa.float64()),
+        pa.field("frame_index", pa.int64()),
+        pa.field("timestamp_sec", pa.float64()),
+        pa.field("created_at", pa.string()),
+        pa.field("imported_at", pa.string()),
+    ])
+    annotations_schema = pa.schema([
+        pa.field("annotation_id", pa.string()),
+        pa.field("asset_id", pa.string()),
+        pa.field("dataset_name", pa.string()),
+        pa.field("label", pa.string()),
+        pa.field("bbox_x", pa.float64()),
+        pa.field("bbox_y", pa.float64()),
+        pa.field("bbox_w", pa.float64()),
+        pa.field("bbox_h", pa.float64()),
+        pa.field("origin", pa.string()),
+        pa.field("reviewer", pa.string()),
+        pa.field("reviewed_at", pa.string()),
+        pa.field("created_at", pa.string()),
+        pa.field("imported_at", pa.string()),
+    ])
+
+    tbl_assets = _open_or_create_table(
+        db,
+        "multimodal_assets",
+        assets_schema,
+        required_columns=[field.name for field in assets_schema],
+    )
+    tbl_events = _open_or_create_table(
+        db,
+        "multimodal_events",
+        events_schema,
+        required_columns=[field.name for field in events_schema],
+    )
+    tbl_detections = _open_or_create_table(
+        db,
+        "multimodal_detections",
+        detections_schema,
+        required_columns=[field.name for field in detections_schema],
+    )
+    tbl_annotations = _open_or_create_table(
+        db,
+        "multimodal_annotations",
+        annotations_schema,
+        required_columns=[field.name for field in annotations_schema],
+    )
+    return tbl_assets, tbl_events, tbl_detections, tbl_annotations
