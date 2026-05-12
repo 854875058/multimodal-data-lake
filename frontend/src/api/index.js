@@ -287,6 +287,22 @@ const api = {
     return apiClient.post('/multimodal/review/import', payload)
   },
 
+  getAnnotationOverview(datasetName = 'tower_eye') {
+    return apiClient.get('/multimodal/annotation/overview', { params: { dataset_name: datasetName } })
+  },
+
+  createAnnotationJob(payload) {
+    return apiClient.post('/multimodal/annotation/jobs', payload)
+  },
+
+  listAnnotationJobs(datasetName = '', limit = 20) {
+    return apiClient.get('/multimodal/annotation/jobs', { params: { dataset_name: datasetName, limit } })
+  },
+
+  getAnnotationJob(jobId) {
+    return apiClient.get(`/multimodal/annotation/jobs/${encodeURIComponent(jobId)}`)
+  },
+
   listMultimodalTraces(payload) {
     return apiClient.post('/multimodal/traces', payload)
   },

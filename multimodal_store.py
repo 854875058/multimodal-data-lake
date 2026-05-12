@@ -682,6 +682,227 @@ def export_review_manifest(dataset_name: str = "tower_eye", limit: int = 0) -> L
         con.close()
 
 
+def get_auto_labeling_overview(dataset_name: str = "tower_eye") -> Dict[str, Any]:
+    con = _get_duckdb_connection()
+    try:
+        summary = get_multimodal_summary(dataset_name)
+        rows = con.execute(
+            """
+            SELECT
+                COUNT(DISTINCT a.asset_id) AS asset_count,
+                COUNT(DISTINCT CASE WHEN LOWER(COALESCE(a.media_type, '')) IN ('image', 'jpg', 'jpeg', 'png', 'bmp', 'webp') THEN a.asset_id END) AS image_asset_count,
+                COUNT(DISTINCT CASE WHEN LOWER(COALESCE(a.media_type, '')) IN ('video', 'mp4', 'mov', 'avi', 'mkv') THEN a.asset_id END) AS video_asset_count,
+                COUNT(DISTINCT CASE WHEN d.detection_id IS NOT NULL THEN a.asset_id END) AS detected_asset_count,
+                COUNT(DISTINCT CASE WHEN an.annotation_id IS NOT NULL THEN a.asset_id END) AS reviewed_asset_count,
+                COUNT(DISTINCT CASE WHEN d.detection_id IS NOT NULL AND an.annotation_id IS NULL THEN a.asset_id END) AS pending_asset_count
+            FROM multimodal_assets a
+            LEFT JOIN multimodal_detections d ON d.asset_id = a.asset_id AND d.dataset_name = a.dataset_name
+            LEFT JOIN multimodal_annotations an ON an.asset_id = a.asset_id AND an.dataset_name = a.dataset_name
+            WHERE a.dataset_name = ?
+            """,
+            [dataset_name],
+        ).fetchone()
+        model_rows = con.execute(
+            """
+            SELECT COALESCE(model_name, 'unknown') AS model_name, COUNT(*) AS cnt
+            FROM multimodal_detections
+            WHERE dataset_name = ?
+            GROUP BY COALESCE(model_name, 'unknown')
+            ORDER BY cnt DESC
+            LIMIT 5
+            """,
+            [dataset_name],
+        ).fetchall()
+        reviewed_asset_count = int(rows[4] or 0)
+        asset_count = int(rows[0] or 0)
+        detected_asset_count = int(rows[3] or 0)
+        return {
+            "dataset_name": dataset_name,
+            "asset_count": asset_count,
+            "image_asset_count": int(rows[1] or 0),
+            "video_asset_count": int(rows[2] or 0),
+            "detected_asset_count": detected_asset_count,
+            "reviewed_asset_count": reviewed_asset_count,
+            "pending_asset_count": int(rows[5] or 0),
+            "coverage_rate": round((reviewed_asset_count / asset_count), 4) if asset_count else 0,
+            "detection_coverage_rate": round((detected_asset_count / asset_count), 4) if asset_count else 0,
+            "top_models": [{"model_name": row[0], "count": row[1]} for row in model_rows],
+            "top_labels": summary.get("top_labels", []),
+            "top_event_types": summary.get("top_event_types", []),
+        }
+    finally:
+        con.close()
+
+
+def generate_auto_label_manifest(
+    dataset_name: str = "tower_eye",
+    limit: int = 50,
+    scope_type: str = "dataset",
+    strategy: str = "high_confidence",
+    min_confidence: float = 0.6,
+    only_unreviewed: bool = True,
+    asset_ids: Optional[Sequence[str]] = None,
+) -> Dict[str, Any]:
+    con = _get_duckdb_connection()
+    try:
+        clauses = ["a.dataset_name = ?"]
+        params: List[Any] = [dataset_name]
+
+        if asset_ids:
+            placeholders = ",".join(["?"] * len(asset_ids))
+            clauses.append(f"a.asset_id IN ({placeholders})")
+            params.extend(list(asset_ids))
+
+        if scope_type == "asset" and not asset_ids:
+            return {
+                "records": [],
+                "stats": {
+                    "dataset_name": dataset_name,
+                    "scope_type": scope_type,
+                    "strategy": strategy,
+                    "record_count": 0,
+                    "prediction_count": 0,
+                    "reviewed_asset_count": 0,
+                    "selected_asset_count": 0,
+                },
+            }
+
+        if only_unreviewed:
+            clauses.append(
+                """
+                NOT EXISTS (
+                    SELECT 1 FROM multimodal_annotations an
+                    WHERE an.asset_id = a.asset_id AND an.dataset_name = a.dataset_name
+                )
+                """
+            )
+
+        if strategy == "high_confidence":
+            detection_filter = "AND COALESCE(d.confidence, 0) >= ?"
+            params_for_detections = params + [min_confidence]
+        else:
+            detection_filter = ""
+            params_for_detections = params
+
+        where = " AND ".join(clauses)
+        asset_sql = f"""
+            SELECT
+                a.asset_id, a.media_type, a.file_path, a.file_name, a.captured_at,
+                a.lat, a.lon,
+                e.event_type, e.alarm_time, e.address, e.device_name, e.algorithm_name,
+                COUNT(DISTINCT d.detection_id) AS detection_count,
+                COUNT(DISTINCT an.annotation_id) AS annotation_count,
+                MAX(COALESCE(d.confidence, 0)) AS max_confidence
+            FROM multimodal_assets a
+            LEFT JOIN multimodal_events e ON e.asset_id = a.asset_id AND e.dataset_name = a.dataset_name
+            LEFT JOIN multimodal_detections d ON d.asset_id = a.asset_id AND d.dataset_name = a.dataset_name {detection_filter}
+            LEFT JOIN multimodal_annotations an ON an.asset_id = a.asset_id AND an.dataset_name = a.dataset_name
+            WHERE {where}
+            GROUP BY
+                a.asset_id, a.media_type, a.file_path, a.file_name, a.captured_at,
+                a.lat, a.lon, e.event_type, e.alarm_time, e.address, e.device_name, e.algorithm_name
+            HAVING COUNT(DISTINCT d.detection_id) > 0
+            ORDER BY MAX(COALESCE(d.confidence, 0)) DESC, COALESCE(e.alarm_time, a.captured_at, '') DESC
+            LIMIT ?
+        """
+        asset_rows = con.execute(asset_sql, params_for_detections + [limit]).fetchall()
+
+        records: List[Dict[str, Any]] = []
+        prediction_count = 0
+        reviewed_asset_count = 0
+        label_counter: Dict[str, int] = {}
+
+        for row in asset_rows:
+            asset_id = row[0]
+            detection_rows = con.execute(
+                f"""
+                SELECT model_name, label, confidence, bbox_x, bbox_y, bbox_w, bbox_h, frame_index, timestamp_sec
+                FROM multimodal_detections d
+                WHERE d.dataset_name = ? AND d.asset_id = ? {detection_filter}
+                ORDER BY COALESCE(d.confidence, 0) DESC
+                LIMIT 50
+                """,
+                [dataset_name, asset_id] + ([min_confidence] if strategy == "high_confidence" else []),
+            ).fetchall()
+            predictions = []
+            for det in detection_rows:
+                label_name = _coerce_text(det[1]) or "unknown"
+                label_counter[label_name] = label_counter.get(label_name, 0) + 1
+                predictions.append(
+                    {
+                        "label": label_name,
+                        "confidence": det[2],
+                        "bbox": [det[3], det[4], det[5], det[6]],
+                        "frame_index": det[7],
+                        "timestamp_sec": det[8],
+                        "model_name": _coerce_text(det[0]),
+                    }
+                )
+
+            annotation_rows = con.execute(
+                """
+                SELECT label, bbox_x, bbox_y, bbox_w, bbox_h, reviewer, reviewed_at
+                FROM multimodal_annotations
+                WHERE dataset_name = ? AND asset_id = ?
+                ORDER BY COALESCE(reviewed_at, created_at, imported_at) DESC
+                LIMIT 20
+                """,
+                [dataset_name, asset_id],
+            ).fetchall()
+            reviewed_asset_count += 1 if annotation_rows else 0
+            prediction_count += len(predictions)
+
+            records.append(
+                {
+                    "asset_id": asset_id,
+                    "media_type": row[1],
+                    "file_path": row[2],
+                    "file_name": row[3],
+                    "captured_at": row[4],
+                    "lat": row[5],
+                    "lon": row[6],
+                    "event_type": row[7],
+                    "alarm_time": row[8],
+                    "address": row[9],
+                    "device_name": row[10],
+                    "algorithm_name": row[11],
+                    "detection_count": row[12],
+                    "annotation_count": row[13],
+                    "max_confidence": row[14],
+                    "predictions": predictions,
+                    "annotations": [
+                        {
+                            "label": ann[0],
+                            "bbox": [ann[1], ann[2], ann[3], ann[4]],
+                            "reviewer": ann[5],
+                            "reviewed_at": ann[6],
+                        }
+                        for ann in annotation_rows
+                    ],
+                }
+            )
+
+        top_labels = [
+            {"label": key, "count": value}
+            for key, value in sorted(label_counter.items(), key=lambda item: item[1], reverse=True)[:10]
+        ]
+        stats = {
+            "dataset_name": dataset_name,
+            "scope_type": scope_type,
+            "strategy": strategy,
+            "min_confidence": min_confidence,
+            "record_count": len(records),
+            "prediction_count": prediction_count,
+            "reviewed_asset_count": reviewed_asset_count,
+            "selected_asset_count": len(records),
+            "top_labels": top_labels,
+            "only_unreviewed": only_unreviewed,
+        }
+        return {"records": records, "stats": stats}
+    finally:
+        con.close()
+
+
 def import_review_manifest(
     records: List[Dict[str, Any]],
     dataset_name: str = "tower_eye",

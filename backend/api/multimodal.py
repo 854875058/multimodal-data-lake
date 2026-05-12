@@ -12,11 +12,19 @@ from pydantic import BaseModel, Field
 from config import TOWER_EYE_ROOT
 from multimodal_store import (
     export_review_manifest,
+    generate_auto_label_manifest,
+    get_auto_labeling_overview,
     get_dataset_overview_text,
     get_multimodal_summary,
     import_review_manifest,
     import_tower_metadata_db,
     search_multimodal_assets,
+)
+from multimodal_labeling import (
+    create_labeling_job_id,
+    get_multimodal_labeling_job,
+    list_multimodal_labeling_jobs,
+    save_multimodal_labeling_job,
 )
 from multimodal_trace import (
     create_trace_id,
@@ -65,6 +73,16 @@ class ReviewImportPayload(BaseModel):
 class TraceListPayload(BaseModel):
     limit: int = 20
     session_id: str = ""
+
+
+class AutoLabelGeneratePayload(BaseModel):
+    dataset_name: str = "tower_eye"
+    scope_type: str = "dataset"
+    strategy: str = "high_confidence"
+    limit: int = 50
+    min_confidence: float = 0.6
+    only_unreviewed: bool = True
+    asset_ids: List[str] = Field(default_factory=list)
 
 
 def _build_followups(question: str, route: str) -> List[str]:
@@ -258,6 +276,73 @@ async def import_multimodal_review(payload: ReviewImportPayload):
     except Exception as error:
         logger.error("导入标注复核清单失败: %s", error, exc_info=True)
         raise HTTPException(status_code=500, detail="导入标注复核清单失败") from error
+
+
+@router.get("/annotation/overview", response_model=GenericResponse)
+async def get_annotation_overview(dataset_name: str = "tower_eye"):
+    try:
+        data = get_auto_labeling_overview(dataset_name)
+        return GenericResponse(success=True, message="ok", data=data)
+    except Exception as error:
+        logger.error("获取自动化标注概览失败: %s", error, exc_info=True)
+        raise HTTPException(status_code=500, detail="获取自动化标注概览失败") from error
+
+
+@router.post("/annotation/jobs", response_model=GenericResponse)
+async def create_annotation_job(payload: AutoLabelGeneratePayload):
+    try:
+        result = generate_auto_label_manifest(
+            dataset_name=payload.dataset_name,
+            limit=payload.limit,
+            scope_type=payload.scope_type,
+            strategy=payload.strategy,
+            min_confidence=payload.min_confidence,
+            only_unreviewed=payload.only_unreviewed,
+            asset_ids=payload.asset_ids,
+        )
+        job_id = create_labeling_job_id()
+        save_multimodal_labeling_job(
+            job_id=job_id,
+            dataset_name=payload.dataset_name,
+            scope_type=payload.scope_type,
+            status="success",
+            strategy=payload.strategy,
+            config=payload.model_dump(),
+            stats=result.get("stats", {}),
+            result=result,
+        )
+        return GenericResponse(
+            success=True,
+            message="ok",
+            data={
+                "job_id": job_id,
+                "dataset_name": payload.dataset_name,
+                "scope_type": payload.scope_type,
+                "strategy": payload.strategy,
+                **result,
+            },
+        )
+    except Exception as error:
+        logger.error("生成自动化标注任务失败: %s", error, exc_info=True)
+        raise HTTPException(status_code=500, detail="生成自动化标注任务失败") from error
+
+
+@router.get("/annotation/jobs", response_model=GenericResponse)
+async def list_annotation_jobs(limit: int = 20, dataset_name: str = ""):
+    try:
+        items = list_multimodal_labeling_jobs(limit=limit, dataset_name=dataset_name)
+        return GenericResponse(success=True, message="ok", data={"items": items, "count": len(items)})
+    except Exception as error:
+        logger.error("获取自动化标注任务列表失败: %s", error, exc_info=True)
+        raise HTTPException(status_code=500, detail="获取自动化标注任务列表失败") from error
+
+
+@router.get("/annotation/jobs/{job_id}", response_model=GenericResponse)
+async def get_annotation_job(job_id: str):
+    data = get_multimodal_labeling_job(job_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="annotation job not found")
+    return GenericResponse(success=True, message="ok", data=data)
 
 
 @router.post("/traces", response_model=GenericResponse)
