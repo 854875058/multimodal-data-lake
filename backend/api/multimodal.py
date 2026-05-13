@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from config import TOWER_EYE_ROOT
 from multimodal_store import (
+    apply_auto_label_job_records,
     export_review_manifest,
     generate_auto_label_manifest,
     get_auto_labeling_overview,
@@ -25,6 +26,7 @@ from multimodal_labeling import (
     get_multimodal_labeling_job,
     list_multimodal_labeling_jobs,
     save_multimodal_labeling_job,
+    update_multimodal_labeling_job,
 )
 from multimodal_trace import (
     create_trace_id,
@@ -82,6 +84,13 @@ class AutoLabelGeneratePayload(BaseModel):
     limit: int = 50
     min_confidence: float = 0.6
     only_unreviewed: bool = True
+    asset_ids: List[str] = Field(default_factory=list)
+
+
+class AutoLabelApplyPayload(BaseModel):
+    reviewer: str = "reviewer"
+    origin: str = "auto_review"
+    action: str = "accept"
     asset_ids: List[str] = Field(default_factory=list)
 
 
@@ -343,6 +352,53 @@ async def get_annotation_job(job_id: str):
     if not data:
         raise HTTPException(status_code=404, detail="annotation job not found")
     return GenericResponse(success=True, message="ok", data=data)
+
+
+@router.post("/annotation/jobs/{job_id}/apply", response_model=GenericResponse)
+async def apply_annotation_job(job_id: str, payload: AutoLabelApplyPayload):
+    job_data = get_multimodal_labeling_job(job_id)
+    if not job_data:
+        raise HTTPException(status_code=404, detail="annotation job not found")
+
+    action = str(payload.action or "accept").strip().lower()
+    if action not in {"accept", "reject"}:
+        raise HTTPException(status_code=400, detail="invalid action")
+
+    try:
+        apply_result = apply_auto_label_job_records(
+            job_data,
+            reviewer=payload.reviewer,
+            origin=payload.origin,
+            action=action,
+            asset_ids=payload.asset_ids,
+        )
+
+        current_stats = job_data.get("stats") or {}
+        current_result = job_data.get("result") or {}
+        accepted_ids = sorted(set((current_result.get("accepted_asset_ids") or []) + apply_result.get("accepted_asset_ids", [])))
+        rejected_ids = sorted(set((current_result.get("rejected_asset_ids") or []) + apply_result.get("rejected_asset_ids", [])))
+
+        current_result["accepted_asset_ids"] = accepted_ids
+        current_result["rejected_asset_ids"] = rejected_ids
+        current_result["last_apply_result"] = apply_result
+
+        current_stats["accepted_asset_count"] = len(accepted_ids)
+        current_stats["rejected_asset_count"] = len(rejected_ids)
+        current_stats["reviewed_asset_count"] = len(accepted_ids) + len(rejected_ids)
+
+        next_status = "reviewed" if current_stats["reviewed_asset_count"] else job_data.get("status") or "success"
+        update_multimodal_labeling_job(
+            job_id,
+            status=next_status,
+            stats=current_stats,
+            result=current_result,
+        )
+
+        updated = get_multimodal_labeling_job(job_id)
+        return GenericResponse(success=True, message="ok", data={"apply_result": apply_result, "job": updated or {}})
+    except Exception as error:
+        logger.error("应用自动化标注任务失败: %s", error, exc_info=True)
+        raise HTTPException(status_code=500, detail="应用自动化标注任务失败") from error
 
 
 @router.post("/traces", response_model=GenericResponse)

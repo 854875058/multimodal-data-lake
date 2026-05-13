@@ -303,6 +303,10 @@ const api = {
     return apiClient.get(`/multimodal/annotation/jobs/${encodeURIComponent(jobId)}`)
   },
 
+  applyAnnotationJob(jobId, payload) {
+    return apiClient.post(`/multimodal/annotation/jobs/${encodeURIComponent(jobId)}/apply`, payload)
+  },
+
   listMultimodalTraces(payload) {
     return apiClient.post('/multimodal/traces', payload)
   },

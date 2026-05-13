@@ -665,6 +665,7 @@ function AnnotationWorkbenchTab() {
   const [jobItems, setJobItems] = useState([])
   const [selectedJobId, setSelectedJobId] = useState('')
   const [selectedJob, setSelectedJob] = useState(null)
+  const [applyBusy, setApplyBusy] = useState(false)
 
   const assetIds = useMemo(() => assetIdsText.split(/[\s,]+/).map((item) => item.trim()).filter(Boolean), [assetIdsText])
 
@@ -784,6 +785,40 @@ function AnnotationWorkbenchTab() {
     }
   }
 
+  const applyJob = async (action) => {
+    if (!selectedJobId) {
+      Message.warning('请先选择一个预标任务')
+      return
+    }
+    setApplyBusy(true)
+    try {
+      const response = await api.applyAnnotationJob(selectedJobId, {
+        reviewer,
+        origin: reviewOrigin,
+        action,
+        asset_ids: [],
+      })
+      const payload = response?.data || {}
+      if (payload.job) {
+        setSelectedJob(payload.job)
+      }
+      await loadOverview()
+      if (action === 'accept') {
+        const annotationCount = payload?.apply_result?.annotations || 0
+        setReviewStats({ count: annotationCount, mode: 'accept' })
+        Message.success(`已批量采纳，写入 ${annotationCount} 条标注`)
+      } else {
+        const rejectedCount = payload?.apply_result?.selected_asset_count || 0
+        setReviewStats({ count: rejectedCount, mode: 'reject' })
+        Message.success(`已批量驳回 ${rejectedCount} 个资产`)
+      }
+    } catch (error) {
+      Message.error(getErrorMessage(error, '处理预标任务失败'))
+    } finally {
+      setApplyBusy(false)
+    }
+  }
+
   const selectedJobRecords = Array.isArray(selectedJob?.result?.records) ? selectedJob.result.records : []
   const selectedJobStats = selectedJob?.stats || null
 
@@ -820,6 +855,7 @@ function AnnotationWorkbenchTab() {
                 <Select value={strategy} onChange={setStrategy} style={{ width: '100%', marginTop: 6 }}>
                   <Option value="high_confidence">高置信度检测框</Option>
                   <Option value="detections">全部检测框</Option>
+                  <Option value="event_bootstrap">事件级预标兜底</Option>
                 </Select>
               </div>
               <div>
@@ -862,7 +898,7 @@ function AnnotationWorkbenchTab() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {reviewStats ? <Card bodyStyle={{ padding: 14 }}><Text type="secondary" style={{ fontSize: 12 }}>{reviewStats.mode === 'import' ? `本次已写入 ${reviewStats.count} 条人工标注` : reviewStats.mode === 'generate' ? `本次已生成 ${reviewStats.count} 条预标记录` : `本次已导出 ${reviewStats.count} 条评审样本`}</Text></Card> : null}
+          {reviewStats ? <Card bodyStyle={{ padding: 14 }}><Text type="secondary" style={{ fontSize: 12 }}>{reviewStats.mode === 'import' ? `本次已写入 ${reviewStats.count} 条人工标注` : reviewStats.mode === 'generate' ? `本次已生成 ${reviewStats.count} 条预标记录` : reviewStats.mode === 'accept' ? `本次已批量采纳 ${reviewStats.count} 条标注` : reviewStats.mode === 'reject' ? `本次已批量驳回 ${reviewStats.count} 个资产` : `本次已导出 ${reviewStats.count} 条评审样本`}</Text></Card> : null}
 
           <Card title="标注清单 JSON" bodyStyle={{ padding: 16 }}>
             <Paragraph style={{ marginTop: 0 }}>这里承接预标结果、人工修订和标注回流。生成任务后，可以直接修改 JSON，再写回 `multimodal_annotations`。</Paragraph>
@@ -916,6 +952,12 @@ function AnnotationWorkbenchTab() {
               <div style={{ display: 'grid', gap: 10, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border-2)' }}>
                 <Tag color="arcoblue">{selectedJob?.strategy || 'job'}</Tag>
                 <Text type="secondary" style={{ fontSize: 12 }}>已选资产 {selectedJobStats.selected_asset_count || 0}，生成预标 {selectedJobStats.prediction_count || 0}，已复核资产 {selectedJobStats.reviewed_asset_count || 0}</Text>
+                <Space wrap>
+                  <Button type="primary" size="small" loading={applyBusy} onClick={() => applyJob('accept')}>批量采纳</Button>
+                  <Button size="small" status="warning" loading={applyBusy} onClick={() => applyJob('reject')}>批量驳回</Button>
+                </Space>
+                {selectedJob?.result?.accepted_asset_ids?.length ? <Text type="secondary" style={{ fontSize: 12 }}>已采纳资产 {selectedJob.result.accepted_asset_ids.length} 个</Text> : null}
+                {selectedJob?.result?.rejected_asset_ids?.length ? <Text type="secondary" style={{ fontSize: 12 }}>已驳回资产 {selectedJob.result.rejected_asset_ids.length} 个</Text> : null}
                 {selectedJobStats.top_labels?.length ? <Space wrap>{selectedJobStats.top_labels.map((item) => <Tag key={item.label}>{item.label} · {item.count}</Tag>)}</Space> : null}
               </div>
             ) : null}

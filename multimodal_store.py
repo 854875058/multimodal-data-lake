@@ -882,6 +882,58 @@ def generate_auto_label_manifest(
                 }
             )
 
+        # Fallback path for datasets that have events but no detection rows yet.
+        if not records and strategy == "event_bootstrap":
+            event_rows = con.execute(
+                f"""
+                SELECT
+                    a.asset_id, a.media_type, a.file_path, a.file_name, a.captured_at,
+                    a.lat, a.lon,
+                    e.event_type, e.alarm_time, e.address, e.device_name, e.algorithm_name
+                FROM multimodal_assets a
+                LEFT JOIN multimodal_events e ON e.asset_id = a.asset_id AND e.dataset_name = a.dataset_name
+                WHERE {where}
+                ORDER BY COALESCE(e.alarm_time, a.captured_at, '') DESC
+                LIMIT ?
+                """,
+                params + [limit],
+            ).fetchall()
+            for row in event_rows:
+                event_label = _coerce_text(row[7]) or "event"
+                label_counter[event_label] = label_counter.get(event_label, 0) + 1
+                predictions = [
+                    {
+                        "label": event_label,
+                        "confidence": 0.5,
+                        "bbox": [None, None, None, None],
+                        "frame_index": None,
+                        "timestamp_sec": None,
+                        "model_name": "event_bootstrap",
+                    }
+                ]
+                prediction_count += 1
+                records.append(
+                    {
+                        "asset_id": row[0],
+                        "media_type": row[1],
+                        "file_path": row[2],
+                        "file_name": row[3],
+                        "captured_at": row[4],
+                        "lat": row[5],
+                        "lon": row[6],
+                        "event_type": row[7],
+                        "alarm_time": row[8],
+                        "address": row[9],
+                        "device_name": row[10],
+                        "algorithm_name": row[11],
+                        "detection_count": 0,
+                        "annotation_count": 0,
+                        "max_confidence": 0.5,
+                        "predictions": predictions,
+                        "annotations": [],
+                    }
+                )
+
         top_labels = [
             {"label": key, "count": value}
             for key, value in sorted(label_counter.items(), key=lambda item: item[1], reverse=True)[:10]
@@ -901,6 +953,69 @@ def generate_auto_label_manifest(
         return {"records": records, "stats": stats}
     finally:
         con.close()
+
+
+def apply_auto_label_job_records(
+    job_data: Dict[str, Any],
+    *,
+    reviewer: str,
+    origin: str,
+    action: str = "accept",
+    asset_ids: Optional[Sequence[str]] = None,
+) -> Dict[str, Any]:
+    selected_asset_ids = set(asset_ids or [])
+    job_result = job_data.get("result") or {}
+    records = job_result.get("records") or []
+
+    target_records = []
+    for record in records:
+        asset_id = str(record.get("asset_id") or "").strip()
+        if not asset_id:
+            continue
+        if selected_asset_ids and asset_id not in selected_asset_ids:
+            continue
+        target_records.append(record)
+
+    accepted_assets = []
+    rejected_assets = []
+    import_result: Dict[str, Any] = {"annotations": 0}
+
+    if action == "accept":
+        review_records = []
+        for record in target_records:
+            annotations = []
+            for prediction in record.get("predictions") or []:
+                annotations.append(
+                    {
+                        "label": prediction.get("label") or "",
+                        "bbox": prediction.get("bbox") or [None, None, None, None],
+                    }
+                )
+            if annotations:
+                accepted_assets.append(record["asset_id"])
+                review_records.append(
+                    {
+                        "asset_id": record["asset_id"],
+                        "annotations": annotations,
+                    }
+                )
+        import_result = import_review_manifest(
+            review_records,
+            dataset_name=str(job_data.get("dataset_name") or "tower_eye"),
+            reviewer=reviewer,
+            origin=origin,
+        )
+    else:
+        rejected_assets = [str(record.get("asset_id") or "") for record in target_records if record.get("asset_id")]
+
+    return {
+        "action": action,
+        "accepted_asset_ids": accepted_assets,
+        "rejected_asset_ids": rejected_assets,
+        "selected_asset_count": len(target_records),
+        "annotations": import_result.get("annotations", 0),
+        "import_result": import_result,
+    }
 
 
 def import_review_manifest(

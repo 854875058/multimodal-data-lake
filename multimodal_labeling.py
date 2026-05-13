@@ -89,6 +89,51 @@ def save_multimodal_labeling_job(
         conn.close()
 
 
+def update_multimodal_labeling_job(
+    job_id: str,
+    *,
+    status: Optional[str] = None,
+    stats: Optional[Dict[str, Any]] = None,
+    result: Optional[Dict[str, Any]] = None,
+) -> None:
+    init_multimodal_labeling_db()
+    conn = sqlite3.connect(str(LABELING_DB_PATH))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            """
+            SELECT status, stats_json, result_json
+            FROM multimodal_labeling_jobs
+            WHERE job_id = ?
+            """,
+            (job_id,),
+        ).fetchone()
+        if not row:
+            raise KeyError(f"labeling job not found: {job_id}")
+
+        next_status = status or row["status"]
+        next_stats = stats if stats is not None else json.loads(row["stats_json"] or "{}")
+        next_result = result if result is not None else json.loads(row["result_json"] or "{}")
+
+        conn.execute(
+            """
+            UPDATE multimodal_labeling_jobs
+            SET status = ?, stats_json = ?, result_json = ?, created_at = ?
+            WHERE job_id = ?
+            """,
+            (
+                next_status,
+                json.dumps(next_stats, ensure_ascii=False),
+                json.dumps(next_result, ensure_ascii=False),
+                datetime.now().isoformat(sep=" ", timespec="seconds"),
+                job_id,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def list_multimodal_labeling_jobs(limit: int = 20, dataset_name: str = "") -> List[Dict[str, Any]]:
     init_multimodal_labeling_db()
     conn = sqlite3.connect(str(LABELING_DB_PATH))
