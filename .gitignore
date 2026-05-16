@@ -30,3 +30,6 @@ venv/
 
 # PID 文件
 *.pid
+
+# 运行时数据库
+logs/*.db

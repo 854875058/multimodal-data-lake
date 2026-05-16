@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   Button,
   Card,
+  Checkbox,
   Empty,
   Grid,
   Input,
@@ -666,6 +667,7 @@ function AnnotationWorkbenchTab() {
   const [selectedJobId, setSelectedJobId] = useState('')
   const [selectedJob, setSelectedJob] = useState(null)
   const [applyBusy, setApplyBusy] = useState(false)
+  const [selectedAssetIds, setSelectedAssetIds] = useState([])
 
   const assetIds = useMemo(() => assetIdsText.split(/[\s,]+/).map((item) => item.trim()).filter(Boolean), [assetIdsText])
 
@@ -693,12 +695,14 @@ function AnnotationWorkbenchTab() {
   const loadJobDetail = async (jobId) => {
     if (!jobId) {
       setSelectedJob(null)
+      setSelectedAssetIds([])
       return
     }
     try {
       const response = await api.getAnnotationJob(jobId)
       setSelectedJob(response?.data || null)
       setSelectedJobId(jobId)
+      setSelectedAssetIds([])
     } catch (error) {
       Message.error(getErrorMessage(error, '加载标注任务详情失败'))
     }
@@ -732,6 +736,7 @@ function AnnotationWorkbenchTab() {
       const records = Array.isArray(payload.records) ? payload.records : []
       setReviewManifest(JSON.stringify(records, null, 2))
       setReviewStats({ count: payload?.stats?.record_count || records.length, mode: 'generate' })
+      setSelectedAssetIds([])
       if (payload.job_id) setSelectedJobId(payload.job_id)
       await loadOverview()
       Message.success(`已生成 ${payload?.stats?.record_count || records.length} 条预标样本`)
@@ -796,12 +801,13 @@ function AnnotationWorkbenchTab() {
         reviewer,
         origin: reviewOrigin,
         action,
-        asset_ids: [],
+        asset_ids: selectedAssetIds,
       })
       const payload = response?.data || {}
       if (payload.job) {
         setSelectedJob(payload.job)
       }
+      setSelectedAssetIds([])
       await loadOverview()
       if (action === 'accept') {
         const annotationCount = payload?.apply_result?.annotations || 0
@@ -821,6 +827,21 @@ function AnnotationWorkbenchTab() {
 
   const selectedJobRecords = Array.isArray(selectedJob?.result?.records) ? selectedJob.result.records : []
   const selectedJobStats = selectedJob?.stats || null
+  const selectableAssetIds = selectedJobRecords.map((item) => item.asset_id).filter(Boolean)
+  const allAssetsChecked = selectableAssetIds.length > 0 && selectedAssetIds.length === selectableAssetIds.length
+
+  const toggleAssetSelection = (assetId, checked) => {
+    setSelectedAssetIds((current) => {
+      if (checked) {
+        return current.includes(assetId) ? current : [...current, assetId]
+      }
+      return current.filter((item) => item !== assetId)
+    })
+  }
+
+  const toggleSelectAllAssets = (checked) => {
+    setSelectedAssetIds(checked ? selectableAssetIds : [])
+  }
 
   const summaryItems = [
     { key: 'target', label: '当前对象', value: scopeType === 'dataset' ? '数据集级' : '资产级', meta: '自动化标注独立成章，围绕预标、复核和回流展开。' },
@@ -913,14 +934,28 @@ function AnnotationWorkbenchTab() {
           <Card title="任务样本预览" bodyStyle={{ padding: 16 }}>
             {selectedJobRecords.length ? (
               <div style={{ display: 'grid', gap: 12 }}>
+                <Space wrap style={{ marginBottom: 4 }}>
+                  <Checkbox checked={allAssetsChecked} indeterminate={!allAssetsChecked && selectedAssetIds.length > 0} onChange={toggleSelectAllAssets}>
+                    全选当前任务
+                  </Checkbox>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    已选 {selectedAssetIds.length} / {selectableAssetIds.length} 个资产
+                  </Text>
+                </Space>
                 {selectedJobRecords.slice(0, 6).map((item) => (
                   <div key={item.asset_id} style={{ padding: 12, borderRadius: 10, border: '1px solid var(--color-border-2)', background: '#fff' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700 }}>{item.file_name || item.asset_id}</div>
-                        <div style={{ marginTop: 4, fontSize: 11, color: 'var(--color-text-3)' }}>{item.event_type || '未分类事件'} · {item.device_name || '未知设备'}</div>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                        <Checkbox checked={selectedAssetIds.includes(item.asset_id)} onChange={(checked) => toggleAssetSelection(item.asset_id, checked)} />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700 }}>{item.file_name || item.asset_id}</div>
+                          <div style={{ marginTop: 4, fontSize: 11, color: 'var(--color-text-3)' }}>{item.event_type || '未分类事件'} · {item.device_name || '未知设备'}</div>
+                        </div>
                       </div>
-                      <Tag color="green">{item.predictions?.length || 0} 条预标</Tag>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ marginTop: 4, fontSize: 11, color: 'var(--color-text-3)', textAlign: 'right' }}>{item.asset_id}</div>
+                        <Tag color="green" style={{ marginTop: 6 }}>{item.predictions?.length || 0} 条预标</Tag>
+                      </div>
                     </div>
                     <Space wrap style={{ marginTop: 8 }}>
                       {(item.predictions || []).slice(0, 4).map((prediction, index) => (
@@ -952,9 +987,13 @@ function AnnotationWorkbenchTab() {
               <div style={{ display: 'grid', gap: 10, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border-2)' }}>
                 <Tag color="arcoblue">{selectedJob?.strategy || 'job'}</Tag>
                 <Text type="secondary" style={{ fontSize: 12 }}>已选资产 {selectedJobStats.selected_asset_count || 0}，生成预标 {selectedJobStats.prediction_count || 0}，已复核资产 {selectedJobStats.reviewed_asset_count || 0}</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  当前操作范围：{selectedAssetIds.length ? `勾选资产 ${selectedAssetIds.length} 个` : '未勾选时默认整任务'}
+                </Text>
                 <Space wrap>
                   <Button type="primary" size="small" loading={applyBusy} onClick={() => applyJob('accept')}>批量采纳</Button>
                   <Button size="small" status="warning" loading={applyBusy} onClick={() => applyJob('reject')}>批量驳回</Button>
+                  {selectedAssetIds.length ? <Button size="small" onClick={() => setSelectedAssetIds([])}>清空勾选</Button> : null}
                 </Space>
                 {selectedJob?.result?.accepted_asset_ids?.length ? <Text type="secondary" style={{ fontSize: 12 }}>已采纳资产 {selectedJob.result.accepted_asset_ids.length} 个</Text> : null}
                 {selectedJob?.result?.rejected_asset_ids?.length ? <Text type="secondary" style={{ fontSize: 12 }}>已驳回资产 {selectedJob.result.rejected_asset_ids.length} 个</Text> : null}

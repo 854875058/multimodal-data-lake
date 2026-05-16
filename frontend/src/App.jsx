@@ -35,20 +35,20 @@ import {
 } from '@arco-design/web-react/icon'
 import { clearAuthSession, loadAuthSession, saveAuthSession, subscribeAuthSession } from '@/auth/session'
 import boncLogo from '@/assets/bonc.jpg'
-import ErrorBoundary from './components/ErrorBoundary.jsx'
+import ComputeJobsOverviewPage from './pages/ComputeJobsOverviewPage.jsx'
 import ConfigCenterPage from './pages/ConfigCenterPage.jsx'
 import DataGovernancePage from './pages/DataGovernancePage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import FilesPage from './pages/FilesPage.jsx'
 import IngestionCenterPage from './pages/IngestionCenterPage.jsx'
-import IngestionWorkbenchPage from './pages/IngestionWorkbenchPage.jsx'
 import LakeQueryPage from './pages/LakeQueryPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import LogsPage from './pages/LogsPage.jsx'
+import OperatorCenterPage from './pages/OperatorCenterPage.jsx'
 import PermissionManagementPage from './pages/PermissionManagementPage.jsx'
 import RayJobsPage from './pages/RayJobsPage.jsx'
 import TaskCenterPage from './pages/TaskCenterPage.jsx'
-import UploadPage from './pages/UploadPage.jsx'
+import TemplateLibraryPage from './pages/TemplateLibraryPage.jsx'
 import UserManagementPage from './pages/UserManagementPage.jsx'
 import WorkflowCenterPage from './pages/WorkflowCenterPage.jsx'
 import AlertPage from './pages/mpp/AlertPage.jsx'
@@ -90,7 +90,10 @@ const navGroups = [
     icon: <IconCommand />,
     items: [
       { path: '/workflow', label: '工作流编排', icon: <IconLayout /> },
+      { path: '/compute/operators', label: '算子中心', icon: <IconCommon /> },
       { path: '/task-center', label: '任务中心', icon: <IconCalendarClock /> },
+      { path: '/compute/jobs', label: '作业实例', icon: <IconRobot /> },
+      { path: '/compute/templates', label: '模板库', icon: <IconFile /> },
     ],
   },
   {
@@ -101,12 +104,13 @@ const navGroups = [
       { path: '/ingestion', label: '总览', icon: <IconStorage /> },
       { path: '/ingestion/source', label: '来源接入', icon: <IconCloudDownload /> },
       { path: '/ingestion/upload', label: '本地上传', icon: <IconUpload /> },
-      { path: '/ingestion/workflow', label: '工作流编排', icon: <IconLayout /> },
-      { path: '/ingestion/tasks', label: '任务治理', icon: <IconCalendarClock /> },
-      { path: '/workbench', label: '来源接入', icon: <IconCloudDownload />, hidden: true },
-      { path: '/upload', label: '本地上传', icon: <IconUpload />, hidden: true },
-      { path: '/workflow', label: '工作流编排', icon: <IconLayout />, hidden: true },
-      { path: '/task-center', label: '任务中心', icon: <IconCalendarClock />, hidden: true },
+    ],
+  },
+  {
+    key: 'lake-governance',
+    title: '湖治理',
+    icon: <IconCalendarClock />,
+    items: [
       { path: '/governance', label: '数据治理', icon: <IconCalendarClock /> },
     ],
   },
@@ -370,17 +374,15 @@ function AppShell({ authSession, onLogout }) {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/ingestion" element={<IngestionCenterPage />} />
+            <Route path="/ingestion/workflow" element={<Navigate to="/workflow" replace />} />
+            <Route path="/ingestion/tasks" element={<Navigate to="/task-center" replace />} />
             <Route path="/ingestion/:tab" element={<IngestionCenterPage />} />
-            <Route
-              path="/workbench"
-              element={
-                <ErrorBoundary pageName="来源接入">
-                  <IngestionWorkbenchPage />
-                </ErrorBoundary>
-              }
-            />
+            <Route path="/workbench" element={<Navigate to="/ingestion/source" replace />} />
             <Route path="/workflow" element={<WorkflowCenterPage />} />
             <Route path="/task-center" element={<TaskCenterPage />} />
+            <Route path="/compute/operators" element={<OperatorCenterPage />} />
+            <Route path="/compute/jobs" element={<ComputeJobsOverviewPage />} />
+            <Route path="/compute/templates" element={<TemplateLibraryPage />} />
             <Route path="/governance" element={<DataGovernancePage />} />
             <Route path="/settings" element={<Navigate to="/settings/access" replace />} />
             <Route path="/settings/access" element={<ConfigCenterPage />} />
@@ -400,10 +402,10 @@ function AppShell({ authSession, onLogout }) {
                 </RequireAdmin>
               )}
             />
-            <Route path="/upload" element={<UploadPage />} />
+            <Route path="/upload" element={<Navigate to="/ingestion/upload" replace />} />
             <Route path="/lake-query" element={<Navigate to="/lake-query/sql" replace />} />
             <Route path="/lake-query/:tab" element={<LakeQueryPage />} />
-            <Route path="/search" element={<Navigate to="/lake-query/sql" replace />} />
+            <Route path="/search" element={<Navigate to="/lake-query/retrieval" replace />} />
             <Route path="/files" element={<FilesPage />} />
             <Route path="/logs" element={<LogsPage />} />
             <Route path="/mpp/cluster" element={<ClusterPage />} />

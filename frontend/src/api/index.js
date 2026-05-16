@@ -267,6 +267,14 @@ const api = {
     return apiClient.post('/platform/workflow/build-job', payload)
   },
 
+  getOperatorCatalog() {
+    return apiClient.get('/operators/catalog')
+  },
+
+  executeOperator(payload) {
+    return apiClient.post('/operators/execute', payload)
+  },
+
   getMultimodalSummary(datasetName = '') {
     return apiClient.get('/multimodal/summary', { params: datasetName ? { dataset_name: datasetName } : {} })
   },

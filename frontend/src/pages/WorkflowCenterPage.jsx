@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { Card, Button, Space, Typography, Grid, Statistic, Spin, Message, Tag } from '@arco-design/web-react'
-import { IconLeft } from '@arco-design/web-react/icon'
+import { IconCalendarClock, IconFile } from '@arco-design/web-react/icon'
 import api, { getErrorMessage } from '@/api'
 import WorkflowStudio from '@/components/WorkflowStudio.jsx'
 
@@ -9,7 +9,6 @@ const { Row, Col } = Grid
 const { Title, Text, Paragraph } = Typography
 
 export default function WorkflowCenterPage() {
-  const navigate = useNavigate()
   const [platformSettings, setPlatformSettings] = useState(null)
   const [workbenchSettings, setWorkbenchSettings] = useState(null)
   const [jobs, setJobs] = useState([])
@@ -48,10 +47,17 @@ export default function WorkflowCenterPage() {
     <div style={{ padding: 24, background: 'var(--color-fill-1)', minHeight: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <div>
-          <Title heading={5} style={{ margin: 0 }}>编排中心</Title>
-          <Text type="secondary">Daft ETL 工作流、Ray Job 资源约束和执行模板</Text>
+          <Title heading={5} style={{ margin: 0 }}>工作流编排</Title>
+          <Text type="secondary">面向多模态处理链路的统一编排入口，承接算子组合、资源约束与执行模板。</Text>
         </div>
-        <Button icon={<IconLeft />} onClick={() => navigate('/workbench')}>返回 AI 工作台</Button>
+        <Space>
+          <NavLink to="/compute/templates">
+            <Button icon={<IconFile />}>查看模板库</Button>
+          </NavLink>
+          <NavLink to="/task-center">
+            <Button type="primary" icon={<IconCalendarClock />}>进入任务中心</Button>
+          </NavLink>
+        </Space>
       </div>
 
       <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -93,10 +99,37 @@ export default function WorkflowCenterPage() {
           </Col>
           <Col span={8}>
             <Tag color="orange">复用配置</Tag>
-            <Paragraph style={{ marginTop: 8 }}>来源配置在 AI 工作台维护，这里直接读最近保存的范围。</Paragraph>
+            <Paragraph style={{ marginTop: 8 }}>来源范围沿用接入配置，算子编排和资源调度在湖计算域统一维护。</Paragraph>
           </Col>
         </Row>
       </Card>
+
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={8}>
+          <Card bodyStyle={{ padding: 18 }}>
+            <Space direction="vertical" size={4}>
+              <Text bold>模板驱动</Text>
+              <Text type="secondary">先从模板库选择标准链路，再按业务补充节点和参数。</Text>
+            </Space>
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card bodyStyle={{ padding: 18 }}>
+            <Space direction="vertical" size={4}>
+              <Text bold>算子复用</Text>
+              <Text type="secondary">跨文本、图像、视频任务复用同一批算子，降低重复建设。</Text>
+            </Space>
+          </Card>
+        </Col>
+        <Col span={8}>
+          <Card bodyStyle={{ padding: 18 }}>
+            <Space direction="vertical" size={4}>
+              <Text bold>运行观测</Text>
+              <Text type="secondary">执行态、日志和 Ray 资源占用统一回流到任务中心与作业实例。</Text>
+            </Space>
+          </Card>
+        </Col>
+      </Row>
 
       <Card title="工作流编辑器" bodyStyle={{ padding: 16 }}>
         <WorkflowStudio
