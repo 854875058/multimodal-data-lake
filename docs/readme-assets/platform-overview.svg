@@ -1,0 +1,24 @@
+<svg width="1200" height="720" viewBox="0 0 1200 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="720" rx="24" fill="#F7F8FA"/>
+  <rect x="28" y="28" width="1144" height="664" rx="20" fill="white" stroke="#E5E6EB"/>
+  <rect x="28" y="28" width="1144" height="68" rx="20" fill="#165DFF"/>
+  <text x="64" y="70" fill="white" font-size="30" font-family="Arial, sans-serif" font-weight="700">Platform Overview Placeholder</text>
+  <text x="64" y="128" fill="#1D2129" font-size="24" font-family="Arial, sans-serif" font-weight="700">Lake Overview / Dashboard / Asset Catalog</text>
+  <rect x="64" y="156" width="240" height="132" rx="14" fill="#E8F3FF"/>
+  <rect x="328" y="156" width="240" height="132" rx="14" fill="#E8FFFB"/>
+  <rect x="592" y="156" width="240" height="132" rx="14" fill="#FFF7E8"/>
+  <rect x="856" y="156" width="252" height="132" rx="14" fill="#F5F3FF"/>
+  <text x="88" y="204" fill="#165DFF" font-size="22" font-family="Arial, sans-serif" font-weight="700">Asset Growth</text>
+  <text x="352" y="204" fill="#00B42A" font-size="22" font-family="Arial, sans-serif" font-weight="700">Modal Distribution</text>
+  <text x="616" y="204" fill="#FF7D00" font-size="22" font-family="Arial, sans-serif" font-weight="700">Storage Trend</text>
+  <text x="880" y="204" fill="#722ED1" font-size="22" font-family="Arial, sans-serif" font-weight="700">Knowledge View</text>
+  <rect x="64" y="324" width="672" height="300" rx="18" fill="#F2F3F5"/>
+  <rect x="768" y="324" width="340" height="300" rx="18" fill="#F2F3F5"/>
+  <text x="88" y="366" fill="#4E5969" font-size="22" font-family="Arial, sans-serif">Recommended replacement:</text>
+  <text x="88" y="404" fill="#1D2129" font-size="20" font-family="Arial, sans-serif">Real screenshot of dashboard cards, charts, asset summaries.</text>
+  <text x="792" y="366" fill="#4E5969" font-size="22" font-family="Arial, sans-serif">Suggested highlights:</text>
+  <text x="792" y="406" fill="#1D2129" font-size="20" font-family="Arial, sans-serif">- Lake overview</text>
+  <text x="792" y="440" fill="#1D2129" font-size="20" font-family="Arial, sans-serif">- Asset density</text>
+  <text x="792" y="474" fill="#1D2129" font-size="20" font-family="Arial, sans-serif">- Operational KPIs</text>
+  <text x="792" y="508" fill="#1D2129" font-size="20" font-family="Arial, sans-serif">- Search and governance entrance</text>
+</svg>

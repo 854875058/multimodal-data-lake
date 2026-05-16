@@ -4,7 +4,7 @@
 import logging
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from models_loader import get_lancedb_tables
 
@@ -38,10 +38,12 @@ class RollbackResponse(BaseModel):
 
 
 class TableStats(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     table: str
     num_rows: int
     version: int
-    schema: List[str]
+    schema_fields: List[str] = Field(alias="schema", serialization_alias="schema")
 
 
 class StatsResponse(BaseModel):
@@ -78,11 +80,11 @@ async def get_stats():
                     table=name,
                     num_rows=num_rows,
                     version=version,
-                    schema=schema_fields,
+                    schema_fields=schema_fields,
                 ))
             except Exception as e:
                 logger.warning(f"获取表 {name} 统计失败: {e}")
-                stats.append(TableStats(table=name, num_rows=0, version=0, schema=[]))
+                stats.append(TableStats(table=name, num_rows=0, version=0, schema_fields=[]))
         return StatsResponse(success=True, stats=stats)
     except Exception as e:
         logger.error(f"获取统计信息失败: {e}", exc_info=True)
