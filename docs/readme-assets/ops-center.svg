@@ -1,0 +1,15 @@
+<svg width="1200" height="720" viewBox="0 0 1200 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="720" rx="24" fill="#F7F8FA"/>
+  <rect x="28" y="28" width="1144" height="664" rx="20" fill="white" stroke="#E5E6EB"/>
+  <rect x="28" y="28" width="1144" height="68" rx="20" fill="#FF7D00"/>
+  <text x="64" y="70" fill="white" font-size="30" font-family="Arial, sans-serif" font-weight="700">Lakehouse Ops Center Placeholder</text>
+  <rect x="64" y="136" width="1044" height="120" rx="16" fill="#FFF7E8"/>
+  <rect x="64" y="288" width="500" height="316" rx="16" fill="#F2F3F5"/>
+  <rect x="608" y="288" width="500" height="316" rx="16" fill="#F2F3F5"/>
+  <text x="92" y="188" fill="#FF7D00" font-size="24" font-family="Arial, sans-serif" font-weight="700">Cluster / SQL / Alert / Inspection</text>
+  <text x="92" y="224" fill="#4E5969" font-size="20" font-family="Arial, sans-serif">Doris and MPP operational surface for data lakehouse runtime.</text>
+  <text x="92" y="340" fill="#1D2129" font-size="22" font-family="Arial, sans-serif" font-weight="700">SQL Editor Preview</text>
+  <text x="636" y="340" fill="#1D2129" font-size="22" font-family="Arial, sans-serif" font-weight="700">Alert / Inspection Preview</text>
+  <text x="92" y="388" fill="#4E5969" font-size="20" font-family="Arial, sans-serif">Replace with real query editor / cluster management screenshot.</text>
+  <text x="636" y="388" fill="#4E5969" font-size="20" font-family="Arial, sans-serif">Replace with alert dashboard / inspection workflow screenshot.</text>
+</svg>

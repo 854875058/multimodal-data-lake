@@ -1,10 +1,26 @@
-﻿# -*- coding: utf-8 -*-
-"""API 路由模块。"""
+# -*- coding: utf-8 -*-
+"""API package metadata.
 
-from . import agents, dashboard, files, multimodal, platform, search, system, upload, workbench
-from . import users, permissions, ray_compute, mpp_proxy, versions, doris
+Keep this package import-light. Route modules are loaded explicitly by
+``backend.main`` so that optional features cannot break the whole service
+during package import.
+"""
 
 __all__ = [
-    "upload", "search", "files", "dashboard", "system", "workbench", "platform", "agents", "multimodal",
-    "users", "permissions", "ray_compute", "mpp_proxy", "versions", "doris",
+    "agents",
+    "dashboard",
+    "doris",
+    "files",
+    "mpp_proxy",
+    "multimodal",
+    "operators",
+    "permissions",
+    "platform",
+    "ray_compute",
+    "search",
+    "system",
+    "upload",
+    "users",
+    "versions",
+    "workbench",
 ]
