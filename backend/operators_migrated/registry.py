@@ -68,6 +68,7 @@ class OperatorSpec:
     module_path: str
     class_name: str
     runtime: str = "CPU"
+    workflow_kind: str = "transform"
     migration_status: str = ""
     input_types: tuple[str, ...] = ()
     output_types: tuple[str, ...] = ()
@@ -101,6 +102,7 @@ OPERATOR_SPECS: tuple[OperatorSpec, ...] = (
         module_path="backend.operators_migrated.text.clean.clean_texts_by_regex",
         class_name="CleanTextsByRegexOperator",
         runtime="CPU",
+        workflow_kind="transform",
         migration_status="Migrated and runnable in the current repository.",
         input_types=("text/plain", "text/markdown", "application/json", "text/csv"),
         output_types=("text/plain", "text/markdown", "application/json", "text/csv"),
@@ -152,6 +154,7 @@ OPERATOR_SPECS: tuple[OperatorSpec, ...] = (
         module_path="backend.operators_migrated.staged.text.format.normalize_ppt_to_markdown",
         class_name="NormalizePptToMarkdown",
         runtime="CPU / LLM",
+        workflow_kind="transform",
         migration_status="Source migrated, runtime integration still incomplete.",
         input_types=("application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
         output_types=("text/markdown",),
@@ -196,6 +199,7 @@ OPERATOR_SPECS: tuple[OperatorSpec, ...] = (
         module_path="backend.operators_migrated.staged.video.enhance.enhance_video_privacy_blur_operator",
         class_name="EnhanceVideoPrivacyBlurOperator",
         runtime="GPU",
+        workflow_kind="transform",
         migration_status="Source migrated, runtime integration still incomplete.",
         input_types=("video/mp4", "video/x-msvideo", "video/quicktime"),
         output_types=("video/mp4",),
@@ -235,6 +239,7 @@ OPERATOR_SPECS: tuple[OperatorSpec, ...] = (
         module_path="backend.operators_migrated.staged.video.enhance.enhance_video_redundancy_operator",
         class_name="EnhanceVideoRedundancyOperator",
         runtime="GPU",
+        workflow_kind="transform",
         migration_status="Source migrated, runtime integration still incomplete.",
         input_types=("video/mp4", "video/x-msvideo", "video/quicktime"),
         output_types=("video/mp4", "application/json"),
@@ -405,6 +410,14 @@ def _parameter_schema_map(parameters: Sequence[OperatorParameterSpec]) -> Dict[s
     return schema
 
 
+def _parameter_default_map(parameters: Sequence[OperatorParameterSpec]) -> Dict[str, Any]:
+    defaults: Dict[str, Any] = {}
+    for item in parameters:
+        if item.default is not None:
+            defaults[item.name] = item.default
+    return defaults
+
+
 def _serialize_parameter(item: OperatorParameterSpec) -> Dict[str, Any]:
     return {
         "name": item.name,
@@ -489,6 +502,45 @@ def get_operator_catalog_summary() -> Dict[str, int]:
         "runnable": len([item for item in operators if item["health"]["can_execute"]]),
         "blocked": len([item for item in operators if not item["health"]["can_execute"]]),
     }
+
+
+def _serialize_workflow_operator(spec: OperatorSpec) -> Dict[str, Any]:
+    health = _health_state(spec)
+    return {
+        "id": spec.key,
+        "operator_key": spec.key,
+        "label": spec.name,
+        "description": spec.summary,
+        "kind": spec.workflow_kind,
+        "status": spec.status,
+        "runtime": spec.runtime,
+        "modality": spec.modality,
+        "category": spec.category,
+        "health": health,
+        "params_schema": _parameter_schema_map(spec.parameters),
+        "default_params": _parameter_default_map(spec.parameters),
+        "input_types": list(spec.input_types),
+        "output_types": list(spec.output_types),
+        "source_code_path": spec.source_code_path,
+        "tags": list(spec.tags),
+    }
+
+
+def list_workflow_operators() -> List[Dict[str, Any]]:
+    operators = [_serialize_workflow_operator(spec) for spec in OPERATOR_SPECS]
+    return sorted(
+        operators,
+        key=lambda item: (
+            0 if item["health"]["can_execute"] else 1,
+            item["modality"],
+            item["label"].lower(),
+        ),
+    )
+
+
+def get_workflow_operator_or_none(operator_key: str) -> Dict[str, Any] | None:
+    spec = _SPEC_BY_KEY.get(operator_key)
+    return _serialize_workflow_operator(spec) if spec else None
 
 
 def _coerce_boolean(value: Any) -> bool:

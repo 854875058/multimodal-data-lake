@@ -11,6 +11,7 @@ import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
+from backend.operators_migrated.registry import list_workflow_operators
 from database import get_app_setting, list_ingestion_jobs, save_app_setting
 from models_loader import get_lancedb_tables
 from text_codec import decode_text_from_storage
@@ -142,6 +143,72 @@ WORKFLOW_PRESETS = [
         'resources': {'cpu': 8, 'gpu': 1, 'memory_gb': 32},
     },
 ]
+
+
+WORKFLOW_PRESET_BLUEPRINTS = [
+    {
+        'id': 'text_privacy_pipeline',
+        'name': 'Text Privacy Pipeline',
+        'description': 'Run regex-based privacy masking on text datasets before downstream use.',
+        'nodes': ['clean_texts_by_regex'],
+        'resources': {'cpu': 4, 'gpu': 0, 'memory_gb': 16},
+    },
+    {
+        'id': 'ppt_cleanup_pipeline',
+        'name': 'PPT Cleanup Pipeline',
+        'description': 'Convert PPT content to Markdown and then apply text privacy masking.',
+        'nodes': ['normalize_ppt_to_markdown', 'clean_texts_by_regex'],
+        'resources': {'cpu': 6, 'gpu': 0, 'memory_gb': 24},
+    },
+    {
+        'id': 'video_privacy_pipeline',
+        'name': 'Video Privacy Pipeline',
+        'description': 'Apply privacy blur to videos that contain sensitive overlays or text.',
+        'nodes': ['enhance_video_privacy_blur_operator'],
+        'resources': {'cpu': 6, 'gpu': 1, 'memory_gb': 24},
+    },
+    {
+        'id': 'video_cleanup_pipeline',
+        'name': 'Video Cleanup Pipeline',
+        'description': 'Reduce redundant frames before applying privacy blur in a second step.',
+        'nodes': ['enhance_video_redundancy_operator', 'enhance_video_privacy_blur_operator'],
+        'resources': {'cpu': 8, 'gpu': 1, 'memory_gb': 32},
+    },
+]
+
+
+def _get_workflow_library() -> List[Dict[str, Any]]:
+    return list_workflow_operators()
+
+
+def _get_workflow_library_map() -> Dict[str, Dict[str, Any]]:
+    return {item['id']: item for item in _get_workflow_library()}
+
+
+def _serialize_workflow_preset(blueprint: Dict[str, Any], library_map: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    resolved_nodes = [node_id for node_id in blueprint.get('nodes', []) if node_id in library_map]
+    missing_nodes = [node_id for node_id in blueprint.get('nodes', []) if node_id not in library_map]
+    blocked_nodes = [
+        {
+            'id': node_id,
+            'label': library_map[node_id]['label'],
+            'state': library_map[node_id]['health']['state'],
+        }
+        for node_id in resolved_nodes
+        if not library_map[node_id]['health']['can_execute']
+    ]
+    return {
+        **blueprint,
+        'nodes': resolved_nodes,
+        'missing_nodes': missing_nodes,
+        'blocked_nodes': blocked_nodes,
+        'execution_ready': not missing_nodes and not blocked_nodes,
+    }
+
+
+def _get_workflow_presets() -> List[Dict[str, Any]]:
+    library_map = _get_workflow_library_map()
+    return [_serialize_workflow_preset(item, library_map) for item in WORKFLOW_PRESET_BLUEPRINTS]
 
 
 class PlatformSettingsPayload(BaseModel):
@@ -1235,11 +1302,78 @@ async def nl_to_vector(payload: NaturalLanguagePayload):
 
 @router.get('/workflow/presets')
 async def get_workflow_presets():
-    return {'success': True, 'library': WORKFLOW_LIBRARY, 'presets': WORKFLOW_PRESETS}
+    library = _get_workflow_library()
+    presets = _get_workflow_presets()
+    return {
+        'success': True,
+        'summary': {
+            'total': len(library),
+            'runnable': len([item for item in library if item['health']['can_execute']]),
+            'blocked': len([item for item in library if not item['health']['can_execute']]),
+            'presets': len(presets),
+        },
+        'library': library,
+        'presets': presets,
+    }
 
 
 @router.post('/workflow/build-job')
 async def build_workflow_job(payload: WorkflowBuildPayload):
+    library_map = _get_workflow_library_map()
+    if not payload.nodes:
+        raise HTTPException(status_code=400, detail='workflow must contain at least one node')
+
+    unknown_nodes = [node_id for node_id in payload.nodes if node_id not in library_map]
+    if unknown_nodes:
+        raise HTTPException(status_code=400, detail=f"unknown workflow operators: {', '.join(unknown_nodes)}")
+
+    node_items = [library_map[node_id] for node_id in payload.nodes]
+    node_labels = [item['label'] for item in node_items]
+    node_details = [
+        {
+            'id': item['id'],
+            'label': item['label'],
+            'kind': item['kind'],
+            'runtime': item['runtime'],
+            'status': item['status'],
+            'health_state': item['health']['state'],
+            'can_execute': item['health']['can_execute'],
+            'issues': item['health']['issues'],
+        }
+        for item in node_items
+    ]
+    blocked_nodes = [item for item in node_details if not item['can_execute']]
+
+    entrypoint = (
+        f"python workflow_runner.py --name {payload.name or 'workflow_job'} "
+        f"--nodes {' '.join(payload.nodes)} "
+        f"--cpu {max(1, payload.cpu)} --gpu {max(0, payload.gpu)} --memory-gb {max(1, payload.memory_gb)}"
+    )
+    runtime_env = {
+        'working_dir': './ray_jobs',
+        'env_vars': {
+            'SOURCE_HINT': payload.source_hint or 'seaweedfs://multimodal',
+            'WORKFLOW_NAME': payload.name or 'workflow_job',
+            'WORKFLOW_OPERATORS': ','.join(payload.nodes),
+        },
+        'pip': ['ray[default]', 'daft', 'lance', 'pyarrow'],
+    }
+    summary = f"Workflow has {len(node_labels)} nodes: {' -> '.join(node_labels)}"
+    if blocked_nodes:
+        summary = f"{summary}. {len(blocked_nodes)} node(s) are not runnable in the current repository."
+    return {
+        'success': True,
+        'data': {
+            'entrypoint': entrypoint,
+            'runtime_env': runtime_env,
+            'resource_hint': {'cpu': payload.cpu, 'gpu': payload.gpu, 'memory_gb': payload.memory_gb},
+            'node_labels': node_labels,
+            'node_details': node_details,
+            'blocked_nodes': blocked_nodes,
+            'execution_ready': not blocked_nodes,
+            'summary': summary,
+        },
+    }
     if not payload.nodes:
         raise HTTPException(status_code=400, detail='工作流至少需要一个节点')
 

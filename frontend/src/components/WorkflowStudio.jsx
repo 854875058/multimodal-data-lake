@@ -14,6 +14,23 @@ const kindLabels = {
   sink: '输出',
 }
 
+const healthStateLabels = {
+  runnable: 'Runnable',
+  staged: 'Staged',
+  missing_env: 'Missing env',
+  missing_dependency: 'Missing dependency',
+  import_error: 'Import error',
+}
+
+function getHealthStateLabel(state) {
+  return healthStateLabels[state] || 'Unknown'
+}
+
+function buildDefaultParamsText(item) {
+  const defaults = item?.default_params || {}
+  return Object.keys(defaults).length ? JSON.stringify(defaults, null, 2) : ''
+}
+
 function createNodeFromLibrary(item, position = { x: 80, y: 80 }) {
   const timestamp = Date.now()
   return {
@@ -22,11 +39,21 @@ function createNodeFromLibrary(item, position = { x: 80, y: 80 }) {
     label: item.label,
     description: item.description,
     kind: item.kind || 'transform',
+    runtime: item.runtime || '',
+    status: item.status || '',
+    modality: item.modality || '',
+    category: item.category || '',
+    health: item.health || null,
+    paramsSchema: item.params_schema || {},
+    sourceCodePath: item.source_code_path || '',
+    inputTypes: item.input_types || [],
+    outputTypes: item.output_types || [],
+    tags: item.tags || [],
     x: position.x,
     y: position.y,
     config: {
       alias: item.label,
-      paramsText: '',
+      paramsText: buildDefaultParamsText(item),
       notes: '',
     },
   }
@@ -160,7 +187,16 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
     const keyword = searchKeyword.trim().toLowerCase()
     if (!keyword) return library
     return library.filter((item) =>
-      [item.label, item.description, item.kind, item.id].some((field) =>
+      [
+        item.label,
+        item.description,
+        item.kind,
+        item.id,
+        item.modality,
+        item.category,
+        item.runtime,
+        ...(Array.isArray(item.tags) ? item.tags : []),
+      ].some((field) =>
         String(field || '').toLowerCase().includes(keyword)
       )
     )
@@ -480,6 +516,9 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
                   <span className="workflow-kind-chip">{kindLabels[item.kind] || '节点'}</span>
                 </div>
                 <span className="workflow-library-copy">{item.description}</span>
+                <span className="workflow-library-copy">
+                  {`${item.runtime || 'Runtime N/A'} | ${getHealthStateLabel(item?.health?.state)}`}
+                </span>
               </button>
             ))}
           </div>
@@ -607,6 +646,15 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
             {selectedNode ? (
               <>
                 <div className="workflow-selected-title">{selectedNode.label}</div>
+                <pre className="workflow-code-block mono" style={{ marginBottom: 12 }}>
+                  {[
+                    `Operator: ${selectedNode.operatorId}`,
+                    `Runtime: ${selectedNode.runtime || 'N/A'}`,
+                    `Health: ${getHealthStateLabel(selectedNode?.health?.state)}`,
+                    `Modality: ${selectedNode.modality || 'N/A'}`,
+                    `Category: ${selectedNode.category || 'N/A'}`,
+                  ].join('\n')}
+                </pre>
                 <div className="field">
                   <label htmlFor="node_alias">节点别名</label>
                   <input
@@ -714,6 +762,23 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
             ) : (
               <div className="empty-state small">还没有建立节点依赖关系。</div>
             )}
+          </div>
+
+          <div className="workflow-summary-panel">
+            <div className="kpi-label">Execution Readiness</div>
+            <div className="workflow-code-block mono">
+              {jobSpec?.summary || 'Build the graph to inspect workflow readiness.'}
+            </div>
+            {jobSpec?.blocked_nodes?.length ? (
+              <div className="workflow-edge-list">
+                {jobSpec.blocked_nodes.map((item) => (
+                  <div key={item.id} className="workflow-edge-row">
+                    <span>{item.label}</span>
+                    <span className="workflow-edge-arrow">{getHealthStateLabel(item.health_state)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="workflow-summary-panel">
