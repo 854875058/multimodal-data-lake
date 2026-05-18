@@ -271,6 +271,14 @@ const api = {
     return apiClient.get('/operators/catalog')
   },
 
+  getOperatorDetail(operatorKey) {
+    return apiClient.get(`/operators/${encodeURIComponent(operatorKey)}`)
+  },
+
+  validateOperator(operatorKey, payload = {}) {
+    return apiClient.post(`/operators/${encodeURIComponent(operatorKey)}/validate`, payload)
+  },
+
   executeOperator(payload) {
     return apiClient.post('/operators/execute', payload)
   },
