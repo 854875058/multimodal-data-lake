@@ -7,6 +7,9 @@ user_data.db
 nul
 *.egg-info/
 .env
+.env.local
+.env.*
+!.env.example
 temp/
 extract/
 

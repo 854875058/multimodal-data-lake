@@ -15,6 +15,15 @@ import glob
 import fitz
 from clientApp.api_handler.qwen_api import qwen_vl_user_prom, encode_image
 
+try:
+    from env_loader import load_local_env_files
+except ImportError:
+    def load_local_env_files():
+        return []
+
+
+load_local_env_files()
+
 """
 功能：将PPT转换为Markdown格式
 处理逻辑：1.拆分PPT为单页 2.转换为高清图片 3.调用多模态大模型识别 4.输出MD文件
