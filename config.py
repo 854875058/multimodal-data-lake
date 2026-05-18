@@ -99,7 +99,7 @@ LANCE_DB_URI = f"s3://{S3_CONFIG['lance_bucket']}/{S3_CONFIG.get('lance_prefix',
 
 # --- LLM / 知识图谱 ---
 # 建议在环境变量中配置 DEEPSEEK_API_KEY；如需本地测试，可临时在此处填入测试密钥
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-db6292d5ea9d470889b63392c4a4abde")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "").strip()
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 

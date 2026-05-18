@@ -21,15 +21,25 @@ from clientApp.api_handler.qwen_api import qwen_vl_user_prom, encode_image
 """
 
 # ==================== 内置配置 ====================
-DEFAULT_CONFIG = {
-    "model_url": "http://10.238.57.34:8000/api/chinaUnicom/generalCenter/intelligenceCenter/Qwen2572BHH/v1",
-    "model_vl_url": "http://10.238.57.34:8000/api/chinaUnicom/generalCenter/intelligenceCenter/Qwen25VL32BHH/v1",
-    "app_id": "FbmEG3Xz6s",
-    "app_secret": "4keWuYTToUz5EkbRCqjPX6kfhzkbeoRU",
-    "nlpt_authorization": "Bearer sk-04581b8469404a74aac2003282b39e36",
-    "vl_nlpt_authorization": "Bearer sk-8bc6504d76714a6fa50b3caae268b743",
-    "scene_code": "SZ-00-0005"
-}
+def _config_from_env():
+    return {
+        "model_url": os.getenv(
+            "PPT2MD_MODEL_URL",
+            "http://10.238.57.34:8000/api/chinaUnicom/generalCenter/intelligenceCenter/Qwen2572BHH/v1",
+        ),
+        "model_vl_url": os.getenv(
+            "PPT2MD_MODEL_VL_URL",
+            "http://10.238.57.34:8000/api/chinaUnicom/generalCenter/intelligenceCenter/Qwen25VL32BHH/v1",
+        ),
+        "app_id": os.getenv("PPT2MD_APP_ID", "").strip(),
+        "app_secret": os.getenv("PPT2MD_APP_SECRET", "").strip(),
+        "nlpt_authorization": os.getenv("PPT2MD_NLPT_AUTHORIZATION", "").strip(),
+        "vl_nlpt_authorization": os.getenv("PPT2MD_VL_NLPT_AUTHORIZATION", "").strip(),
+        "scene_code": os.getenv("PPT2MD_SCENE_CODE", "SZ-00-0005").strip(),
+    }
+
+
+DEFAULT_CONFIG = {**_config_from_env()}
 
 
 # ==================== PPT转MD核心类 ====================
@@ -480,6 +490,16 @@ class NormalizePptToMarkdown(OperatorAbs):
         # 使用传入的配置（如果为空则使用DEFAULT_CONFIG）
         if api_config is None:
             api_config = DEFAULT_CONFIG.copy()
+
+        required_keys = [
+            'app_id',
+            'app_secret',
+            'nlpt_authorization',
+            'vl_nlpt_authorization',
+        ]
+        missing_keys = [key for key in required_keys if not str(api_config.get(key, '') or '').strip()]
+        if missing_keys:
+            raise ValueError(f"缺少鉴权配置: {', '.join(missing_keys)}")
 
         # 创建转换器
         converter = PPT2MDConverter(
