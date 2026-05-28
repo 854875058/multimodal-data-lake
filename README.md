@@ -4,7 +4,7 @@
   <a href="README.md">English</a> | <a href="README.zh-CN.md">中文</a>
 </p>
 
-<img src="docs/readme-assets/hero-banner.svg" width="100%" alt="Multimodal Data Lake Banner" />
+<img src="docs/readme-assets/hero-banner.png" width="100%" alt="Multimodal Data Lake Banner" />
 
 # Multimodal Data Lake
 
@@ -40,9 +40,6 @@ Traditional approaches have pain points:
 
 **Multimodal Data Lake unifies everything into a single platform.**
 
-<div align="center">
-<img src="docs/readme-assets/capability-radar.svg" width="600" alt="Capability Radar" />
-</div>
 
 ---
 
@@ -67,7 +64,7 @@ Traditional approaches have pain points:
 ## Architecture
 
 <div align="center">
-<img src="docs/readme-assets/architecture.svg" width="800" alt="Architecture Diagram" />
+<img src="docs/readme-assets/architecture.png" width="800" alt="Architecture Diagram" />
 </div>
 
 ```
@@ -210,7 +207,7 @@ python start.py stop      # Stop service
 ## Workflow Studio
 
 <div align="center">
-<img src="docs/readme-assets/workflow-studio.svg" width="800" alt="Workflow Studio" />
+<img src="docs/readme-assets/workflow-preview.png" width="800" alt="Workflow Studio" />
 </div>
 
 **Core Features:**
