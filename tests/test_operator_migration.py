@@ -7,7 +7,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from backend.operators_migrated.text.clean.clean_texts_by_regex import CleanTextsByRegexOperator
+from backend.operators.text.clean.clean_texts_by_regex import CleanTextsByRegexOperator
 
 
 class DummyLogger:

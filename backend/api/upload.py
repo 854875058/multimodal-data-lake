@@ -8,9 +8,9 @@ from typing import List
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks
 from pydantic import BaseModel
 
-from config import TEMP_DIR, MAX_UPLOAD_SIZE_MB
-from etl import batch_process_local_files
-from models_loader import load_models_cached, get_lancedb_tables
+from backend.core.config import TEMP_DIR, MAX_UPLOAD_SIZE_MB
+from backend.services.etl import batch_process_local_files
+from backend.core.models_loader import load_models_cached, get_lancedb_tables
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

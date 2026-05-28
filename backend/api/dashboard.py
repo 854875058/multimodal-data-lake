@@ -8,10 +8,10 @@ import numpy as np
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from database import get_file_entities, get_file_entity_relations
-from models_loader import get_lancedb_tables, load_models_cached
-from stats_service import get_dashboard_stats, get_task_trend
-from text_codec import decode_text_from_storage
+from backend.core.database import get_file_entities, get_file_entity_relations
+from backend.core.models_loader import get_lancedb_tables, load_models_cached
+from backend.services.stats_service import get_dashboard_stats, get_task_trend
+from backend.utils.text_codec import decode_text_from_storage
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

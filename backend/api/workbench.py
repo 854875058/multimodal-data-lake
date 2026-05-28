@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from database import get_ingestion_job
-from ingestion_workbench import (
+from backend.core.database import get_ingestion_job
+from backend.services.ingestion_workbench import (
     build_vector_indices,
     cancel_ingestion_job,
     get_index_status,

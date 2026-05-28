@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from config import MAX_LOG_LINES, SYSTEM_API_LOCAL_ONLY
+from backend.core.config import MAX_LOG_LINES, SYSTEM_API_LOCAL_ONLY
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -85,7 +85,7 @@ async def get_status():
 
         # AI 模型状态
         try:
-            from models_loader import load_models_cached
+            from backend.core.models_loader import load_models_cached
             models = load_models_cached()
             model_status = ModelStatus(
                 loaded=True,
@@ -97,7 +97,7 @@ async def get_status():
 
         # LanceDB 状态
         try:
-            from models_loader import get_lancedb_tables
+            from backend.core.models_loader import get_lancedb_tables
             tbl_text, tbl_image, tbl_files = get_lancedb_tables()
             lancedb_status = LanceDBStatus(
                 connected=True,

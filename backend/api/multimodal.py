@@ -9,8 +9,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from config import TOWER_EYE_ROOT
-from multimodal_store import (
+from backend.core.config import TOWER_EYE_ROOT
+from backend.services.multimodal_store import (
     apply_auto_label_job_records,
     export_review_manifest,
     generate_auto_label_manifest,
@@ -21,14 +21,14 @@ from multimodal_store import (
     import_tower_metadata_db,
     search_multimodal_assets,
 )
-from multimodal_labeling import (
+from backend.services.multimodal_labeling import (
     create_labeling_job_id,
     get_multimodal_labeling_job,
     list_multimodal_labeling_jobs,
     save_multimodal_labeling_job,
     update_multimodal_labeling_job,
 )
-from multimodal_trace import (
+from backend.services.multimodal_trace import (
     create_trace_id,
     get_multimodal_query_trace,
     get_multimodal_trace_stats,

@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 ROOT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from config import BACKEND_RELOAD, CORS_ALLOW_CREDENTIALS, CORS_ALLOW_ORIGINS
+from backend.core.config import BACKEND_RELOAD, CORS_ALLOW_CREDENTIALS, CORS_ALLOW_ORIGINS
 
 _log_dir = ROOT_DIR / "logs"
 _log_dir.mkdir(exist_ok=True)
@@ -54,7 +54,7 @@ ROUTE_SPECS = [
 
 def _load_background_resources() -> None:
     try:
-        from models_loader import get_lancedb_tables, load_models_cached
+        from backend.core.models_loader import get_lancedb_tables, load_models_cached
 
         models = load_models_cached()
         logger.info("AI 模型加载完成: %s", list(models.keys()))
@@ -113,7 +113,7 @@ async def lifespan(app: FastAPI):
     logger.info("多模态数据湖 API 服务启动")
     logger.info("=" * 60)
 
-    from database import init_db
+    from backend.core.database import init_db
 
     _run_startup_step("SQLite 数据库初始化", init_db)
 

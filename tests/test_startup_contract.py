@@ -7,7 +7,9 @@ from pathlib import Path
 from fastapi import FastAPI
 
 ROOT_DIR = Path(__file__).parent.parent
+SCRIPTS_DIR = ROOT_DIR / "scripts"
 sys.path.insert(0, str(ROOT_DIR))
+sys.path.insert(0, str(SCRIPTS_DIR))
 
 import backend.main as backend_main
 import start

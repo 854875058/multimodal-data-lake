@@ -9,11 +9,11 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from config import FILE_DELETE_LOCAL_ONLY
-from database import delete_file_from_registry
-from models_loader import get_lancedb_tables
-from s3_utils import delete_from_s3
-from text_codec import decode_text_from_storage
+from backend.core.config import FILE_DELETE_LOCAL_ONLY
+from backend.core.database import delete_file_from_registry
+from backend.core.models_loader import get_lancedb_tables
+from backend.services.s3_utils import delete_from_s3
+from backend.utils.text_codec import decode_text_from_storage
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

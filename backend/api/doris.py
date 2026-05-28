@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from config import DB_PATH
+from backend.core.config import DB_PATH
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

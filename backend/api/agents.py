@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from agents.request_store import create_request, load_requests
-from config import SYSTEM_API_LOCAL_ONLY
+from backend.core.config import SYSTEM_API_LOCAL_ONLY
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

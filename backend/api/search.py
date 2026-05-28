@@ -6,8 +6,8 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from models_loader import load_models_cached, get_lancedb_tables
-from text_codec import decode_text_from_storage
+from backend.core.models_loader import load_models_cached, get_lancedb_tables
+from backend.utils.text_codec import decode_text_from_storage
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from models_loader import get_lancedb_tables
+from backend.core.models_loader import get_lancedb_tables
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

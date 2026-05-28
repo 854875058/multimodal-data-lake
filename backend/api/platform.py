@@ -11,10 +11,10 @@ import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from backend.operators_migrated.registry import list_workflow_operators
-from database import get_app_setting, list_ingestion_jobs, save_app_setting
-from models_loader import get_lancedb_tables
-from text_codec import decode_text_from_storage
+from backend.operators.registry import list_workflow_operators
+from backend.core.database import get_app_setting, list_ingestion_jobs, save_app_setting
+from backend.core.models_loader import get_lancedb_tables
+from backend.utils.text_codec import decode_text_from_storage
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -762,7 +762,7 @@ def _probe_lancedb_component() -> Dict[str, Any]:
 def _probe_model_component() -> Dict[str, Any]:
     probed_at = datetime.now().isoformat(timespec='seconds')
     try:
-        from models_loader import load_models_cached
+        from backend.core.models_loader import load_models_cached
 
         models = load_models_cached()
         return {

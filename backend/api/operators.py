@@ -11,7 +11,7 @@ from typing import Any, Dict
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
-from backend.operators_migrated.registry import (
+from backend.operators.registry import (
     OperatorValidationError,
     build_operator_instance,
     get_operator_catalog_summary,

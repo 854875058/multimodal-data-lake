@@ -8,7 +8,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from database import _get_connection as get_db_connection
+from backend.core.database import _get_connection as get_db_connection
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
