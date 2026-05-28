@@ -1562,6 +1562,13 @@ pre {
   stroke-dasharray: 10 8;
 }
 
+.workflow-edge-connecting {
+  stroke: rgba(22, 93, 255, 0.8);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
+
 .workflow-graph-node {
   position: absolute;
   width: 220px;
