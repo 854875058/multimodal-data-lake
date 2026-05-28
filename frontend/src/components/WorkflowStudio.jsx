@@ -389,6 +389,14 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
   }, [])
 
+  // 计算画布边界（必须在条件返回之前，否则 hooks 顺序错乱）
+  const canvasBounds = useMemo(() => {
+    if (!canvasNodes.length) return { minX: 0, minY: 0, maxX: 1200, maxY: 800 }
+    const xs = canvasNodes.map(n => n.x)
+    const ys = canvasNodes.map(n => n.y)
+    return { minX: Math.min(...xs) - 50, minY: Math.min(...ys) - 50, maxX: Math.max(...xs) + 280, maxY: Math.max(...ys) + 150 }
+  }, [canvasNodes])
+
   if (loading) return <div className="loading-state compact">加载中...</div>
 
   const renderEdges = () => {
@@ -408,14 +416,6 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
       return <path key={edge.id} d={d} className="workflow-edge-path" />
     })
   }
-
-  // 计算画布边界
-  const canvasBounds = useMemo(() => {
-    if (!canvasNodes.length) return { minX: 0, minY: 0, maxX: 1200, maxY: 800 }
-    const xs = canvasNodes.map(n => n.x)
-    const ys = canvasNodes.map(n => n.y)
-    return { minX: Math.min(...xs) - 50, minY: Math.min(...ys) - 50, maxX: Math.max(...xs) + 280, maxY: Math.max(...ys) + 150 }
-  }, [canvasNodes])
 
   const canvasW = canvasBounds.maxX - canvasBounds.minX
   const canvasH = canvasBounds.maxY - canvasBounds.minY
