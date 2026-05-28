@@ -330,28 +330,39 @@ function AppShell({ authSession, onLogout }) {
           ))}
         </Menu>
         <div
+          className="sidebar-hover-trigger"
           onClick={() => setCollapsed(!collapsed)}
           style={{
             position: 'absolute',
             top: 0,
-            right: -24,
-            width: 24,
+            right: -28,
+            width: 28,
             height: '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            zIndex: 10,
-            background: 'var(--color-fill-1)',
-            borderRight: '1px solid var(--color-border-2)',
-            transition: 'background 0.2s',
+            zIndex: 100,
+            background: 'transparent',
+            opacity: 0,
+            transition: 'opacity 0.2s, background 0.2s',
           }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--color-fill-2)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'var(--color-fill-1)'}
         >
-          <span style={{ fontSize: 14, color: 'var(--color-text-2)', fontWeight: 500 }}>
-            {collapsed ? '›' : '‹'}
-          </span>
+          <div style={{
+            width: 20,
+            height: 48,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--color-bg-2)',
+            border: '1px solid var(--color-border-2)',
+            borderRadius: '0 6px 6px 0',
+            boxShadow: '2px 0 8px rgba(0,0,0,0.06)',
+          }}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
+              {collapsed ? '›' : '‹'}
+            </span>
+          </div>
         </div>
       </Sider>
 

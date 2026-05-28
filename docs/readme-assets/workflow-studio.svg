@@ -1,22 +1,200 @@
-<svg width="1200" height="720" viewBox="0 0 1200 720" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1200" height="720" rx="24" fill="#F7F8FA"/>
-  <rect x="28" y="28" width="1144" height="664" rx="20" fill="white" stroke="#E5E6EB"/>
-  <rect x="28" y="28" width="1144" height="68" rx="20" fill="#0E42D2"/>
-  <text x="64" y="70" fill="white" font-size="30" font-family="Arial, sans-serif" font-weight="700">Workflow Studio Placeholder</text>
-  <rect x="64" y="124" width="250" height="500" rx="18" fill="#F2F3F5"/>
-  <rect x="346" y="124" width="520" height="500" rx="18" fill="#EEF3FF"/>
-  <rect x="898" y="124" width="210" height="500" rx="18" fill="#F2F3F5"/>
-  <rect x="406" y="204" width="140" height="72" rx="14" fill="#165DFF"/>
-  <rect x="622" y="204" width="140" height="72" rx="14" fill="#00B42A"/>
-  <rect x="514" y="356" width="140" height="72" rx="14" fill="#FF7D00"/>
-  <path d="M546 240H622" stroke="#4E5969" stroke-width="6" stroke-linecap="round"/>
-  <path d="M692 276V356H584" stroke="#4E5969" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="92" y="170" fill="#1D2129" font-size="22" font-family="Arial, sans-serif" font-weight="700">Operator Library</text>
-  <text x="92" y="208" fill="#4E5969" font-size="20" font-family="Arial, sans-serif">Source / Transform / AI / Sink</text>
-  <text x="384" y="170" fill="#1D2129" font-size="22" font-family="Arial, sans-serif" font-weight="700">Canvas Preview</text>
-  <text x="930" y="170" fill="#1D2129" font-size="22" font-family="Arial, sans-serif" font-weight="700">Job Spec</text>
-  <text x="408" y="246" fill="white" font-size="20" font-family="Arial, sans-serif" font-weight="700">Ingest</text>
-  <text x="648" y="246" fill="white" font-size="20" font-family="Arial, sans-serif" font-weight="700">Vectorize</text>
-  <text x="544" y="398" fill="white" font-size="20" font-family="Arial, sans-serif" font-weight="700">Publish</text>
-  <text x="92" y="572" fill="#4E5969" font-size="20" font-family="Arial, sans-serif">Replace with real workflow orchestration screenshot.</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450">
+  <defs>
+    <linearGradient id="wsBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="nodeSource" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#60a5fa;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="nodeTransform" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#34d399;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="nodeAI" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a78bfa;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="nodeSink" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fbbf24;stop-opacity:1" />
+    </linearGradient>
+    <filter id="nodeShadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.3)"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="450" fill="url(#wsBg)" rx="12"/>
+
+  <!-- Grid dots -->
+  <g fill="rgba(100,116,139,0.15)">
+    <circle cx="50" cy="50" r="1"/><circle cx="100" cy="50" r="1"/><circle cx="150" cy="50" r="1"/>
+    <circle cx="200" cy="50" r="1"/><circle cx="250" cy="50" r="1"/><circle cx="300" cy="50" r="1"/>
+    <circle cx="350" cy="50" r="1"/><circle cx="400" cy="50" r="1"/><circle cx="450" cy="50" r="1"/>
+    <circle cx="500" cy="50" r="1"/><circle cx="550" cy="50" r="1"/><circle cx="600" cy="50" r="1"/>
+    <circle cx="650" cy="50" r="1"/><circle cx="700" cy="50" r="1"/><circle cx="750" cy="50" r="1"/>
+    <circle cx="50" cy="100" r="1"/><circle cx="100" cy="100" r="1"/><circle cx="150" cy="100" r="1"/>
+    <circle cx="200" cy="100" r="1"/><circle cx="250" cy="100" r="1"/><circle cx="300" cy="100" r="1"/>
+    <circle cx="350" cy="100" r="1"/><circle cx="400" cy="100" r="1"/><circle cx="450" cy="100" r="1"/>
+    <circle cx="500" cy="100" r="1"/><circle cx="550" cy="100" r="1"/><circle cx="600" cy="100" r="1"/>
+    <circle cx="650" cy="100" r="1"/><circle cx="700" cy="100" r="1"/><circle cx="750" cy="100" r="1"/>
+    <circle cx="50" cy="150" r="1"/><circle cx="100" cy="150" r="1"/><circle cx="150" cy="150" r="1"/>
+    <circle cx="200" cy="150" r="1"/><circle cx="250" cy="150" r="1"/><circle cx="300" cy="150" r="1"/>
+    <circle cx="350" cy="150" r="1"/><circle cx="400" cy="150" r="1"/><circle cx="450" cy="150" r="1"/>
+    <circle cx="500" cy="150" r="1"/><circle cx="550" cy="150" r="1"/><circle cx="600" cy="150" r="1"/>
+    <circle cx="650" cy="150" r="1"/><circle cx="700" cy="150" r="1"/><circle cx="750" cy="150" r="1"/>
+    <circle cx="50" cy="200" r="1"/><circle cx="100" cy="200" r="1"/><circle cx="150" cy="200" r="1"/>
+    <circle cx="200" cy="200" r="1"/><circle cx="250" cy="200" r="1"/><circle cx="300" cy="200" r="1"/>
+    <circle cx="350" cy="200" r="1"/><circle cx="400" cy="200" r="1"/><circle cx="450" cy="200" r="1"/>
+    <circle cx="500" cy="200" r="1"/><circle cx="550" cy="200" r="1"/><circle cx="600" cy="200" r="1"/>
+    <circle cx="650" cy="200" r="1"/><circle cx="700" cy="200" r="1"/><circle cx="750" cy="200" r="1"/>
+    <circle cx="50" cy="250" r="1"/><circle cx="100" cy="250" r="1"/><circle cx="150" cy="250" r="1"/>
+    <circle cx="200" cy="250" r="1"/><circle cx="250" cy="250" r="1"/><circle cx="300" cy="250" r="1"/>
+    <circle cx="350" cy="250" r="1"/><circle cx="400" cy="250" r="1"/><circle cx="450" cy="250" r="1"/>
+    <circle cx="500" cy="250" r="1"/><circle cx="550" cy="250" r="1"/><circle cx="600" cy="250" r="1"/>
+    <circle cx="650" cy="250" r="1"/><circle cx="700" cy="250" r="1"/><circle cx="750" cy="250" r="1"/>
+    <circle cx="50" cy="300" r="1"/><circle cx="100" cy="300" r="1"/><circle cx="150" cy="300" r="1"/>
+    <circle cx="200" cy="300" r="1"/><circle cx="250" cy="300" r="1"/><circle cx="300" cy="300" r="1"/>
+    <circle cx="350" cy="300" r="1"/><circle cx="400" cy="300" r="1"/><circle cx="450" cy="300" r="1"/>
+    <circle cx="500" cy="300" r="1"/><circle cx="550" cy="300" r="1"/><circle cx="600" cy="300" r="1"/>
+    <circle cx="650" cy="300" r="1"/><circle cx="700" cy="300" r="1"/><circle cx="750" cy="300" r="1"/>
+    <circle cx="50" cy="350" r="1"/><circle cx="100" cy="350" r="1"/><circle cx="150" cy="350" r="1"/>
+    <circle cx="200" cy="350" r="1"/><circle cx="250" cy="350" r="1"/><circle cx="300" cy="350" r="1"/>
+    <circle cx="350" cy="350" r="1"/><circle cx="400" cy="350" r="1"/><circle cx="450" cy="350" r="1"/>
+    <circle cx="500" cy="350" r="1"/><circle cx="550" cy="350" r="1"/><circle cx="600" cy="350" r="1"/>
+    <circle cx="650" cy="350" r="1"/><circle cx="700" cy="350" r="1"/><circle cx="750" cy="350" r="1"/>
+    <circle cx="50" cy="400" r="1"/><circle cx="100" cy="400" r="1"/><circle cx="150" cy="400" r="1"/>
+    <circle cx="200" cy="400" r="1"/><circle cx="250" cy="400" r="1"/><circle cx="300" cy="400" r="1"/>
+    <circle cx="350" cy="400" r="1"/><circle cx="400" cy="400" r="1"/><circle cx="450" cy="400" r="1"/>
+    <circle cx="500" cy="400" r="1"/><circle cx="550" cy="400" r="1"/><circle cx="600" cy="400" r="1"/>
+    <circle cx="650" cy="400" r="1"/><circle cx="700" cy="400" r="1"/><circle cx="750" cy="400" r="1"/>
+  </g>
+
+  <!-- Toolbar -->
+  <rect x="10" y="10" width="780" height="40" rx="6" fill="rgba(30,41,59,0.9)" stroke="rgba(100,116,139,0.2)" stroke-width="1"/>
+  <g font-family="Arial" font-size="11" fill="#94a3b8">
+    <rect x="20" y="18" width="120" height="24" rx="4" fill="rgba(100,116,139,0.15)" stroke="rgba(100,116,139,0.2)" stroke-width="0.5"/>
+    <text x="80" y="34" text-anchor="middle" fill="#e2e8f0">文本清洗流水线</text>
+
+    <rect x="150" y="18" width="100" height="24" rx="4" fill="rgba(100,116,139,0.15)" stroke="rgba(100,116,139,0.2)" stroke-width="0.5"/>
+    <text x="200" y="34" text-anchor="middle" fill="#e2e8f0">multimodal</text>
+
+    <text x="400" y="34" text-anchor="middle" fill="#64748b">4 节点 · 3 连线 · 已连接 4</text>
+
+    <rect x="650" y="18" width="60" height="24" rx="4" fill="rgba(239,68,68,0.2)" stroke="rgba(239,68,68,0.3)" stroke-width="0.5"/>
+    <text x="680" y="34" text-anchor="middle" fill="#fca5a5">清空</text>
+
+    <rect x="720" y="18" width="60" height="24" rx="4" fill="rgba(59,130,246,0.3)" stroke="rgba(59,130,246,0.5)" stroke-width="0.5"/>
+    <text x="750" y="34" text-anchor="middle" fill="#93c5fd">复制</text>
+  </g>
+
+  <!-- Left panel - Operator library -->
+  <rect x="10" y="55" width="150" height="385" rx="6" fill="rgba(30,41,59,0.9)" stroke="rgba(100,116,139,0.2)" stroke-width="1"/>
+  <text x="85" y="75" text-anchor="middle" font-family="Arial" font-size="12" font-weight="bold" fill="white">算子库</text>
+
+  <!-- Operator items -->
+  <g filter="url(#nodeShadow)">
+    <rect x="20" y="85" width="130" height="45" rx="6" fill="rgba(30,41,59,0.95)" stroke="rgba(59,130,246,0.3)" stroke-width="1"/>
+    <rect x="20" y="85" width="4" height="45" rx="2" fill="#3b82f6"/>
+    <text x="35" y="105" font-family="Arial" font-size="10" fill="#e2e8f0">读取 Lance 数据</text>
+    <text x="35" y="120" font-family="Arial" font-size="8" fill="#64748b">输入 · CPU</text>
+  </g>
+
+  <g filter="url(#nodeShadow)">
+    <rect x="20" y="140" width="130" height="45" rx="6" fill="rgba(30,41,59,0.95)" stroke="rgba(16,185,129,0.3)" stroke-width="1"/>
+    <rect x="20" y="140" width="4" height="45" rx="2" fill="#10b981"/>
+    <text x="35" y="160" font-family="Arial" font-size="10" fill="#e2e8f0">正则隐私脱敏</text>
+    <text x="35" y="175" font-family="Arial" font-size="8" fill="#64748b">处理 · CPU</text>
+  </g>
+
+  <g filter="url(#nodeShadow)">
+    <rect x="20" y="195" width="130" height="45" rx="6" fill="rgba(30,41,59,0.95)" stroke="rgba(16,185,129,0.3)" stroke-width="1"/>
+    <rect x="20" y="195" width="4" height="45" rx="2" fill="#10b981"/>
+    <text x="35" y="215" font-family="Arial" font-size="10" fill="#e2e8f0">文本按长度切分</text>
+    <text x="35" y="230" font-family="Arial" font-size="8" fill="#64748b">处理 · CPU</text>
+  </g>
+
+  <g filter="url(#nodeShadow)">
+    <rect x="20" y="250" width="130" height="45" rx="6" fill="rgba(30,41,59,0.95)" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+    <rect x="20" y="250" width="4" height="45" rx="2" fill="#8b5cf6"/>
+    <text x="35" y="270" font-family="Arial" font-size="10" fill="#e2e8f0">文本向量化</text>
+    <text x="35" y="285" font-family="Arial" font-size="8" fill="#64748b">智能 · GPU</text>
+  </g>
+
+  <g filter="url(#nodeShadow)">
+    <rect x="20" y="305" width="130" height="45" rx="6" fill="rgba(30,41,59,0.95)" stroke="rgba(245,158,11,0.3)" stroke-width="1"/>
+    <rect x="20" y="305" width="4" height="45" rx="2" fill="#f59e0b"/>
+    <text x="35" y="325" font-family="Arial" font-size="10" fill="#e2e8f0">写入 Doris</text>
+    <text x="35" y="340" font-family="Arial" font-size="8" fill="#64748b">输出 · CPU</text>
+  </g>
+
+  <!-- Canvas nodes -->
+  <!-- Node 1: Read Lance -->
+  <g filter="url(#nodeShadow)">
+    <rect x="200" y="100" width="160" height="70" rx="8" fill="rgba(30,41,59,0.98)" stroke="rgba(59,130,246,0.5)" stroke-width="2"/>
+    <rect x="200" y="100" width="4" height="70" rx="2" fill="url(#nodeSource)"/>
+    <text x="215" y="125" font-family="Arial" font-size="12" font-weight="bold" fill="white">读取 Lance 数据</text>
+    <text x="215" y="145" font-family="Arial" font-size="9" fill="#64748b">read_lance</text>
+    <circle cx="360" cy="135" r="6" fill="#3b82f6" stroke="#1e40af" stroke-width="1.5"/>
+  </g>
+
+  <!-- Node 2: Clean Text -->
+  <g filter="url(#nodeShadow)">
+    <rect x="400" y="100" width="160" height="70" rx="8" fill="rgba(30,41,59,0.98)" stroke="rgba(16,185,129,0.5)" stroke-width="2"/>
+    <rect x="400" y="100" width="4" height="70" rx="2" fill="url(#nodeTransform)"/>
+    <circle cx="400" cy="135" r="6" fill="#10b981" stroke="#059669" stroke-width="1.5"/>
+    <text x="415" y="125" font-family="Arial" font-size="12" font-weight="bold" fill="white">正则隐私脱敏</text>
+    <text x="415" y="145" font-family="Arial" font-size="9" fill="#64748b">clean_texts_by_regex</text>
+    <text x="415" y="160" font-family="Arial" font-size="8" fill="#94a3b8">chunk_size: 500</text>
+    <circle cx="560" cy="135" r="6" fill="#10b981" stroke="#059669" stroke-width="1.5"/>
+  </g>
+
+  <!-- Node 3: Split Text -->
+  <g filter="url(#nodeShadow)">
+    <rect x="400" y="200" width="160" height="70" rx="8" fill="rgba(30,41,59,0.98)" stroke="rgba(16,185,129,0.5)" stroke-width="2"/>
+    <rect x="400" y="200" width="4" height="70" rx="2" fill="url(#nodeTransform)"/>
+    <circle cx="400" cy="235" r="6" fill="#10b981" stroke="#059669" stroke-width="1.5"/>
+    <text x="415" y="225" font-family="Arial" font-size="12" font-weight="bold" fill="white">文本按长度切分</text>
+    <text x="415" y="245" font-family="Arial" font-size="9" fill="#64748b">split_text_by_length</text>
+    <text x="415" y="260" font-family="Arial" font-size="8" fill="#94a3b8">chunk_size: 1000</text>
+    <circle cx="560" cy="235" r="6" fill="#10b981" stroke="#059669" stroke-width="1.5"/>
+  </g>
+
+  <!-- Node 4: Vectorize -->
+  <g filter="url(#nodeShadow)">
+    <rect x="600" y="150" width="160" height="70" rx="8" fill="rgba(30,41,59,0.98)" stroke="rgba(139,92,246,0.5)" stroke-width="2"/>
+    <rect x="600" y="150" width="4" height="70" rx="2" fill="url(#nodeAI)"/>
+    <circle cx="600" cy="185" r="6" fill="#8b5cf6" stroke="#7c3aed" stroke-width="1.5"/>
+    <text x="615" y="175" font-family="Arial" font-size="12" font-weight="bold" fill="white">文本向量化</text>
+    <text x="615" y="195" font-family="Arial" font-size="9" fill="#64748b">vectorize_text</text>
+    <circle cx="760" cy="185" r="6" fill="#8b5cf6" stroke="#7c3aed" stroke-width="1.5"/>
+  </g>
+
+  <!-- Edge connections -->
+  <g stroke="rgba(59,130,246,0.6)" stroke-width="2" fill="none" stroke-dasharray="6 4">
+    <path d="M 360 135 C 380 135, 380 135, 400 135"/>
+    <path d="M 560 135 C 580 135, 580 185, 600 185"/>
+    <path d="M 560 235 C 580 235, 580 185, 600 185"/>
+  </g>
+
+  <!-- Right panel preview hint -->
+  <rect x="630" y="55" width="160" height="385" rx="6" fill="rgba(30,41,59,0.7)" stroke="rgba(100,116,139,0.15)" stroke-width="1"/>
+  <text x="710" y="75" text-anchor="middle" font-family="Arial" font-size="10" fill="#64748b">配置面板</text>
+
+  <!-- Minimap hint -->
+  <rect x="640" y="380" width="140" height="50" rx="4" fill="rgba(30,41,59,0.9)" stroke="rgba(100,116,139,0.2)" stroke-width="1"/>
+  <text x="710" y="400" text-anchor="middle" font-family="Arial" font-size="8" fill="#64748b">小地图</text>
+  <rect x="650" y="405" width="120" height="20" rx="2" fill="rgba(100,116,139,0.1)"/>
+  <rect x="660" y="410" width="30" height="10" rx="2" fill="rgba(59,130,246,0.3)" stroke="rgba(59,130,246,0.5)" stroke-width="0.5"/>
+  <rect x="700" y="410" width="30" height="10" rx="2" fill="rgba(16,185,129,0.3)" stroke="rgba(16,185,129,0.5)" stroke-width="0.5"/>
+
+  <!-- Zoom controls hint -->
+  <g transform="translate(20, 390)">
+    <rect width="80" height="40" rx="4" fill="rgba(30,41,59,0.9)" stroke="rgba(100,116,139,0.2)" stroke-width="1"/>
+    <text x="20" y="25" font-family="Arial" font-size="14" fill="#94a3b8">+</text>
+    <text x="40" y="25" font-family="Arial" font-size="9" fill="#64748b">100%</text>
+    <text x="65" y="25" font-family="Arial" font-size="14" fill="#94a3b8">−</text>
+  </g>
 </svg>

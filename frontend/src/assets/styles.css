@@ -1431,6 +1431,25 @@ pre {
   height: 100%;
 }
 
+/* 侧边栏悬停触发器 */
+.sidebar-hover-trigger {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+div[class*="Sider"]:hover .sidebar-hover-trigger,
+div[class*="sider"]:hover .sidebar-hover-trigger,
+aside:hover .sidebar-hover-trigger {
+  opacity: 1 !important;
+  pointer-events: auto;
+}
+
+/* 用父元素 hover 触发 */
+.ant-layout-sider:hover .sidebar-hover-trigger {
+  opacity: 1 !important;
+  pointer-events: auto;
+}
+
 .workflow-panel-head {
   display: flex;
   justify-content: space-between;
