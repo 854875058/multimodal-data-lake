@@ -109,6 +109,7 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
   const [leftCollapsed, setLeftCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const [llmModels, setLlmModels] = useState([])
+  const [zoom, setZoom] = useState(1)
   const [, forceUpdate] = useState(0)
 
   nodesRef.current = canvasNodes
@@ -344,9 +345,33 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
         </aside>
 
         <main className="workflow-canvas-column workflow-panel">
+          <div className="workflow-zoom-controls">
+            <button onClick={() => setZoom(z => Math.min(2, z + 0.1))} title="放大">+</button>
+            <span>{Math.round(zoom * 100)}%</span>
+            <button onClick={() => setZoom(z => Math.max(0.3, z - 0.1))} title="缩小">−</button>
+            <button onClick={() => setZoom(1)} title="重置">↺</button>
+          </div>
+          <div className="workflow-minimap">
+            <div className="workflow-minimap-title">小地图</div>
+            <svg viewBox={`0 0 ${Math.max(1200, ...canvasNodes.map(n => n.x + 240))} ${Math.max(800, ...canvasNodes.map(n => n.y + 100))}`} preserveAspectRatio="xMidYMid meet">
+              {edges.map(e => {
+                const s = canvasNodes.find(n => n.id === e.source)
+                const t = canvasNodes.find(n => n.id === e.target)
+                if (!s || !t) return null
+                return <line key={e.id} x1={s.x + 110} y1={s.y + 44} x2={t.x} y2={t.y + 44} stroke="rgba(22,93,255,0.3)" strokeWidth="2" />
+              })}
+              {canvasNodes.map(n => (
+                <rect key={n.id} x={n.x} y={n.y} width={220} height={88} rx="6"
+                  fill={selectedNodeId === n.id ? 'rgba(22,93,255,0.2)' : 'rgba(255,255,255,0.8)'}
+                  stroke={selectedNodeId === n.id ? 'rgba(22,93,255,0.6)' : 'rgba(0,0,0,0.1)'} strokeWidth="1" />
+              ))}
+            </svg>
+          </div>
           <div ref={canvasRef} className="workflow-node-canvas"
+            style={{ transform: `scale(${zoom})`, transformOrigin: '0 0' }}
+            onWheel={e => { if (e.ctrlKey) { e.preventDefault(); setZoom(z => Math.min(2, Math.max(0.3, z + (e.deltaY > 0 ? -0.1 : 0.1)))) } }}
             onDragOver={e => e.preventDefault()}
-            onDrop={e => { e.preventDefault(); const opId = e.dataTransfer.getData('application/operator-id'); const op = libraryMap.get(opId); if (!op || !canvasRef.current) return; const r = canvasRef.current.getBoundingClientRect(); addNode(op, { x: Math.max(24, e.clientX - r.left - 110), y: Math.max(24, e.clientY - r.top - 42) }) }}>
+            onDrop={e => { e.preventDefault(); const opId = e.dataTransfer.getData('application/operator-id'); const op = libraryMap.get(opId); if (!op || !canvasRef.current) return; const r = canvasRef.current.getBoundingClientRect(); addNode(op, { x: Math.max(24, (e.clientX - r.left) / zoom - 110), y: Math.max(24, (e.clientY - r.top) / zoom - 42) }) }}>
             <svg className="workflow-edge-layer">{renderEdges()}</svg>
             {canvasNodes.length ? canvasNodes.map(node => (
               <div key={node.id} id={`wf-node-${node.id}`}
