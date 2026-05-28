@@ -56,7 +56,14 @@ function topoSort(nodes, edges) {
   return out.length === nodes.length ? out : [...nodes].sort((a, b) => a.x - b.x || a.y - b.y)
 }
 
-function NodeParamForm({ node, onUpdate, llmModels = [] }) {
+// 自动映射：上游输出字段 -> 下游输入参数
+const AUTO_PARAM_MAP = {
+  'output_path': 'source_path',
+  'output_dir': 'source_path',
+  'sink_path': 'source_path',
+}
+
+function NodeParamForm({ node, onUpdate, llmModels = [], connectedParams = {} }) {
   const schema = node.paramsSchema || {}
   const keys = Object.keys(schema)
   if (!keys.length) return null
@@ -67,16 +74,26 @@ function NodeParamForm({ node, onUpdate, llmModels = [] }) {
     <div className="workflow-node-params" onMouseDown={e => e.stopPropagation()}>
       {keys.map(k => {
         const s = schema[k], v = params[k] ?? s.default ?? '', t = s.type || 'string'
+        const isLocked = !!connectedParams[k]
+        const lockSource = connectedParams[k] || ''
         return (
-          <div key={k} className="workflow-param-field">
-            <label className="workflow-param-label">{k}</label>
-            {t === 'boolean' ? <input type="checkbox" checked={!!v} onChange={e => set(k, e.target.checked)} className="workflow-param-checkbox" />
+          <div key={k} className={`workflow-param-field ${isLocked ? 'is-locked' : ''}`}>
+            <label className="workflow-param-label">
+              {k}
+              {isLocked && <span className="workflow-param-lock" title={`来自: ${lockSource}`}>🔗</span>}
+            </label>
+            {isLocked ? (
+              <div className="workflow-param-locked">
+                <span className="workflow-param-locked-value">{lockSource}</span>
+                <button className="workflow-param-unlock" onClick={() => set(k, '')} title="断开连接，手动输入">×</button>
+              </div>
+            ) : t === 'boolean' ? <input type="checkbox" checked={!!v} onChange={e => set(k, e.target.checked)} className="workflow-param-checkbox" />
             : t === 'integer' || t === 'number' ? <input type="number" value={v} onChange={e => set(k, t === 'integer' ? parseInt(e.target.value || 0, 10) : parseFloat(e.target.value || 0))} className="workflow-param-input" />
             : isLLM(k) && llmModels.length ? <select value={String(v)} onChange={e => set(k, e.target.value)} className="workflow-param-select"><option value="">选择模型</option>{llmModels.map(m => <option key={m.id} value={m.model}>{m.name}</option>)}</select>
             : s.enum?.length ? <select value={String(v)} onChange={e => set(k, e.target.value)} className="workflow-param-select">{s.enum.map(o => <option key={o} value={o}>{o}</option>)}</select>
             : t === 'array' ? <input type="text" value={Array.isArray(v) ? v.join(', ') : String(v)} onChange={e => set(k, e.target.value.split(',').map(s => s.trim()).filter(Boolean))} className="workflow-param-input" placeholder="逗号分隔" />
             : <input type="text" value={String(v)} onChange={e => set(k, e.target.value)} className="workflow-param-input" />}
-            {s.description && <span className="workflow-param-hint">{s.description}</span>}
+            {s.description && !isLocked && <span className="workflow-param-hint">{s.description}</span>}
           </div>
         )
       })}
@@ -143,6 +160,23 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
   const selectedNode = useMemo(() => canvasNodes.find(n => n.id === selectedNodeId), [canvasNodes, selectedNodeId])
   const selectedNodeIndex = useMemo(() => canvasNodes.findIndex(n => n.id === selectedNodeId), [canvasNodes, selectedNodeId])
   const orderedNodes = useMemo(() => topoSort(canvasNodes, edges), [canvasNodes, edges])
+
+  // 计算每个节点的参数连接映射
+  const getConnectedParams = useCallback((nodeId) => {
+    const result = {}
+    const incomingEdges = edges.filter(e => e.target === nodeId)
+    for (const edge of incomingEdges) {
+      const sourceNode = canvasNodes.find(n => n.id === edge.source)
+      if (!sourceNode) continue
+      // 自动映射：上游的 output_path -> 下游的 source_path
+      for (const [srcField, tgtField] of Object.entries(AUTO_PARAM_MAP)) {
+        if (sourceNode.paramsSchema?.[srcField] || tgtField) {
+          result[tgtField] = `${sourceNode.config?.alias || sourceNode.label}.${srcField}`
+        }
+      }
+    }
+    return result
+  }, [edges, canvasNodes])
 
   useEffect(() => {
     if (!orderedNodes.length) { setJobSpec(null); return }
@@ -397,7 +431,7 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
                 {Object.keys(node.paramsSchema || {}).length > 0 && (
                   <button type="button" className="workflow-params-toggle" onClick={e => { e.stopPropagation(); toggleParams(node.id) }}>{node.paramsExpanded ? '收起参数' : '展开参数'}</button>
                 )}
-                {node.paramsExpanded && <NodeParamForm node={node} llmModels={llmModels} onUpdate={patch => setCanvasNodes(p => p.map(n => n.id === node.id ? { ...n, config: { ...n.config, ...patch } } : n))} />}
+                {node.paramsExpanded && <NodeParamForm node={node} llmModels={llmModels} connectedParams={getConnectedParams(node.id)} onUpdate={patch => setCanvasNodes(p => p.map(n => n.id === node.id ? { ...n, config: { ...n.config, ...patch } } : n))} />}
                 <div className="workflow-graph-node-actions">
                   <button className="button button-mini button-ghost" onClick={() => dupNode(node.id)}>复制</button>
                   <button className="button button-mini button-danger" onClick={() => removeNode(node.id)}>删除</button>
