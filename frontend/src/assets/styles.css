@@ -1511,6 +1511,8 @@ aside:hover .sidebar-hover-trigger {
 .workflow-canvas-column {
   padding: 0;
   overflow: hidden;
+  flex: 1;
+  min-width: 0;
 }
 
 .workflow-library-grid {
@@ -1635,7 +1637,7 @@ aside:hover .sidebar-hover-trigger {
 .workflow-minimap {
   position: absolute;
   bottom: 16px;
-  right: 336px;
+  right: 16px;
   width: 220px;
   height: 160px;
   background: var(--color-bg-2);
@@ -1645,12 +1647,6 @@ aside:hover .sidebar-hover-trigger {
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   overflow: hidden;
   cursor: move;
-  transition: right 0.3s ease;
-}
-
-.workflow-summary-column.is-collapsed ~ .workflow-canvas-column .workflow-minimap,
-.workflow-studio-layout:has(.workflow-summary-column.is-collapsed) .workflow-minimap {
-  right: 16px;
 }
 
 .workflow-minimap-title {
