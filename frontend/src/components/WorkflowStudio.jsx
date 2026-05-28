@@ -343,6 +343,14 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
     connected: new Set(edges.flatMap(e => [e.source, e.target])).size,
   }), [canvasNodes.length, edges])
 
+  // 计算画布边界（必须在条件返回之前，否则 hooks 顺序错乱）
+  const canvasBounds = useMemo(() => {
+    if (!canvasNodes.length) return { minX: 0, minY: 0, maxX: 1200, maxY: 800 }
+    const xs = canvasNodes.map(n => n.x)
+    const ys = canvasNodes.map(n => n.y)
+    return { minX: Math.min(...xs) - 50, minY: Math.min(...ys) - 50, maxX: Math.max(...xs) + 280, maxY: Math.max(...ys) + 150 }
+  }, [canvasNodes])
+
   // 小地图视图框拖拽
   const minimapDragRef = useRef(null)
   const [minimapView, setMinimapView] = useState({ x: 0, y: 0, w: 800, h: 600 })
@@ -374,14 +382,15 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
     const minimapSvg = minimapRef.current?.querySelector('svg')
     if (!minimapSvg) return
     const svgRect = minimapSvg.getBoundingClientRect()
-    const svgContentW = canvasW || 1
-    const svgContentH = canvasH || 1
+    const bounds = canvasBounds
+    const svgContentW = (bounds.maxX - bounds.minX) || 1
+    const svgContentH = (bounds.maxY - bounds.minY) || 1
     const scaleX = svgRect.width / svgContentW
     const scaleY = svgRect.height / svgContentH
 
     const scrollToPos = (clientX, clientY) => {
-      const relX = (clientX - svgRect.left) / scaleX + canvasBounds.minX
-      const relY = (clientY - svgRect.top) / scaleY + canvasBounds.minY
+      const relX = (clientX - svgRect.left) / scaleX + bounds.minX
+      const relY = (clientY - svgRect.top) / scaleY + bounds.minY
       canvas.scrollLeft = relX - canvas.clientWidth / 2
       canvas.scrollTop = relY - canvas.clientHeight / 2
     }
@@ -393,17 +402,12 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
     const onUp = () => { minimapDragRef.current = null; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-  }, [canvasW, canvasH, canvasBounds])
-
-  // 计算画布边界（必须在条件返回之前，否则 hooks 顺序错乱）
-  const canvasBounds = useMemo(() => {
-    if (!canvasNodes.length) return { minX: 0, minY: 0, maxX: 1200, maxY: 800 }
-    const xs = canvasNodes.map(n => n.x)
-    const ys = canvasNodes.map(n => n.y)
-    return { minX: Math.min(...xs) - 50, minY: Math.min(...ys) - 50, maxX: Math.max(...xs) + 280, maxY: Math.max(...ys) + 150 }
-  }, [canvasNodes])
+  }, [canvasBounds])
 
   if (loading) return <div className="loading-state compact">加载中...</div>
+
+  const canvasW = canvasBounds.maxX - canvasBounds.minX
+  const canvasH = canvasBounds.maxY - canvasBounds.minY
 
   const renderEdges = () => {
     const allEdges = [...edgesRef.current]
@@ -422,9 +426,6 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
       return <path key={edge.id} d={d} className="workflow-edge-path" />
     })
   }
-
-  const canvasW = canvasBounds.maxX - canvasBounds.minX
-  const canvasH = canvasBounds.maxY - canvasBounds.minY
 
   return (
     <section className="workflow-studio-fullscreen">
