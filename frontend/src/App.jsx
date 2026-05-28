@@ -251,10 +251,12 @@ function AppShell({ authSession, onLogout }) {
         collapsed={collapsed}
         onCollapse={setCollapsed}
         collapsible
-        width={272}
+        width={260}
+        trigger={null}
         style={{
           background: 'var(--color-bg-2)',
           borderRight: '1px solid var(--color-border-2)',
+          position: 'relative',
         }}
       >
         <div
@@ -326,6 +328,27 @@ function AppShell({ authSession, onLogout }) {
             </SubMenu>
           ))}
         </Menu>
+        <div
+          onClick={() => setCollapsed(!collapsed)}
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: 20,
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 10,
+            background: 'var(--color-fill-2)',
+            borderLeft: '1px solid var(--color-border-2)',
+          }}
+        >
+          <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
+            {collapsed ? '»' : '«'}
+          </span>
+        </div>
       </Sider>
 
       <Layout>

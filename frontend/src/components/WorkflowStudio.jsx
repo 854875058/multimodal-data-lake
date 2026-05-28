@@ -15,15 +15,15 @@ const kindLabels = {
 }
 
 const healthStateLabels = {
-  runnable: 'Runnable',
-  staged: 'Staged',
-  missing_env: 'Missing env',
-  missing_dependency: 'Missing dependency',
-  import_error: 'Import error',
+  runnable: '可运行',
+  staged: '待集成',
+  missing_env: '缺少环境变量',
+  missing_dependency: '缺少依赖',
+  import_error: '导入失败',
 }
 
 function getHealthStateLabel(state) {
-  return healthStateLabels[state] || 'Unknown'
+  return healthStateLabels[state] || '未知'
 }
 
 function buildDefaultParamsText(item) {
@@ -45,6 +45,7 @@ function createNodeFromLibrary(item, position = { x: 80, y: 80 }) {
     category: item.category || '',
     health: item.health || null,
     paramsSchema: item.params_schema || {},
+    defaultParams: item.default_params || {},
     sourceCodePath: item.source_code_path || '',
     inputTypes: item.input_types || [],
     outputTypes: item.output_types || [],
@@ -56,6 +57,7 @@ function createNodeFromLibrary(item, position = { x: 80, y: 80 }) {
       paramsText: buildDefaultParamsText(item),
       notes: '',
     },
+    paramsExpanded: true,
   }
 }
 
@@ -64,7 +66,7 @@ function buildPresetGraph(preset, libraryMap) {
   const presetEdges = []
   const baseX = 60
   const baseY = 90
-  const gapX = 240
+  const gapX = 260
   ;(preset?.nodes || []).forEach((nodeId, index) => {
     const item = libraryMap.get(nodeId) || {
       id: nodeId,
@@ -73,8 +75,8 @@ function buildPresetGraph(preset, libraryMap) {
       kind: 'transform',
     }
     const node = createNodeFromLibrary(item, {
-      x: baseX + (index % 3) * gapX,
-      y: baseY + Math.floor(index / 3) * 170,
+      x: baseX + (index % 4) * gapX,
+      y: baseY + Math.floor(index / 4) * 200,
     })
     presetNodes.push(node)
     if (index > 0) {
@@ -135,7 +137,101 @@ function sortNodesForExecution(nodes, edges) {
   return ordered
 }
 
-export default function WorkflowStudio({ sourceHint = '', onBanner }) {
+function NodeParamForm({ node, onUpdate, llmModels = [] }) {
+  const paramsSchema = node.paramsSchema || {}
+  const paramKeys = Object.keys(paramsSchema)
+  if (!paramKeys.length) return null
+
+  let params = {}
+  try {
+    params = parseParams(node.config?.paramsText)
+  } catch {
+    params = {}
+  }
+
+  const handleChange = (key, value) => {
+    const next = { ...params, [key]: value }
+    onUpdate({ paramsText: JSON.stringify(next, null, 2) })
+  }
+
+  const isLLMParam = (key, schema) => {
+    const lowerKey = key.toLowerCase()
+    return lowerKey.includes('model') || lowerKey.includes('llm') || lowerKey.includes('provider')
+  }
+
+  return (
+    <div className="workflow-node-params">
+      {paramKeys.map((key) => {
+        const schema = paramsSchema[key]
+        const value = params[key] ?? schema.default ?? ''
+        const type = schema.type || 'string'
+        const showLLMSelector = isLLMParam(key, schema) && llmModels.length > 0
+
+        return (
+          <div key={key} className="workflow-param-field">
+            <label className="workflow-param-label">{key}</label>
+            {type === 'boolean' ? (
+              <input
+                type="checkbox"
+                checked={!!value}
+                onChange={(e) => handleChange(key, e.target.checked)}
+                className="workflow-param-checkbox"
+              />
+            ) : type === 'integer' || type === 'number' ? (
+              <input
+                type="number"
+                value={value}
+                onChange={(e) => handleChange(key, type === 'integer' ? parseInt(e.target.value || 0, 10) : parseFloat(e.target.value || 0))}
+                className="workflow-param-input"
+              />
+            ) : showLLMSelector ? (
+              <select
+                value={String(value)}
+                onChange={(e) => handleChange(key, e.target.value)}
+                className="workflow-param-select"
+              >
+                <option value="">选择模型</option>
+                {llmModels.map((m) => (
+                  <option key={m.id} value={m.model}>{m.name} ({m.model})</option>
+                ))}
+              </select>
+            ) : schema.enum && schema.enum.length ? (
+              <select
+                value={String(value)}
+                onChange={(e) => handleChange(key, e.target.value)}
+                className="workflow-param-select"
+              >
+                {schema.enum.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            ) : type === 'array' ? (
+              <input
+                type="text"
+                value={Array.isArray(value) ? value.join(', ') : String(value)}
+                onChange={(e) => handleChange(key, e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
+                className="workflow-param-input"
+                placeholder="逗号分隔"
+              />
+            ) : (
+              <input
+                type="text"
+                value={String(value)}
+                onChange={(e) => handleChange(key, e.target.value)}
+                className="workflow-param-input"
+              />
+            )}
+            {schema.description && (
+              <span className="workflow-param-hint">{schema.description}</span>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export default function WorkflowStudio({ sourceHint = '', platformSettings = null, onBanner }) {
   const canvasRef = useRef(null)
   const dragStateRef = useRef(null)
   const [library, setLibrary] = useState([])
@@ -152,6 +248,21 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
   const [building, setBuilding] = useState(false)
   const [error, setError] = useState('')
   const [searchKeyword, setSearchKeyword] = useState('')
+  const [leftCollapsed, setLeftCollapsed] = useState(false)
+  const [rightCollapsed, setRightCollapsed] = useState(false)
+  const [llmModels, setLlmModels] = useState([])
+
+  useEffect(() => {
+    const loadLLM = async () => {
+      try {
+        const resp = await api.getLLMModels()
+        setLlmModels(Array.isArray(resp?.items) ? resp.items : [])
+      } catch {
+        setLlmModels([])
+      }
+    }
+    loadLLM()
+  }, [])
 
   useEffect(() => {
     const load = async () => {
@@ -256,20 +367,33 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
     const onPointerMove = (event) => {
       const dragState = dragStateRef.current
       if (!dragState) return
-      setCanvasNodes((current) =>
-        current.map((node) =>
-          node.id === dragState.nodeId
-            ? {
-                ...node,
-                x: Math.max(20, event.clientX - dragState.offsetX),
-                y: Math.max(20, event.clientY - dragState.offsetY),
-              }
-            : node
-        )
-      )
+      const canvasEl = canvasRef.current
+      if (!canvasEl) return
+      const rect = canvasEl.getBoundingClientRect()
+      const scrollTop = canvasEl.scrollTop || 0
+      const scrollLeft = canvasEl.scrollLeft || 0
+      const newX = Math.max(20, event.clientX - rect.left + scrollLeft - dragState.offsetX)
+      const newY = Math.max(20, event.clientY - rect.top + scrollTop - dragState.offsetY)
+      const nodeEl = document.getElementById(`wf-node-${dragState.nodeId}`)
+      if (nodeEl) {
+        nodeEl.style.left = `${newX}px`
+        nodeEl.style.top = `${newY}px`
+      }
+      dragState.currentX = newX
+      dragState.currentY = newY
     }
 
     const onPointerUp = () => {
+      const dragState = dragStateRef.current
+      if (dragState && dragState.currentX !== undefined) {
+        setCanvasNodes((current) =>
+          current.map((node) =>
+            node.id === dragState.nodeId
+              ? { ...node, x: dragState.currentX, y: dragState.currentY }
+              : node
+          )
+        )
+      }
       dragStateRef.current = null
       window.removeEventListener('mousemove', onPointerMove)
       window.removeEventListener('mouseup', onPointerUp)
@@ -284,7 +408,7 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
       window.removeEventListener('mousemove', onPointerMove)
       window.removeEventListener('mouseup', onPointerUp)
     }
-  }, [canvasNodes])
+  }, [])
 
   const applyPreset = (presetId) => {
     const preset = presets.find((item) => item.id === presetId)
@@ -352,7 +476,7 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
     if (!operator || !canvasRef.current) return
     const rect = canvasRef.current.getBoundingClientRect()
     addNodeToCanvas(operator, {
-      x: Math.max(24, event.clientX - rect.left - 96),
+      x: Math.max(24, event.clientX - rect.left - 110),
       y: Math.max(24, event.clientY - rect.top - 42),
     })
   }
@@ -360,10 +484,12 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
   const onNodeMouseDown = (event, node) => {
     if (!canvasRef.current) return
     const rect = canvasRef.current.getBoundingClientRect()
+    const scrollTop = canvasRef.current.scrollTop || 0
+    const scrollLeft = canvasRef.current.scrollLeft || 0
     dragStateRef.current = {
       nodeId: node.id,
-      offsetX: event.clientX - rect.left - node.x,
-      offsetY: event.clientY - rect.top - node.y,
+      offsetX: event.clientX - rect.left + scrollLeft - node.x,
+      offsetY: event.clientY - rect.top + scrollTop - node.y,
     }
     setSelectedNodeId(node.id)
   }
@@ -402,6 +528,16 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
     )
   }
 
+  const toggleNodeParams = (nodeId) => {
+    setCanvasNodes((current) =>
+      current.map((node) =>
+        node.id === nodeId
+          ? { ...node, paramsExpanded: !node.paramsExpanded }
+          : node
+      )
+    )
+  }
+
   const removeEdge = (edgeId) => {
     setEdges((current) => current.filter((edge) => edge.id !== edgeId))
   }
@@ -427,16 +563,6 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
     }
   }
 
-  const paramsValidationMessage = useMemo(() => {
-    if (!selectedNode?.config?.paramsText) return ''
-    try {
-      parseParams(selectedNode.config.paramsText)
-      return '参数 JSON 合法'
-    } catch {
-      return '参数 JSON 不合法'
-    }
-  }, [selectedNode])
-
   const nodeStats = useMemo(() => {
     return {
       total: canvasNodes.length,
@@ -450,114 +576,96 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
   }
 
   return (
-    <section className="glass-card workflow-studio-card workflow-editor-shell">
-      <div className="card-header workflow-editor-header">
-        <div>
-          <h2>可视化工作流编排</h2>
-          <p>从左侧拖入算子，在中间画布布置节点并建立依赖关系，右侧维护节点参数、资源配置和任务预览。</p>
+    <section className="workflow-studio-fullscreen">
+      {error ? <div className="error-banner">{error}</div> : null}
+
+      <div className="workflow-top-toolbar">
+        <div className="workflow-toolbar-left">
+          <select
+            className="select workflow-preset-select"
+            value={selectedPresetId}
+            onChange={(event) => applyPreset(event.target.value)}
+          >
+            <option value="">选择预设模板</option>
+            {presets.map((preset) => (
+              <option key={preset.id} value={preset.id}>
+                {preset.name}
+              </option>
+            ))}
+          </select>
+          <input
+            className="input workflow-name-input"
+            value={workflowName}
+            onChange={(event) => setWorkflowName(event.target.value)}
+            placeholder="工作流名称"
+          />
         </div>
-        <div className="workflow-head-badges">
+        <div className="workflow-toolbar-center">
           <span className="badge">{nodeStats.total} 个节点</span>
           <span className="badge subtle">{nodeStats.edges} 条连线</span>
+          <span className="badge subtle">已连接 {nodeStats.connected}</span>
+          {connectSourceId ? <span className="badge warning">连线中</span> : null}
+        </div>
+        <div className="workflow-toolbar-right">
+          <button type="button" className="button button-small button-secondary" onClick={clearWorkflow} disabled={!canvasNodes.length}>
+            清空画布
+          </button>
+          <button type="button" className="button button-small button-primary" onClick={copyEntrypoint} disabled={!jobSpec?.entrypoint}>
+            复制命令
+          </button>
+          <button type="button" className="button button-small button-secondary" onClick={copyGraphSpec} disabled={!jobSpec?.graph}>
+            复制图定义
+          </button>
         </div>
       </div>
 
-      {error ? <div className="error-banner">{error}</div> : null}
-
       <div className="workflow-studio-layout workflow-editor-layout">
-        <aside className="workflow-library-column workflow-panel">
-          <div className="workflow-panel-head">
-            <div>
-              <div className="panel-title">算子库</div>
-              <div className="panel-copy">拖到画布即可生成节点，也可以先套用预设工作流。</div>
-            </div>
-          </div>
-
-          <div className="field">
-            <label htmlFor="workflow_preset">预设模板</label>
-            <select
-              id="workflow_preset"
-              className="select"
-              value={selectedPresetId}
-              onChange={(event) => applyPreset(event.target.value)}
-            >
-              <option value="">选择模板</option>
-              {presets.map((preset) => (
-                <option key={preset.id} value={preset.id}>
-                  {preset.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field">
-            <label htmlFor="workflow_search">筛选算子</label>
-            <input
-              id="workflow_search"
-              className="input"
-              value={searchKeyword}
-              onChange={(event) => setSearchKeyword(event.target.value)}
-              placeholder="按名称、类型或描述搜索"
-            />
-          </div>
-
-          <div className="workflow-library-grid">
-            {filteredLibrary.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                draggable
-                className={`workflow-library-item kind-${item.kind || 'transform'}`}
-                onDragStart={(event) => onLibraryDragStart(event, item)}
-                onClick={() => addNodeToCanvas(item, { x: 72, y: 72 + canvasNodes.length * 26 })}
-              >
-                <div className="workflow-library-topline">
-                  <span className="workflow-library-name">{item.label}</span>
-                  <span className="workflow-kind-chip">{kindLabels[item.kind] || '节点'}</span>
-                </div>
-                <span className="workflow-library-copy">{item.description}</span>
-                <span className="workflow-library-copy">
-                  {`${item.runtime || 'Runtime N/A'} | ${getHealthStateLabel(item?.health?.state)}`}
-                </span>
-              </button>
-            ))}
-          </div>
+        <aside className={`workflow-library-column workflow-panel ${leftCollapsed ? 'is-collapsed' : ''}`}>
+          {!leftCollapsed && (
+            <>
+              <div className="workflow-panel-head">
+                <div className="panel-title">算子库</div>
+                <button type="button" className="button button-mini button-ghost" onClick={() => setLeftCollapsed(true)}>收起</button>
+              </div>
+              <div className="field">
+                <input
+                  className="input"
+                  value={searchKeyword}
+                  onChange={(event) => setSearchKeyword(event.target.value)}
+                  placeholder="搜索算子..."
+                />
+              </div>
+              <div className="workflow-library-grid">
+                {filteredLibrary.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    draggable
+                    className={`workflow-library-item kind-${item.kind || 'transform'}`}
+                    onDragStart={(event) => onLibraryDragStart(event, item)}
+                    onClick={() => addNodeToCanvas(item, { x: 72, y: 72 + canvasNodes.length * 26 })}
+                  >
+                    <div className="workflow-library-topline">
+                      <span className="workflow-library-name">{item.label}</span>
+                      <span className="workflow-kind-chip">{kindLabels[item.kind] || '节点'}</span>
+                    </div>
+                    <span className="workflow-library-copy">{item.description}</span>
+                    <span className="workflow-library-copy">
+                      {`${item.runtime || 'N/A'} | ${getHealthStateLabel(item?.health?.state)}`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {leftCollapsed && (
+            <button type="button" className="workflow-collapse-expand" onClick={() => setLeftCollapsed(false)}>
+              算子库
+            </button>
+          )}
         </aside>
 
         <main className="workflow-canvas-column workflow-panel">
-          <div className="workflow-panel-head">
-            <div>
-              <div className="panel-title">工作流画布</div>
-              <div className="panel-copy">
-                蓝色输出点用于发起连线，节点左侧输入点用于接收连线。拖拽节点可以调整布局。
-              </div>
-            </div>
-            <div className="toolbar-group">
-              <button type="button" className="button button-small button-secondary" onClick={clearWorkflow} disabled={!canvasNodes.length}>
-                清空画布
-              </button>
-            </div>
-          </div>
-
-          <div className="toolbar workflow-inline-toolbar">
-            <div className="toolbar-group">
-              <div className="field grow-field">
-                <label htmlFor="workflow_name">工作流名称</label>
-                <input
-                  id="workflow_name"
-                  className="input"
-                  value={workflowName}
-                  onChange={(event) => setWorkflowName(event.target.value)}
-                  placeholder="multimodal_workflow"
-                />
-              </div>
-            </div>
-            <div className="workflow-inline-metrics">
-              <span>已连接节点 {nodeStats.connected}</span>
-              {connectSourceId ? <span className="linking-state">连线中</span> : null}
-            </div>
-          </div>
-
           <div
             ref={canvasRef}
             className="workflow-node-canvas"
@@ -569,7 +677,7 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
                 const source = canvasNodes.find((node) => node.id === edge.source)
                 const target = canvasNodes.find((node) => node.id === edge.target)
                 if (!source || !target) return null
-                const x1 = source.x + 188
+                const x1 = source.x + 220
                 const y1 = source.y + 44
                 const x2 = target.x
                 const y2 = target.y + 44
@@ -582,7 +690,8 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
               canvasNodes.map((node) => (
                 <div
                   key={node.id}
-                  className={`workflow-graph-node kind-${node.kind || 'transform'} ${selectedNodeId === node.id ? 'is-selected' : ''}`}
+                  id={`wf-node-${node.id}`}
+                  className={`workflow-graph-node kind-${node.kind || 'transform'} ${selectedNodeId === node.id ? 'is-selected' : ''} ${node.paramsExpanded ? 'is-expanded' : ''}`}
                   style={{ left: node.x, top: node.y }}
                   onClick={() => setSelectedNodeId(node.id)}
                 >
@@ -606,8 +715,33 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
 
                   <div className="workflow-graph-node-body">
                     <div className="workflow-node-code">{node.operatorId}</div>
-                    <div className="workflow-node-notes">{node.config?.notes || '未配置节点备注'}</div>
                   </div>
+
+                  {Object.keys(node.paramsSchema || {}).length > 0 && (
+                    <button
+                      type="button"
+                      className="workflow-params-toggle"
+                      onClick={(e) => { e.stopPropagation(); toggleNodeParams(node.id) }}
+                    >
+                      {node.paramsExpanded ? '收起参数' : '展开参数'}
+                    </button>
+                  )}
+
+                  {node.paramsExpanded && (
+                    <NodeParamForm
+                      node={node}
+                      llmModels={llmModels}
+                      onUpdate={(patch) => {
+                        setCanvasNodes((current) =>
+                          current.map((n) =>
+                            n.id === node.id
+                              ? { ...n, config: { ...n.config, ...patch } }
+                              : n
+                          )
+                        )
+                      }}
+                    />
+                  )}
 
                   <div className="workflow-graph-node-actions">
                     <button type="button" className="button button-mini button-ghost" onClick={() => duplicateNode(node.id)}>复制</button>
@@ -627,189 +761,140 @@ export default function WorkflowStudio({ sourceHint = '', onBanner }) {
               ))
             ) : (
               <div className="empty-state small workflow-empty-state">
-                从左侧拖入算子开始搭建工作流，当前画布支持节点拖拽、连线和参数配置。
+                从左侧拖入算子开始搭建工作流
               </div>
             )}
           </div>
         </main>
 
-        <aside className="workflow-summary-column workflow-panel">
-          <div className="workflow-panel-head">
-            <div>
-              <div className="panel-title">节点与运行配置</div>
-              <div className="panel-copy">右侧负责参数、资源和 Ray Job 预览，不再把这些信息挤到画布里。</div>
-            </div>
-          </div>
+        <aside className={`workflow-summary-column workflow-panel ${rightCollapsed ? 'is-collapsed' : ''}`}>
+          {!rightCollapsed && (
+            <>
+              <div className="workflow-panel-head">
+                <div className="panel-title">配置面板</div>
+                <button type="button" className="button button-mini button-ghost" onClick={() => setRightCollapsed(true)}>收起</button>
+              </div>
 
-          <div className="workflow-inspector-block">
-            <div className="kpi-label">当前节点</div>
-            {selectedNode ? (
-              <>
-                <div className="workflow-selected-title">{selectedNode.label}</div>
-                <pre className="workflow-code-block mono" style={{ marginBottom: 12 }}>
-                  {[
-                    `Operator: ${selectedNode.operatorId}`,
-                    `Runtime: ${selectedNode.runtime || 'N/A'}`,
-                    `Health: ${getHealthStateLabel(selectedNode?.health?.state)}`,
-                    `Modality: ${selectedNode.modality || 'N/A'}`,
-                    `Category: ${selectedNode.category || 'N/A'}`,
-                  ].join('\n')}
-                </pre>
-                <div className="field">
-                  <label htmlFor="node_alias">节点别名</label>
-                  <input
-                    id="node_alias"
-                    className="input"
-                    value={selectedNode.config?.alias || ''}
-                    onChange={(event) => updateSelectedNodeConfig({ alias: event.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="node_notes">节点备注</label>
-                  <textarea
-                    id="node_notes"
-                    className="textarea"
-                    value={selectedNode.config?.notes || ''}
-                    onChange={(event) => updateSelectedNodeConfig({ notes: event.target.value })}
-                    rows={3}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="node_params">节点参数 JSON</label>
-                  <textarea
-                    id="node_params"
-                    className="textarea mono"
-                    value={selectedNode.config?.paramsText || ''}
-                    onChange={(event) => updateSelectedNodeConfig({ paramsText: event.target.value })}
-                    rows={6}
-                    placeholder='{"batch_size": 32}'
-                  />
-                  {paramsValidationMessage ? (
-                    <div className={`workflow-validation-note ${paramsValidationMessage.includes('不合法') ? 'is-error' : 'is-success'}`}>
-                      {paramsValidationMessage}
+              <div className="workflow-inspector-block">
+                <div className="kpi-label">当前节点</div>
+                {selectedNode ? (
+                  <>
+                    <div className="workflow-selected-title">{selectedNode.label}</div>
+                    <pre className="workflow-code-block mono" style={{ marginBottom: 12 }}>
+                      {[
+                        `算子: ${selectedNode.operatorId}`,
+                        `运行时: ${selectedNode.runtime || 'N/A'}`,
+                        `状态: ${getHealthStateLabel(selectedNode?.health?.state)}`,
+                        `模态: ${selectedNode.modality || 'N/A'}`,
+                        `分类: ${selectedNode.category || 'N/A'}`,
+                      ].join('\n')}
+                    </pre>
+                    <div className="field">
+                      <label htmlFor="node_alias">节点别名</label>
+                      <input
+                        id="node_alias"
+                        className="input"
+                        value={selectedNode.config?.alias || ''}
+                        onChange={(event) => updateSelectedNodeConfig({ alias: event.target.value })}
+                      />
                     </div>
-                  ) : null}
-                </div>
-              </>
-            ) : (
-              <div className="empty-state small">先在画布中选中一个节点，再编辑参数和备注。</div>
-            )}
-          </div>
-
-          <div className="workflow-resource-grid">
-            <div className="field compact-field">
-              <label htmlFor="workflow_cpu">CPU</label>
-              <input
-                id="workflow_cpu"
-                className="input"
-                type="number"
-                min="1"
-                value={resources.cpu}
-                onChange={(event) => setResources((current) => ({ ...current, cpu: Number(event.target.value || 1) }))}
-              />
-            </div>
-            <div className="field compact-field">
-              <label htmlFor="workflow_gpu">GPU</label>
-              <input
-                id="workflow_gpu"
-                className="input"
-                type="number"
-                min="0"
-                value={resources.gpu}
-                onChange={(event) => setResources((current) => ({ ...current, gpu: Number(event.target.value || 0) }))}
-              />
-            </div>
-            <div className="field compact-field">
-              <label htmlFor="workflow_memory">内存 GB</label>
-              <input
-                id="workflow_memory"
-                className="input"
-                type="number"
-                min="1"
-                value={resources.memory_gb}
-                onChange={(event) => setResources((current) => ({ ...current, memory_gb: Number(event.target.value || 1) }))}
-              />
-            </div>
-          </div>
-
-          <div className="workflow-summary-panel">
-            <div className="kpi-label">拓扑顺序</div>
-            <div className="workflow-node-order">
-              {orderedNodes.map((node, index) => (
-                <div key={node.id} className={`workflow-node-order-item ${selectedNodeIndex === index ? 'is-active' : ''}`}>
-                  <span>{String(index + 1).padStart(2, '0')}</span>
-                  <strong>{node.config?.alias || node.label}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="workflow-summary-panel">
-            <div className="kpi-label">连线清单</div>
-            {edges.length ? (
-              <div className="workflow-edge-list">
-                {edges.map((edge) => (
-                  <div key={edge.id} className="workflow-edge-row">
-                    <span>{canvasNodes.find((node) => node.id === edge.source)?.label || edge.source}</span>
-                    <span className="workflow-edge-arrow">→</span>
-                    <span>{canvasNodes.find((node) => node.id === edge.target)?.label || edge.target}</span>
-                    <button type="button" className="button button-mini button-ghost" onClick={() => removeEdge(edge.id)}>
-                      删除
-                    </button>
-                  </div>
-                ))}
+                    <div className="field">
+                      <label htmlFor="node_notes">节点备注</label>
+                      <textarea
+                        id="node_notes"
+                        className="textarea"
+                        value={selectedNode.config?.notes || ''}
+                        onChange={(event) => updateSelectedNodeConfig({ notes: event.target.value })}
+                        rows={2}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="empty-state small">选中节点后可编辑别名和备注</div>
+                )}
               </div>
-            ) : (
-              <div className="empty-state small">还没有建立节点依赖关系。</div>
-            )}
-          </div>
 
-          <div className="workflow-summary-panel">
-            <div className="kpi-label">Execution Readiness</div>
-            <div className="workflow-code-block mono">
-              {jobSpec?.summary || 'Build the graph to inspect workflow readiness.'}
-            </div>
-            {jobSpec?.blocked_nodes?.length ? (
-              <div className="workflow-edge-list">
-                {jobSpec.blocked_nodes.map((item) => (
-                  <div key={item.id} className="workflow-edge-row">
-                    <span>{item.label}</span>
-                    <span className="workflow-edge-arrow">{getHealthStateLabel(item.health_state)}</span>
-                  </div>
-                ))}
+              <div className="workflow-resource-grid">
+                <div className="field compact-field">
+                  <label htmlFor="workflow_cpu">CPU</label>
+                  <input
+                    id="workflow_cpu"
+                    className="input"
+                    type="number"
+                    min="1"
+                    value={resources.cpu}
+                    onChange={(event) => setResources((current) => ({ ...current, cpu: Number(event.target.value || 1) }))}
+                  />
+                </div>
+                <div className="field compact-field">
+                  <label htmlFor="workflow_gpu">GPU</label>
+                  <input
+                    id="workflow_gpu"
+                    className="input"
+                    type="number"
+                    min="0"
+                    value={resources.gpu}
+                    onChange={(event) => setResources((current) => ({ ...current, gpu: Number(event.target.value || 0) }))}
+                  />
+                </div>
+                <div className="field compact-field">
+                  <label htmlFor="workflow_memory">内存 GB</label>
+                  <input
+                    id="workflow_memory"
+                    className="input"
+                    type="number"
+                    min="1"
+                    value={resources.memory_gb}
+                    onChange={(event) => setResources((current) => ({ ...current, memory_gb: Number(event.target.value || 1) }))}
+                  />
+                </div>
               </div>
-            ) : null}
-          </div>
 
-          <div className="workflow-summary-panel">
-            <div className="kpi-label">Ray Job Entrypoint</div>
-            <div className="workflow-code-block mono">
-              {building ? '生成中...' : (jobSpec?.entrypoint || '画布上至少放置一个节点后自动生成 Ray Job 预览。')}
-            </div>
-          </div>
+              <div className="workflow-summary-panel">
+                <div className="kpi-label">拓扑顺序</div>
+                <div className="workflow-node-order">
+                  {orderedNodes.map((node, index) => (
+                    <div key={node.id} className={`workflow-node-order-item ${selectedNodeIndex === index ? 'is-active' : ''}`}>
+                      <span>{String(index + 1).padStart(2, '0')}</span>
+                      <strong>{node.config?.alias || node.label}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-          <div className="workflow-summary-panel">
-            <div className="kpi-label">Runtime Env</div>
-            <pre className="workflow-code-block mono">
-              {jobSpec ? JSON.stringify(jobSpec.runtime_env, null, 2) : '{}'}
-            </pre>
-          </div>
+              <div className="workflow-summary-panel">
+                <div className="kpi-label">连线清单</div>
+                {edges.length ? (
+                  <div className="workflow-edge-list">
+                    {edges.map((edge) => (
+                      <div key={edge.id} className="workflow-edge-row">
+                        <span>{canvasNodes.find((node) => node.id === edge.source)?.label || edge.source}</span>
+                        <span className="workflow-edge-arrow">→</span>
+                        <span>{canvasNodes.find((node) => node.id === edge.target)?.label || edge.target}</span>
+                        <button type="button" className="button button-mini button-ghost" onClick={() => removeEdge(edge.id)}>
+                          删除
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state small">还没有连线</div>
+                )}
+              </div>
 
-          <div className="workflow-summary-panel">
-            <div className="kpi-label">工作流图定义</div>
-            <pre className="workflow-code-block mono">
-              {jobSpec?.graph ? JSON.stringify(jobSpec.graph, null, 2) : '{}'}
-            </pre>
-          </div>
-
-          <div className="toolbar-group">
-            <button type="button" className="button button-small button-primary" onClick={copyEntrypoint} disabled={!jobSpec?.entrypoint}>
-              复制命令
+              <div className="workflow-summary-panel">
+                <div className="kpi-label">Ray Job 预览</div>
+                <div className="workflow-code-block mono" style={{ fontSize: 11 }}>
+                  {building ? '生成中...' : (jobSpec?.entrypoint || '放置节点后自动生成')}
+                </div>
+              </div>
+            </>
+          )}
+          {rightCollapsed && (
+            <button type="button" className="workflow-collapse-expand" onClick={() => setRightCollapsed(false)}>
+              配置
             </button>
-            <button type="button" className="button button-small button-secondary" onClick={copyGraphSpec} disabled={!jobSpec?.graph}>
-              复制图定义
-            </button>
-          </div>
+          )}
         </aside>
       </div>
     </section>

@@ -87,81 +87,354 @@ class OperatorSpec:
 
 
 OPERATOR_SPECS: tuple[OperatorSpec, ...] = (
+    # === 可运行算子 ===
     OperatorSpec(
         key="clean_texts_by_regex",
-        name="Text Regex Privacy Cleaner",
+        name="正则隐私脱敏",
         modality="text",
         category="clean",
         status="active",
-        summary="Mask common privacy fields in text files with local regex rules.",
+        summary="使用正则表达式对文本中的手机号、邮箱、身份证号等隐私字段进行脱敏。",
         description=(
-            "This operator walks a source directory, masks common privacy tokens such as "
-            "mobile numbers, email addresses, IP addresses and ID cards, and writes the "
-            "cleaned files into the sink directory."
+            "遍历源目录中的文本文件，使用正则规则匹配手机号、邮箱、IP 地址、"
+            "座机号、身份证号和邮编等隐私字段，进行差异化掩码处理后写入目标目录。"
         ),
         module_path="backend.operators_migrated.text.clean.clean_texts_by_regex",
         class_name="CleanTextsByRegexOperator",
         runtime="CPU",
         workflow_kind="transform",
-        migration_status="Migrated and runnable in the current repository.",
+        migration_status="已迁移，可直接运行。",
         input_types=("text/plain", "text/markdown", "application/json", "text/csv"),
         output_types=("text/plain", "text/markdown", "application/json", "text/csv"),
         usage_steps=(
-            "Place source text files under source_path. Nested directories are supported.",
-            "Set chunk_size when you want to tune chunk splitting during masking.",
-            "Run the operator and read cleaned output from sink_path.",
+            "将待脱敏的文本文件放入源目录，支持嵌套子目录。",
+            "可调整 chunk_size 参数控制切片大小。",
+            "运行算子后从目标目录读取脱敏结果。",
         ),
         parameters=(
             OperatorParameterSpec(
                 name="chunk_size",
                 type="integer",
-                description="Split long text into chunks before masking.",
+                description="脱敏前将长文本按此长度切片处理",
                 default=500,
                 example=512,
             ),
             OperatorParameterSpec(
                 name="use_ai_detection",
                 type="boolean",
-                description="Reserved switch from the legacy implementation. The migrated operator currently falls back to regex-only mode.",
+                description="是否启用 AI 辅助检测（当前版本仅支持正则模式）",
                 default=False,
                 example=False,
             ),
         ),
         examples=(
             OperatorExampleSpec(
-                name="Default masking",
-                description="Use the built-in defaults for a directory of plain text files.",
+                name="默认脱敏",
+                description="使用默认参数对文本目录进行隐私脱敏。",
                 source_path="E:/datasets/raw_texts",
                 sink_path="E:/datasets/clean_texts",
                 params={"chunk_size": 500},
             ),
         ),
-        tags=("privacy", "masking", "text"),
+        tags=("隐私", "脱敏", "文本"),
         allow_extra_params=False,
     ),
     OperatorSpec(
+        key="split_text_by_length",
+        name="文本按长度切分",
+        modality="text",
+        category="split",
+        status="active",
+        summary="将长文本按指定字符数切分为多个片段，支持重叠区间。",
+        description=(
+            "遍历源目录中的文本文件，按指定的 chunk_size 切分为多段，"
+            "每段生成独立文件，支持 overlap 重叠以保留上下文连贯性。"
+        ),
+        module_path="backend.operators_migrated.text.split.split_text_by_length",
+        class_name="SplitTextByLengthOperator",
+        runtime="CPU",
+        workflow_kind="transform",
+        migration_status="已迁移，可直接运行。",
+        input_types=("text/plain", "text/markdown", "application/json", "text/csv"),
+        output_types=("text/plain", "text/markdown"),
+        usage_steps=(
+            "将待切分的文本文件放入源目录。",
+            "设置 chunk_size 控制每段长度，设置 overlap 控制重叠字符数。",
+            "运行算子后从目标目录读取切分结果。",
+        ),
+        parameters=(
+            OperatorParameterSpec(
+                name="chunk_size",
+                type="integer",
+                description="每段文本的最大字符数",
+                default=500,
+                example=1000,
+            ),
+            OperatorParameterSpec(
+                name="overlap",
+                type="integer",
+                description="相邻段之间的重叠字符数",
+                default=50,
+                example=100,
+            ),
+        ),
+        examples=(
+            OperatorExampleSpec(
+                name="按 1000 字切分",
+                description="将文本按 1000 字符切分，重叠 100 字符。",
+                source_path="E:/datasets/long_texts",
+                sink_path="E:/datasets/split_texts",
+                params={"chunk_size": 1000, "overlap": 100},
+            ),
+        ),
+        tags=("切分", "文本", "预处理"),
+    ),
+    OperatorSpec(
+        key="deduplicate_by_hash",
+        name="哈希去重",
+        modality="text",
+        category="dedup",
+        status="active",
+        summary="对文本文件按内容哈希去重，保留首次出现的文件。",
+        description=(
+            "遍历源目录中的文本文件，计算内容哈希值（支持 MD5/SHA256），"
+            "跳过内容重复的文件，仅保留首次出现的副本。"
+        ),
+        module_path="backend.operators_migrated.text.dedup.deduplicate_by_hash",
+        class_name="DeduplicateByHashOperator",
+        runtime="CPU",
+        workflow_kind="transform",
+        migration_status="已迁移，可直接运行。",
+        input_types=("text/plain", "text/markdown", "application/json", "text/csv"),
+        output_types=("text/plain", "text/markdown", "application/json", "text/csv"),
+        usage_steps=(
+            "将待去重的文件放入源目录。",
+            "选择哈希算法（md5 或 sha256）。",
+            "运行算子后从目标目录读取去重结果。",
+        ),
+        parameters=(
+            OperatorParameterSpec(
+                name="algorithm",
+                type="string",
+                description="哈希算法",
+                default="md5",
+                example="md5",
+                enum=("md5", "sha256"),
+            ),
+        ),
+        examples=(
+            OperatorExampleSpec(
+                name="MD5 去重",
+                description="使用 MD5 算法对文本文件去重。",
+                source_path="E:/datasets/raw_texts",
+                sink_path="E:/datasets/deduped_texts",
+                params={"algorithm": "md5"},
+            ),
+        ),
+        tags=("去重", "哈希", "文本"),
+    ),
+    OperatorSpec(
+        key="convert_csv_to_json",
+        name="CSV 转 JSON",
+        modality="text",
+        category="convert",
+        status="active",
+        summary="将 CSV 文件逐行转为 JSON 数组文件。",
+        description=(
+            "遍历源目录中的 CSV 文件，使用 csv.DictReader 逐行读取，"
+            "转换为 JSON 数组格式写入目标目录，非 CSV 文件直接拷贝。"
+        ),
+        module_path="backend.operators_migrated.text.convert.convert_csv_to_json",
+        class_name="ConvertCsvToJsonOperator",
+        runtime="CPU",
+        workflow_kind="transform",
+        migration_status="已迁移，可直接运行。",
+        input_types=("text/csv",),
+        output_types=("application/json",),
+        usage_steps=(
+            "将 CSV 文件放入源目录。",
+            "设置文件编码（默认 utf-8）。",
+            "运行算子后从目标目录读取 JSON 结果。",
+        ),
+        parameters=(
+            OperatorParameterSpec(
+                name="encoding",
+                type="string",
+                description="CSV 文件编码",
+                default="utf-8",
+                example="utf-8",
+                enum=("utf-8", "gbk", "gb2312", "latin-1"),
+            ),
+        ),
+        examples=(
+            OperatorExampleSpec(
+                name="UTF-8 CSV 转 JSON",
+                description="将 UTF-8 编码的 CSV 转为 JSON。",
+                source_path="E:/datasets/csv_files",
+                sink_path="E:/datasets/json_files",
+                params={"encoding": "utf-8"},
+            ),
+        ),
+        tags=("转换", "CSV", "JSON"),
+    ),
+    OperatorSpec(
+        key="filter_by_keyword",
+        name="关键词过滤",
+        modality="text",
+        category="filter",
+        status="active",
+        summary="按关键词筛选文本文件，保留或排除包含指定关键词的文件。",
+        description=(
+            "遍历源目录中的文本文件，检查内容是否包含指定关键词，"
+            "根据 include/exclude 模式决定保留或排除匹配文件。"
+        ),
+        module_path="backend.operators_migrated.text.filter.filter_by_keyword",
+        class_name="FilterByKeywordOperator",
+        runtime="CPU",
+        workflow_kind="transform",
+        migration_status="已迁移，可直接运行。",
+        input_types=("text/plain", "text/markdown", "application/json", "text/csv"),
+        output_types=("text/plain", "text/markdown", "application/json", "text/csv"),
+        usage_steps=(
+            "将待过滤的文件放入源目录。",
+            "设置关键词列表和过滤模式（include 保留匹配 / exclude 排除匹配）。",
+            "运行算子后从目标目录读取过滤结果。",
+        ),
+        parameters=(
+            OperatorParameterSpec(
+                name="keywords",
+                type="array",
+                description="关键词列表",
+                default=["示例"],
+                example=["数据", "AI"],
+            ),
+            OperatorParameterSpec(
+                name="mode",
+                type="string",
+                description="过滤模式：include 保留匹配文件，exclude 排除匹配文件",
+                default="include",
+                example="include",
+                enum=("include", "exclude"),
+            ),
+        ),
+        examples=(
+            OperatorExampleSpec(
+                name="保留含关键词的文件",
+                description='仅保留包含"数据"或"AI"的文件。',
+                source_path="E:/datasets/all_texts",
+                sink_path="E:/datasets/filtered_texts",
+                params={"keywords": ["数据", "AI"], "mode": "include"},
+            ),
+        ),
+        tags=("过滤", "关键词", "文本"),
+    ),
+    OperatorSpec(
+        key="merge_small_files",
+        name="小文件合并",
+        modality="file",
+        category="merge",
+        status="active",
+        summary="将多个小文本文件合并为单个文件。",
+        description=(
+            "遍历源目录，将小于指定大小的文本文件合并为一个输出文件，"
+            "大文件和非文本文件直接拷贝到目标目录。"
+        ),
+        module_path="backend.operators_migrated.file.merge_small_files",
+        class_name="MergeSmallFilesOperator",
+        runtime="CPU",
+        workflow_kind="transform",
+        migration_status="已迁移，可直接运行。",
+        input_types=("text/plain", "text/markdown", "application/json", "text/csv"),
+        output_types=("text/plain",),
+        usage_steps=(
+            "将待合并的小文件放入源目录。",
+            "设置 max_size_kb 控制合并阈值，设置 separator 控制分隔符。",
+            "运行算子后从目标目录读取合并结果。",
+        ),
+        parameters=(
+            OperatorParameterSpec(
+                name="max_size_kb",
+                type="integer",
+                description="文件大小阈值（KB），低于此大小的文件将被合并",
+                default=10,
+                example=50,
+            ),
+            OperatorParameterSpec(
+                name="separator",
+                type="string",
+                description="合并时的文件分隔符",
+                default="\n---\n",
+                example="\n===\n",
+            ),
+        ),
+        examples=(
+            OperatorExampleSpec(
+                name="合并小文件",
+                description="将小于 10KB 的文件合并。",
+                source_path="E:/datasets/small_files",
+                sink_path="E:/datasets/merged",
+                params={"max_size_kb": 10},
+            ),
+        ),
+        tags=("合并", "小文件", "文件"),
+    ),
+    OperatorSpec(
+        key="extract_text_metadata",
+        name="元数据提取",
+        modality="file",
+        category="extract",
+        status="active",
+        summary="从文件中提取基础元数据（大小、行数、字符数、类型等）。",
+        description=(
+            "遍历源目录中的所有文件，提取文件名、大小、扩展名、是否为文本等元数据，"
+            "文本文件额外提取行数、字符数、词数和空行数，输出为 JSON 格式。"
+        ),
+        module_path="backend.operators_migrated.file.extract_text_metadata",
+        class_name="ExtractTextMetadataOperator",
+        runtime="CPU",
+        workflow_kind="transform",
+        migration_status="已迁移，可直接运行。",
+        input_types=("text/plain", "text/markdown", "application/json", "text/csv"),
+        output_types=("application/json",),
+        usage_steps=(
+            "将待分析的文件放入源目录。",
+            "运行算子后从目标目录读取元数据 JSON 文件。",
+        ),
+        parameters=(),
+        examples=(
+            OperatorExampleSpec(
+                name="提取文本元数据",
+                description="提取目录中所有文件的元数据。",
+                source_path="E:/datasets/texts",
+                sink_path="E:/datasets/metadata",
+                params={},
+            ),
+        ),
+        tags=("元数据", "分析", "文件"),
+    ),
+    # === 未完成算子（staged）===
+    OperatorSpec(
         key="normalize_ppt_to_markdown",
-        name="PPT to Markdown",
+        name="PPT 转 Markdown",
         modality="text",
         category="format",
         status="staged",
-        summary="Convert PPT or PPTX decks into Markdown with multimodal model assistance.",
+        summary="将 PPT/PPTX 演示文稿转换为 Markdown 格式。",
         description=(
-            "The source code is present in this repository, but the operator still depends on "
-            "legacy clientApp modules, LibreOffice conversion, and model gateway credentials "
-            "before it can be executed here."
+            "源码已迁入仓库，但仍依赖遗留 clientApp 模块、LibreOffice 转换工具"
+            "和模型网关凭据，暂无法在当前环境执行。"
         ),
         module_path="backend.operators_migrated.staged.text.format.normalize_ppt_to_markdown",
         class_name="NormalizePptToMarkdown",
         runtime="CPU / LLM",
         workflow_kind="transform",
-        migration_status="Source migrated, runtime integration still incomplete.",
+        migration_status="源码已迁移，运行时集成未完成。",
         input_types=("application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
         output_types=("text/markdown",),
         usage_steps=(
-            "Populate the PPT2MD_* secrets in .env or process environment.",
-            "Install LibreOffice and ensure the soffice executable is available.",
-            "Wire the legacy prompt helpers or replace them with repository-local helpers before enabling execution.",
+            "在 .env 或环境变量中配置 PPT2MD_* 密钥。",
+            "安装 LibreOffice 并确保 soffice 可执行文件可用。",
+            "替换遗留 prompt 工具为仓库本地工具后启用执行。",
         ),
         required_env=(
             "PPT2MD_APP_ID",
@@ -170,100 +443,100 @@ OPERATOR_SPECS: tuple[OperatorSpec, ...] = (
             "PPT2MD_VL_NLPT_AUTHORIZATION",
         ),
         dependencies=(
-            OperatorDependencySpec(kind="legacy_module", name="clientApp", check="clientApp", notes="Legacy prompt and operator base package."),
-            OperatorDependencySpec(kind="python_package", name="fitz", check="fitz", notes="PyMuPDF for slide rendering."),
-            OperatorDependencySpec(kind="system_binary", name="soffice", check="soffice", notes="LibreOffice headless conversion."),
+            OperatorDependencySpec(kind="legacy_module", name="clientApp", check="clientApp", notes="遗留 prompt 和算子基础包。"),
+            OperatorDependencySpec(kind="python_package", name="fitz", check="fitz", notes="PyMuPDF 幻灯片渲染。"),
+            OperatorDependencySpec(kind="system_binary", name="soffice", check="soffice", notes="LibreOffice 无头模式转换。"),
         ),
         examples=(
             OperatorExampleSpec(
-                name="Deck conversion",
-                description="Convert a directory of PPT/PPTX files into Markdown outputs.",
+                name="演示文稿转换",
+                description="将 PPT/PPTX 文件目录转换为 Markdown 输出。",
                 source_path="E:/datasets/ppt_source",
                 sink_path="E:/datasets/ppt_markdown",
                 params={},
             ),
         ),
-        tags=("ppt", "markdown", "multimodal"),
+        tags=("PPT", "Markdown", "多模态"),
     ),
     OperatorSpec(
         key="enhance_video_privacy_blur_operator",
-        name="Video Privacy Blur",
+        name="视频隐私模糊",
         modality="video",
         category="enhance",
         status="staged",
-        summary="Blur privacy-sensitive regions detected in video frames.",
+        summary="对视频帧中检测到的隐私敏感区域进行模糊处理。",
         description=(
-            "The migrated source still references legacy clientApp utilities and needs the "
-            "final runtime packaging before it can be executed in this repository."
+            "迁移的源码仍引用遗留 clientApp 工具，需要完成最终运行时打包"
+            "后才能在当前仓库执行。"
         ),
         module_path="backend.operators_migrated.staged.video.enhance.enhance_video_privacy_blur_operator",
         class_name="EnhanceVideoPrivacyBlurOperator",
         runtime="GPU",
         workflow_kind="transform",
-        migration_status="Source migrated, runtime integration still incomplete.",
+        migration_status="源码已迁移，运行时集成未完成。",
         input_types=("video/mp4", "video/x-msvideo", "video/quicktime"),
         output_types=("video/mp4",),
         usage_steps=(
-            "Install OpenCV and the video processing runtime on the target worker.",
-            "Replace legacy clientApp helpers with repository-local utilities.",
-            "Attach the operator to a repository-local OCR or text detection service before enabling execution.",
+            "在目标 worker 上安装 OpenCV 和视频处理运行时。",
+            "将遗留 clientApp 工具替换为仓库本地工具。",
+            "接入 OCR 或文本检测服务后启用执行。",
         ),
         dependencies=(
-            OperatorDependencySpec(kind="legacy_module", name="clientApp", check="clientApp", notes="Legacy operator base and file helpers."),
-            OperatorDependencySpec(kind="python_package", name="cv2", check="cv2", notes="OpenCV video processing."),
-            OperatorDependencySpec(kind="python_package", name="numpy", check="numpy", notes="Numerical frame processing."),
-            OperatorDependencySpec(kind="system_binary", name="ffmpeg", check="ffmpeg", notes="Video muxing and transcoding."),
+            OperatorDependencySpec(kind="legacy_module", name="clientApp", check="clientApp", notes="遗留算子基础和文件工具。"),
+            OperatorDependencySpec(kind="python_package", name="cv2", check="cv2", notes="OpenCV 视频处理。"),
+            OperatorDependencySpec(kind="python_package", name="numpy", check="numpy", notes="帧数据数值处理。"),
+            OperatorDependencySpec(kind="system_binary", name="ffmpeg", check="ffmpeg", notes="视频封装和转码。"),
         ),
         examples=(
             OperatorExampleSpec(
-                name="Privacy blur",
-                description="Blur detected text boxes or privacy regions in videos.",
+                name="隐私模糊",
+                description="对视频中检测到的文本框或隐私区域进行模糊。",
                 source_path="E:/datasets/raw_video",
                 sink_path="E:/datasets/blurred_video",
                 params={},
             ),
         ),
-        tags=("video", "privacy", "blur"),
+        tags=("视频", "隐私", "模糊"),
     ),
     OperatorSpec(
         key="enhance_video_redundancy_operator",
-        name="Video Redundancy Filter",
+        name="视频冗余帧过滤",
         modality="video",
         category="enhance",
         status="staged",
-        summary="Drop redundant video frames and optionally preserve meaningful audio segments.",
+        summary="去除视频中的冗余帧，可选保留有意义的音频片段。",
         description=(
-            "The migrated source is present, but the operator still depends on legacy modules "
-            "and the final video runtime before it can run in the current repository."
+            "迁移的源码已存在，但仍依赖遗留模块和最终视频运行时，"
+            "需要完成集成后才能在当前仓库运行。"
         ),
         module_path="backend.operators_migrated.staged.video.enhance.enhance_video_redundancy_operator",
         class_name="EnhanceVideoRedundancyOperator",
         runtime="GPU",
         workflow_kind="transform",
-        migration_status="Source migrated, runtime integration still incomplete.",
+        migration_status="源码已迁移，运行时集成未完成。",
         input_types=("video/mp4", "video/x-msvideo", "video/quicktime"),
         output_types=("video/mp4", "application/json"),
         usage_steps=(
-            "Install OpenCV and ffmpeg on the target worker.",
-            "Replace the legacy operator base and helper imports with repository-local equivalents.",
-            "Review frame selection parameters for your video cadence before enabling execution.",
+            "在目标 worker 上安装 OpenCV 和 ffmpeg。",
+            "将遗留算子基础和辅助工具导入替换为仓库本地等效实现。",
+            "根据视频帧率调整帧筛选参数后启用执行。",
         ),
         dependencies=(
-            OperatorDependencySpec(kind="legacy_module", name="clientApp", check="clientApp", notes="Legacy operator base and file helpers."),
-            OperatorDependencySpec(kind="python_package", name="cv2", check="cv2", notes="OpenCV video processing."),
-            OperatorDependencySpec(kind="python_package", name="numpy", check="numpy", notes="Numerical frame processing."),
-            OperatorDependencySpec(kind="system_binary", name="ffmpeg", check="ffmpeg", notes="Video muxing and transcoding."),
+            OperatorDependencySpec(kind="legacy_module", name="clientApp", check="clientApp", notes="遗留算子基础和文件工具。"),
+            OperatorDependencySpec(kind="python_package", name="cv2", check="cv2", notes="OpenCV 视频处理。"),
+            OperatorDependencySpec(kind="python_package", name="numpy", check="numpy", notes="帧数据数值处理。"),
+            OperatorDependencySpec(kind="system_binary", name="ffmpeg", check="ffmpeg", notes="视频封装和转码。"),
         ),
         examples=(
             OperatorExampleSpec(
-                name="Redundancy reduction",
-                description="Reduce repeated frames in archived video footage.",
+                name="冗余帧去除",
+                description="对存档视频进行冗余帧去除。",
                 source_path="E:/datasets/raw_video",
                 sink_path="E:/datasets/reduced_video",
                 params={"active_keep_fps": 24.0},
             ),
         ),
-        tags=("video", "redundancy", "sampling"),
+        tags=("视频", "冗余", "采样"),
     ),
 )
 

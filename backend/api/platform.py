@@ -46,7 +46,41 @@ DEFAULT_PLATFORM_SETTINGS = {
     'doris_user': 'root',
     'doris_password': '',
     'use_mock': False,
+    'llm_configs': [],
 }
+
+DEFAULT_LLM_CONFIGS = [
+    {
+        'id': 'default_openai',
+        'name': 'OpenAI GPT-4o',
+        'provider': 'openai',
+        'endpoint': 'https://api.openai.com/v1',
+        'api_key': '',
+        'model': 'gpt-4o',
+        'max_tokens': 4096,
+        'temperature': 0.7,
+    },
+    {
+        'id': 'default_azure',
+        'name': 'Azure OpenAI',
+        'provider': 'azure',
+        'endpoint': '',
+        'api_key': '',
+        'model': 'gpt-4o',
+        'max_tokens': 4096,
+        'temperature': 0.7,
+    },
+    {
+        'id': 'default_local',
+        'name': '本地模型 (vLLM/Ollama)',
+        'provider': 'openai_compatible',
+        'endpoint': 'http://localhost:11434/v1',
+        'api_key': 'sk-no-key',
+        'model': 'qwen2.5:7b',
+        'max_tokens': 4096,
+        'temperature': 0.7,
+    },
+]
 
 CATALOG_BLUEPRINT = {
     'lakehouse_catalog': {
@@ -148,29 +182,43 @@ WORKFLOW_PRESETS = [
 WORKFLOW_PRESET_BLUEPRINTS = [
     {
         'id': 'text_privacy_pipeline',
-        'name': 'Text Privacy Pipeline',
-        'description': 'Run regex-based privacy masking on text datasets before downstream use.',
+        'name': '文本隐私脱敏流水线',
+        'description': '对文本数据集执行正则隐私脱敏，适用于下游分析或模型训练前的数据清洗。',
         'nodes': ['clean_texts_by_regex'],
         'resources': {'cpu': 4, 'gpu': 0, 'memory_gb': 16},
     },
     {
+        'id': 'text_cleaning_pipeline',
+        'name': '文本清洗流水线',
+        'description': '切分长文本 → 关键词过滤 → 哈希去重 → 隐私脱敏，完整的文本预处理链路。',
+        'nodes': ['split_text_by_length', 'filter_by_keyword', 'deduplicate_by_hash', 'clean_texts_by_regex'],
+        'resources': {'cpu': 4, 'gpu': 0, 'memory_gb': 16},
+    },
+    {
+        'id': 'data_format_pipeline',
+        'name': '数据格式转换流水线',
+        'description': 'CSV 转 JSON → 元数据提取 → 小文件合并，适合异构数据的格式统一。',
+        'nodes': ['convert_csv_to_json', 'extract_text_metadata', 'merge_small_files'],
+        'resources': {'cpu': 4, 'gpu': 0, 'memory_gb': 16},
+    },
+    {
         'id': 'ppt_cleanup_pipeline',
-        'name': 'PPT Cleanup Pipeline',
-        'description': 'Convert PPT content to Markdown and then apply text privacy masking.',
+        'name': 'PPT 清洗流水线',
+        'description': '将 PPT 内容转为 Markdown 后执行文本隐私脱敏。',
         'nodes': ['normalize_ppt_to_markdown', 'clean_texts_by_regex'],
         'resources': {'cpu': 6, 'gpu': 0, 'memory_gb': 24},
     },
     {
         'id': 'video_privacy_pipeline',
-        'name': 'Video Privacy Pipeline',
-        'description': 'Apply privacy blur to videos that contain sensitive overlays or text.',
+        'name': '视频隐私模糊流水线',
+        'description': '对包含敏感覆盖层或文本的视频执行隐私模糊处理。',
         'nodes': ['enhance_video_privacy_blur_operator'],
         'resources': {'cpu': 6, 'gpu': 1, 'memory_gb': 24},
     },
     {
         'id': 'video_cleanup_pipeline',
-        'name': 'Video Cleanup Pipeline',
-        'description': 'Reduce redundant frames before applying privacy blur in a second step.',
+        'name': '视频清洗流水线',
+        'description': '先去除冗余帧，再执行隐私模糊处理。',
         'nodes': ['enhance_video_redundancy_operator', 'enhance_video_privacy_blur_operator'],
         'resources': {'cpu': 8, 'gpu': 1, 'memory_gb': 32},
     },
@@ -211,6 +259,17 @@ def _get_workflow_presets() -> List[Dict[str, Any]]:
     return [_serialize_workflow_preset(item, library_map) for item in WORKFLOW_PRESET_BLUEPRINTS]
 
 
+class LLMConfigItem(BaseModel):
+    id: str = ''
+    name: str = ''
+    provider: str = 'openai'
+    endpoint: str = ''
+    api_key: str = ''
+    model: str = ''
+    max_tokens: int = 4096
+    temperature: float = 0.7
+
+
 class PlatformSettingsPayload(BaseModel):
     gravitino_url: str = DEFAULT_PLATFORM_SETTINGS['gravitino_url']
     metalake: str = DEFAULT_PLATFORM_SETTINGS['metalake']
@@ -224,6 +283,7 @@ class PlatformSettingsPayload(BaseModel):
     doris_user: str = DEFAULT_PLATFORM_SETTINGS['doris_user']
     doris_password: str = DEFAULT_PLATFORM_SETTINGS['doris_password']
     use_mock: bool = False
+    llm_configs: List[LLMConfigItem] = []
 
     @field_validator(
         'gravitino_url',
@@ -335,8 +395,11 @@ def _normalize_platform_settings(payload: Optional[Dict[str, Any]]) -> Dict[str,
     normalized.update(payload or {})
     normalized['doris_mysql_port'] = PlatformSettingsPayload(**normalized).doris_mysql_port
     normalized['use_mock'] = bool(normalized.get('use_mock', False))
+    normalized['llm_configs'] = normalized.get('llm_configs', [])
+    if not isinstance(normalized['llm_configs'], list):
+        normalized['llm_configs'] = []
     for key in normalized:
-        if key == 'doris_mysql_port' or key == 'use_mock':
+        if key in ('doris_mysql_port', 'use_mock', 'llm_configs'):
             continue
         normalized[key] = str(normalized.get(key, '') or '').strip()
     return normalized
@@ -1042,6 +1105,50 @@ async def get_platform_component_status(component_id: str = ''):
 async def save_platform_settings(payload: PlatformSettingsPayload):
     settings = _save_platform_settings(payload.model_dump())
     return {'success': True, 'message': '平台配置已保存', 'data': settings}
+
+
+@router.get('/platform/llm-models')
+async def get_llm_models():
+    settings = _get_platform_settings()
+    llm_configs = settings.get('llm_configs', [])
+    if not llm_configs:
+        llm_configs = DEFAULT_LLM_CONFIGS
+    return {
+        'success': True,
+        'items': [
+            {
+                'id': item.get('id', ''),
+                'name': item.get('name', ''),
+                'provider': item.get('provider', 'openai'),
+                'model': item.get('model', ''),
+                'endpoint': item.get('endpoint', ''),
+            }
+            for item in llm_configs
+            if item.get('endpoint') and item.get('model')
+        ],
+    }
+
+
+@router.post('/platform/llm-test')
+async def test_llm_connection(payload: dict):
+    endpoint = str(payload.get('endpoint', '')).strip()
+    api_key = str(payload.get('api_key', '')).strip()
+    model = str(payload.get('model', '')).strip()
+    if not endpoint or not model:
+        return {'success': False, 'message': '请填写 endpoint 和 model'}
+    try:
+        import requests as req
+        resp = req.post(
+            f'{endpoint}/chat/completions',
+            headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+            json={'model': model, 'messages': [{'role': 'user', 'content': 'hello'}], 'max_tokens': 5},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return {'success': True, 'message': f'连接成功 ({model})'}
+        return {'success': False, 'message': f'返回状态 {resp.status_code}: {resp.text[:200]}'}
+    except Exception as e:
+        return {'success': False, 'message': f'连接失败: {str(e)}'}
 
 
 @router.get('/assets/catalogs')

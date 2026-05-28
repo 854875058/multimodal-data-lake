@@ -203,6 +203,14 @@ const api = {
     return apiClient.post('/platform/settings', payload)
   },
 
+  getLLMModels() {
+    return apiClient.get('/platform/llm-models')
+  },
+
+  testLLMConnection(payload) {
+    return apiClient.post('/platform/llm-test', payload)
+  },
+
   getAssetCatalogs() {
     return apiClient.get('/platform/assets/catalogs')
   },
