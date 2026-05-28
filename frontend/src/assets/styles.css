@@ -1379,25 +1379,52 @@ pre {
 }
 
 .workflow-studio-layout {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
   gap: 0;
   flex: 1;
   overflow: hidden;
 }
 
 .workflow-editor-layout {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
 }
 
-.workflow-library-column:not(.is-collapsed) {
-  width: 280px;
-  min-width: 240px;
+.workflow-library-column {
+  display: none;
 }
 
 .workflow-summary-column:not(.is-collapsed) {
   width: 320px;
   min-width: 280px;
+  flex-shrink: 0;
+}
+
+.workflow-right-tabs {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.tab-btn {
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--color-text-3);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  background: var(--color-fill-2);
+  color: var(--color-text-2);
+}
+
+.tab-btn.active {
+  background: rgba(22, 93, 255, 0.1);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .workflow-studio-layout .is-collapsed {
@@ -1608,15 +1635,22 @@ aside:hover .sidebar-hover-trigger {
 .workflow-minimap {
   position: absolute;
   bottom: 16px;
-  right: 16px;
-  width: 200px;
-  height: 140px;
+  right: 336px;
+  width: 220px;
+  height: 160px;
   background: var(--color-bg-2);
   border: 1px solid var(--color-border-2);
   border-radius: 8px;
   z-index: 10;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   overflow: hidden;
+  cursor: move;
+  transition: right 0.3s ease;
+}
+
+.workflow-summary-column.is-collapsed ~ .workflow-canvas-column .workflow-minimap,
+.workflow-studio-layout:has(.workflow-summary-column.is-collapsed) .workflow-minimap {
+  right: 16px;
 }
 
 .workflow-minimap-title {
@@ -1624,11 +1658,13 @@ aside:hover .sidebar-hover-trigger {
   color: var(--color-text-3);
   padding: 4px 8px;
   border-bottom: 1px solid var(--color-border-2);
+  user-select: none;
 }
 
 .workflow-minimap svg {
   width: 100%;
   height: calc(100% - 24px);
+  pointer-events: none;
 }
 
 .workflow-edge-layer {

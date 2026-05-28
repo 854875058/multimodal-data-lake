@@ -335,8 +335,8 @@ function AppShell({ authSession, onLogout }) {
           style={{
             position: 'absolute',
             top: 0,
-            right: -28,
-            width: 28,
+            right: -32,
+            width: 32,
             height: '100%',
             display: 'flex',
             alignItems: 'center',
@@ -345,21 +345,19 @@ function AppShell({ authSession, onLogout }) {
             zIndex: 100,
             background: 'transparent',
             opacity: 0,
-            transition: 'opacity 0.2s, background 0.2s',
+            transition: 'opacity 0.2s',
           }}
         >
           <div style={{
-            width: 20,
-            height: 48,
+            width: 24,
+            height: '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'var(--color-bg-2)',
-            border: '1px solid var(--color-border-2)',
-            borderRadius: '0 6px 6px 0',
-            boxShadow: '2px 0 8px rgba(0,0,0,0.06)',
+            background: 'var(--color-fill-2)',
+            borderRight: '1px solid var(--color-border-2)',
           }}>
-            <span style={{ fontSize: 12, color: 'var(--color-text-3)' }}>
+            <span style={{ fontSize: 14, color: 'var(--color-text-3)', fontWeight: 600 }}>
               {collapsed ? '›' : '‹'}
             </span>
           </div>
