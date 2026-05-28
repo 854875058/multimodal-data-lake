@@ -119,7 +119,6 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
   const [rightTab, setRightTab] = useState('operators') // 'operators' | 'config' | 'pipeline'
   const [llmModels, setLlmModels] = useState([])
   const [zoom, setZoom] = useState(1)
-  const [canvasScroll, setCanvasScroll] = useState({ x: 0, y: 0 })
   const [, forceUpdate] = useState(0)
 
   nodesRef.current = canvasNodes
@@ -268,17 +267,6 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
   }, [])
 
-  // 画布滚动监听（用于小地图）
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const onScroll = () => {
-      setCanvasScroll({ x: canvas.scrollLeft, y: canvas.scrollTop })
-    }
-    canvas.addEventListener('scroll', onScroll)
-    return () => canvas.removeEventListener('scroll', onScroll)
-  }, [])
-
   const applyPreset = (pid) => {
     const p = presets.find(i => i.id === pid); if (!p) return
     const { presetNodes, presetEdges } = buildPresetGraph(p, libraryMap)
@@ -357,37 +345,55 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
 
   // 小地图视图框拖拽
   const minimapDragRef = useRef(null)
-  const onMinimapMouseDown = useCallback((e) => {
-    e.preventDefault()
+  const [minimapView, setMinimapView] = useState({ x: 0, y: 0, w: 800, h: 600 })
+
+  // 更新小地图视图框（基于画布滚动位置）
+  useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const minimap = minimapRef.current
-    if (!minimap) return
-    const rect = minimap.getBoundingClientRect()
-    minimapDragRef.current = { startX: e.clientX, startY: e.clientY, scrollStartX: canvas.scrollLeft, scrollStartY: canvas.scrollTop, minimapRect: rect }
+    const update = () => {
+      setMinimapView({
+        x: canvas.scrollLeft,
+        y: canvas.scrollTop,
+        w: canvas.clientWidth,
+        h: canvas.clientHeight,
+      })
+    }
+    update()
+    canvas.addEventListener('scroll', update)
+    const ro = new ResizeObserver(update)
+    ro.observe(canvas)
+    return () => { canvas.removeEventListener('scroll', update); ro.disconnect() }
   }, [])
 
-  useEffect(() => {
-    const onMove = (e) => {
-      const d = minimapDragRef.current
-      if (!d) return
-      const canvas = canvasRef.current
-      if (!canvas) return
-      const canvasW = canvas.scrollWidth || 2000
-      const canvasH = canvas.scrollHeight || 1500
-      const minimapW = d.minimapRect.width
-      const minimapH = d.minimapRect.height
-      const scale = minimapW / canvasW
-      const dx = (e.clientX - d.startX) / scale
-      const dy = (e.clientY - d.startY) / scale
-      canvas.scrollLeft = d.scrollStartX + dx
-      canvas.scrollTop = d.scrollStartY + dy
+  const onMinimapMouseDown = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const minimapSvg = minimapRef.current?.querySelector('svg')
+    if (!minimapSvg) return
+    const svgRect = minimapSvg.getBoundingClientRect()
+    const svgContentW = canvasW || 1
+    const svgContentH = canvasH || 1
+    const scaleX = svgRect.width / svgContentW
+    const scaleY = svgRect.height / svgContentH
+
+    const scrollToPos = (clientX, clientY) => {
+      const relX = (clientX - svgRect.left) / scaleX + canvasBounds.minX
+      const relY = (clientY - svgRect.top) / scaleY + canvasBounds.minY
+      canvas.scrollLeft = relX - canvas.clientWidth / 2
+      canvas.scrollTop = relY - canvas.clientHeight / 2
     }
-    const onUp = () => { minimapDragRef.current = null }
+    scrollToPos(e.clientX, e.clientY)
+
+    minimapDragRef.current = { scrollToPos }
+
+    const onMove = (ev) => { minimapDragRef.current?.scrollToPos(ev.clientX, ev.clientY) }
+    const onUp = () => { minimapDragRef.current = null; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
-  }, [])
+  }, [canvasW, canvasH, canvasBounds])
 
   // 计算画布边界（必须在条件返回之前，否则 hooks 顺序错乱）
   const canvasBounds = useMemo(() => {
@@ -472,10 +478,10 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
               ))}
               {/* 视图框 */}
               <rect
-                x={canvasBounds.minX + canvasScroll.x / zoom}
-                y={canvasBounds.minY + canvasScroll.y / zoom}
-                width={(canvasRef.current?.clientWidth || 800) / zoom}
-                height={(canvasRef.current?.clientHeight || 600) / zoom}
+                x={canvasBounds.minX + minimapView.x}
+                y={canvasBounds.minY + minimapView.y}
+                width={minimapView.w}
+                height={minimapView.h}
                 fill="rgba(22,93,255,0.08)" stroke="#165dff" strokeWidth="2" strokeDasharray="6 3" rx="4"
                 style={{ cursor: 'move' }}
               />
