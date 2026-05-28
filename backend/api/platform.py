@@ -1107,7 +1107,7 @@ async def save_platform_settings(payload: PlatformSettingsPayload):
     return {'success': True, 'message': '平台配置已保存', 'data': settings}
 
 
-@router.get('/platform/llm-models')
+@router.get('/llm-models')
 async def get_llm_models():
     settings = _get_platform_settings()
     llm_configs = settings.get('llm_configs', [])
@@ -1129,7 +1129,7 @@ async def get_llm_models():
     }
 
 
-@router.post('/platform/llm-test')
+@router.post('/llm-test')
 async def test_llm_connection(payload: dict):
     endpoint = str(payload.get('endpoint', '')).strip()
     api_key = str(payload.get('api_key', '')).strip()
