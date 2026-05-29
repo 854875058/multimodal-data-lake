@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from importlib import import_module
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -167,6 +167,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 全局认证中间件（轻量版：记录用户信息，不拦截请求）
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    """认证中间件：为请求注入用户信息（当前为宽松模式，不强制拦截）"""
+    path = request.url.path
+    request.state.user = {'id': 0, 'username': 'anonymous', 'is_admin': False, 'authenticated': False}
+
+    if path.startswith('/api/'):
+        auth_header = request.headers.get('authorization', '')
+        if auth_header.startswith('Bearer '):
+            token = auth_header[7:]
+            try:
+                from backend.core.auth import decode_token
+                payload = decode_token(token)
+                request.state.user = {
+                    'id': int(payload.get('sub', 0)),
+                    'username': payload.get('username', ''),
+                    'is_admin': payload.get('is_admin', False),
+                    'authenticated': True,
+                }
+            except Exception:
+                pass
+
+    return await call_next(request)
+
 
 _register_routers(app)
 

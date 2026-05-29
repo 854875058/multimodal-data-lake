@@ -153,9 +153,12 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         if not row[5]:  # is_active
             raise HTTPException(status_code=400, detail='账号已被禁用')
 
-        # 简化实现：返回用户信息（实际应该返回 JWT token）
+        # 生成真实 JWT token
+        from backend.core.auth import create_access_token
+        token = create_access_token(user_id=row[0], username=row[1], is_admin=bool(row[6]))
+
         return {
-            'access_token': f'user_{row[0]}',
+            'access_token': token,
             'token_type': 'bearer',
             'user': {
                 'id': row[0],
