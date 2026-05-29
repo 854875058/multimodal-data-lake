@@ -1481,34 +1481,85 @@ async def build_workflow_job(payload: WorkflowBuildPayload):
             'summary': summary,
         },
     }
-    if not payload.nodes:
-        raise HTTPException(status_code=400, detail='工作流至少需要一个节点')
 
-    node_labels = []
-    for node_id in payload.nodes:
-        match = next((item for item in WORKFLOW_LIBRARY if item['id'] == node_id), None)
-        node_labels.append(match['label'] if match else node_id)
 
-    entrypoint = (
-        f"python workflow_runner.py --name {payload.name or 'workflow_job'} "
-        f"--nodes {' '.join(payload.nodes)} "
-        f"--cpu {max(1, payload.cpu)} --gpu {max(0, payload.gpu)} --memory-gb {max(1, payload.memory_gb)}"
-    )
-    runtime_env = {
-        'working_dir': './ray_jobs',
-        'env_vars': {
-            'SOURCE_HINT': payload.source_hint or 'seaweedfs://multimodal',
-            'WORKFLOW_NAME': payload.name or 'workflow_job',
-        },
-        'pip': ['ray[default]', 'daft', 'lance', 'pyarrow'],
-    }
-    return {
-        'success': True,
-        'data': {
-            'entrypoint': entrypoint,
-            'runtime_env': runtime_env,
-            'resource_hint': {'cpu': payload.cpu, 'gpu': payload.gpu, 'memory_gb': payload.memory_gb},
-            'node_labels': node_labels,
-            'summary': f"工作流包含 {len(node_labels)} 个节点：{' → '.join(node_labels)}",
-        },
-    }
+class WorkflowSubmitPayload(BaseModel):
+    name: str = 'workflow_job'
+    entrypoint: str = ''
+    runtime_env: Optional[Dict[str, Any]] = None
+    cpu: int = 4
+    gpu: int = 0
+    memory_gb: int = 16
+    nodes: List[str] = Field(default_factory=list)
+
+
+@router.post('/workflow/submit-job')
+async def submit_workflow_job(payload: WorkflowSubmitPayload):
+    """提交工作流到 Ray 集群执行"""
+    from backend.api.ray_compute import _get_ray_client, _get_ray_dashboard_url
+    import requests as req
+
+    ray_url = _get_ray_dashboard_url()
+    if not payload.entrypoint:
+        raise HTTPException(status_code=400, detail='entrypoint 不能为空')
+
+    # 通过 Ray Dashboard API 提交
+    try:
+        submit_payload = {
+            'entrypoint': payload.entrypoint,
+            'runtime_env': payload.runtime_env or {},
+            'entrypoint_num_cpus': payload.cpu,
+            'entrypoint_num_gpus': payload.gpu,
+        }
+        resp = req.post(f'{ray_url}/api/jobs/', json=submit_payload, timeout=30)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=502, detail=f'Ray 提交失败: {resp.text[:300]}')
+
+        result = resp.json()
+        job_id = result.get('job_id') or result.get('data', {}).get('job_id', '')
+
+        return {
+            'success': True,
+            'message': f'工作流已提交到 Ray 集群',
+            'data': {
+                'job_id': job_id,
+                'name': payload.name,
+                'entrypoint': payload.entrypoint,
+                'nodes': payload.nodes,
+                'ray_dashboard': f'{ray_url}/#/jobs/{job_id}' if job_id else '',
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f'Ray 提交异常: {str(e)}')
+
+
+@router.get('/workflow/job-status/{job_id}')
+async def get_workflow_job_status(job_id: str):
+    """查询工作流任务执行状态"""
+    from backend.api.ray_compute import _get_ray_dashboard_url
+    import requests as req
+
+    ray_url = _get_ray_dashboard_url()
+    try:
+        resp = req.get(f'{ray_url}/api/jobs/{job_id}', timeout=10)
+        if resp.status_code != 200:
+            return {'success': False, 'message': f'查询失败: {resp.text[:200]}'}
+
+        data = resp.json()
+        job_data = data.get('data', data)
+
+        return {
+            'success': True,
+            'data': {
+                'job_id': job_id,
+                'status': job_data.get('status', 'UNKNOWN'),
+                'entrypoint': job_data.get('entrypoint', ''),
+                'start_time': job_data.get('start_time', ''),
+                'end_time': job_data.get('end_time', ''),
+                'message': job_data.get('message', ''),
+            },
+        }
+    except Exception as e:
+        return {'success': False, 'message': f'查询异常: {str(e)}'}
