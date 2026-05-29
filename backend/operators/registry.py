@@ -412,51 +412,60 @@ OPERATOR_SPECS: tuple[OperatorSpec, ...] = (
         ),
         tags=("元数据", "分析", "文件"),
     ),
-    # === 未完成算子（staged）===
+    # === 文档解析算子 ===
     OperatorSpec(
         key="normalize_ppt_to_markdown",
-        name="PPT 转 Markdown",
+        name="文档转 Markdown",
         modality="text",
         category="format",
-        status="staged",
-        summary="将 PPT/PPTX 演示文稿转换为 Markdown 格式。",
+        status="active",
+        summary="将 PPT/PPTX/PDF 文档转换为 Markdown 格式（基于 MinerU）。",
         description=(
-            "源码已迁入仓库，但仍依赖遗留 clientApp 模块、LibreOffice 转换工具"
-            "和模型网关凭据，暂无法在当前环境执行。"
+            "基于 MinerU (magic-pdf) 的版面分析能力，支持 PPT/PPTX/PDF 转 Markdown。"
+            "PPT 文件需要 LibreOffice 转 PDF 后再解析，PDF 可直接解析。"
         ),
-        module_path="backend.operators.staged.text.format.normalize_ppt_to_markdown",
+        module_path="backend.operators.text.format.normalize_ppt_to_markdown",
         class_name="NormalizePptToMarkdown",
-        runtime="CPU / LLM",
+        runtime="CPU",
         workflow_kind="transform",
-        migration_status="源码已迁移，运行时集成未完成。",
-        input_types=("application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+        migration_status="已迁移，基于 MinerU 重写，可直接运行。",
+        input_types=(
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/pdf",
+        ),
         output_types=("text/markdown",),
         usage_steps=(
-            "在 .env 或环境变量中配置 PPT2MD_* 密钥。",
-            "安装 LibreOffice 并确保 soffice 可执行文件可用。",
-            "替换遗留 prompt 工具为仓库本地工具后启用执行。",
+            "将 PPT/PPTX/PDF 文件放入源目录。",
+            "可选参数：enable_ocr 启用 OCR 识别。",
+            "运行算子后从目标目录读取 Markdown 结果。",
         ),
-        required_env=(
-            "PPT2MD_APP_ID",
-            "PPT2MD_APP_SECRET",
-            "PPT2MD_NLPT_AUTHORIZATION",
-            "PPT2MD_VL_NLPT_AUTHORIZATION",
-        ),
-        dependencies=(
-            OperatorDependencySpec(kind="legacy_module", name="clientApp", check="clientApp", notes="遗留 prompt 和算子基础包。"),
-            OperatorDependencySpec(kind="python_package", name="fitz", check="fitz", notes="PyMuPDF 幻灯片渲染。"),
-            OperatorDependencySpec(kind="system_binary", name="soffice", check="soffice", notes="LibreOffice 无头模式转换。"),
+        parameters=(
+            OperatorParameterSpec(
+                name="enable_ocr",
+                type="boolean",
+                description="是否启用 OCR 识别（对扫描件 PDF 有效）",
+                default=False,
+                example=False,
+            ),
+            OperatorParameterSpec(
+                name="batch_size",
+                type="integer",
+                description="批处理大小",
+                default=5,
+                example=10,
+            ),
         ),
         examples=(
             OperatorExampleSpec(
-                name="演示文稿转换",
-                description="将 PPT/PPTX 文件目录转换为 Markdown 输出。",
-                source_path="E:/datasets/ppt_source",
-                sink_path="E:/datasets/ppt_markdown",
+                name="文档转换",
+                description="将 PPT/PDF 文件目录转换为 Markdown 输出。",
+                source_path="E:/datasets/documents",
+                sink_path="E:/datasets/markdown",
                 params={},
             ),
         ),
-        tags=("PPT", "Markdown", "多模态"),
+        tags=("PPT", "PDF", "Markdown", "文档解析"),
     ),
     OperatorSpec(
         key="enhance_video_privacy_blur_operator",
