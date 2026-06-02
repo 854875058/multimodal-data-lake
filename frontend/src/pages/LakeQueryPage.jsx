@@ -31,6 +31,7 @@ import {
   IconStorage,
 } from '@arco-design/web-react/icon'
 import api, { getErrorMessage } from '@/api'
+import { dorisGet, dorisPost, dorisDelete } from '@/api/doris'
 import { truncateText } from '@/utils/format'
 
 const { Title, Text, Paragraph } = Typography
@@ -38,8 +39,6 @@ const { TextArea } = Input
 const { Row, Col } = Grid
 const TabPane = Tabs.TabPane
 const Option = Select.Option
-
-const DORIS_BASE = '/api/doris'
 
 const PAGE_MAP = {
   sql: 'SQL 查询工作台',
@@ -95,41 +94,6 @@ const FILTER_LABELS = {
   lat: '纬度',
   lon: '经度',
   radius_km: '半径(km)',
-}
-
-async function dorisGet(path, params = {}) {
-  const url = new URL(DORIS_BASE + path, window.location.origin)
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      url.searchParams.set(key, value)
-    }
-  })
-  const response = await fetch(url.toString(), { credentials: 'include' })
-  if (!response.ok) throw new Error(`请求失败: ${response.status}`)
-  return response.json()
-}
-
-async function dorisPost(path, body = {}) {
-  const response = await fetch(DORIS_BASE + path, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!response.ok) throw new Error(`请求失败: ${response.status}`)
-  return response.json()
-}
-
-async function dorisDelete(path, params = {}) {
-  const url = new URL(DORIS_BASE + path, window.location.origin)
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      url.searchParams.set(key, value)
-    }
-  })
-  const response = await fetch(url.toString(), { method: 'DELETE', credentials: 'include' })
-  if (!response.ok) throw new Error(`请求失败: ${response.status}`)
-  return response.json()
 }
 
 function buildTableColumns(columns = []) {

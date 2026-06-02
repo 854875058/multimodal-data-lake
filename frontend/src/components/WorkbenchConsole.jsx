@@ -1,41 +1,45 @@
-function DetailItem({ label, value, mono }) {
-  return (
-    <div className="detail-item">
-      <div className="kpi-label">{label}</div>
-      <div className={`detail-value${mono ? ' mono' : ''}`}>{value ?? '—'}</div>
-    </div>
-  )
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  Empty,
+  Grid,
+  Input,
+  InputNumber,
+  Modal,
+  Progress,
+  Radio,
+  Select,
+  Table,
+  Tag,
+  Typography,
+} from '@arco-design/web-react'
+import {
+  IconCheckCircle,
+  IconCloseCircle,
+  IconCloudDownload,
+  IconRefresh,
+} from '@arco-design/web-react/icon'
+
+const { Row, Col } = Grid
+const { Title, Text } = Typography
+const Option = Select.Option
+
+function StatusTag({ status, getJobBadgeClass, getJobStatusText }) {
+  const cls = getJobBadgeClass(status)
+  const colorMap = { 'is-success': 'green', 'is-danger': 'red', 'is-warning': 'orange', 'is-muted': 'gray' }
+  return <Tag color={colorMap[cls] || 'gray'} size="small">{getJobStatusText(status)}</Tag>
 }
 
-function ModalShell({ open, title, subtitle, badge, onClose, children }) {
-  if (!open) return null
+function InfoCard({ label, value, note, children }) {
   return (
-    <div className="modal-overlay" onClick={onClose} role="presentation">
-      <div className="modal-panel glass-card" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
-        <div className="modal-header">
-          <div>
-            <div className="modal-title">{title}</div>
-            <div className="modal-subtitle">
-              <span>{subtitle}</span>
-              {badge ? <span className="badge">{badge}</span> : null}
-            </div>
-          </div>
-          <button type="button" className="button button-small button-ghost" onClick={onClose}>关闭</button>
-        </div>
-        <div className="modal-body">{children}</div>
-      </div>
-    </div>
-  )
-}
-
-function InfoCard({ label, value, note, tone = 'neutral', children }) {
-  return (
-    <section className={`workbench-metric-card is-${tone}`}>
-      <div className="kpi-label">{label}</div>
-      <div className="workbench-metric-value">{value}</div>
-      <div className="workbench-metric-note">{note}</div>
-      {children ? <div className="workbench-metric-action">{children}</div> : null}
-    </section>
+    <Card bodyStyle={{ padding: 16 }} style={{ height: '100%' }}>
+      <Text type="secondary" style={{ fontSize: 12 }}>{label}</Text>
+      <div style={{ fontSize: 18, fontWeight: 700, margin: '6px 0 4px', lineHeight: 1.3 }}>{value}</div>
+      <Text type="secondary" style={{ fontSize: 12 }}>{note}</Text>
+      {children && <div style={{ marginTop: 8 }}>{children}</div>}
+    </Card>
   )
 }
 
@@ -67,260 +71,396 @@ export default function WorkbenchConsole({ vm, actions, helpers }) {
 
   const previewItems = pagedScanObjects.filter((item) => selectedScanKeys.includes(item.key)).slice(0, 3)
 
-  return (
-    <div className="content-wrap">
-      <div className="page-header">
+  /* ── 任务列表列定义 ──────────────────────────────────────────────── */
+  const jobColumns = [
+    {
+      title: '任务', width: 180,
+      render: (_, job) => (
         <div>
-          <h1 className="page-title">接入工作台</h1>
-          <p className="page-subtitle">重构后的页面只保留操作台该有的东西：状态、选择和动作。明细全部进弹窗。</p>
+          <Text style={{ fontFamily: 'monospace', fontSize: 12 }}>{job.job_id}</Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 11 }}>{getJobCompactStats(job)}</Text>
         </div>
-        <div className="page-actions">
-          <button type="button" className="button button-secondary" onClick={onNavigateUpload}>本地上传</button>
-          <button type="button" className="button button-secondary" onClick={onRefresh} disabled={refreshing}>{refreshing ? '刷新中...' : '刷新状态'}</button>
+      ),
+    },
+    {
+      title: '来源', width: 180,
+      render: (_, job) => (
+        <div>
+          <Text style={{ fontSize: 12 }}>{getSourceTypeText(job.payload?.source_type)}</Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>
+            {job.payload?.source_type === 'sftp'
+              ? `${job.payload?.sftp_host || '--'} / ${job.payload?.sftp_path || '/'}`
+              : `${job.payload?.bucket_name || '--'} / ${job.payload?.prefix || '/'}`}
+          </Text>
+        </div>
+      ),
+    },
+    {
+      title: '状态', width: 90,
+      render: (_, job) => <StatusTag status={job.status} getJobBadgeClass={getJobBadgeClass} getJobStatusText={getJobStatusText} />,
+    },
+    {
+      title: '进度', width: 120,
+      render: (_, job) => {
+        const p = getJobProgress(job)
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Progress percent={p} showText={false} size="small" style={{ flex: 1 }} />
+            <Text style={{ fontSize: 11, fontFeatureSettings: '"tnum"' }}>{p}%</Text>
+          </div>
+        )
+      },
+    },
+    {
+      title: '更新时间', width: 140,
+      render: (_, job) => <Text style={{ fontSize: 12 }}>{job.updated_at ? formatDateTime(job.updated_at) : '--'}</Text>,
+    },
+    {
+      title: '操作', width: 200,
+      render: (_, job) => (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <Button size="mini" type={selectedJobId === job.job_id ? 'primary' : 'default'} onClick={() => onSelectJob(job.job_id)}>选中</Button>
+          <Button size="mini" onClick={() => onReuseJobConfig(job)}>复用</Button>
+          <Button size="mini" onClick={() => onOpenJobDetail(job.job_id)}>详情</Button>
+          {['pending', 'running', 'cancelling'].includes(job.status) && (
+            <Button size="mini" status="danger" onClick={() => onCancelJob(job.job_id)}>取消</Button>
+          )}
+        </div>
+      ),
+    },
+  ]
+
+  /* ── 扫描表格列定义 ──────────────────────────────────────────────── */
+  const scanColumns = [
+    {
+      title: '选择', width: 50,
+      render: (_, item) => item.supported
+        ? <Checkbox checked={selectedScanKeys.includes(item.key)} onChange={() => onToggleScanSelection(item.key)} />
+        : null,
+    },
+    {
+      title: '文件名',
+      render: (_, item) => (
+        <div>
+          <Text style={{ fontSize: 12 }}>{item.name || '-'}</Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 11 }}>扩展名：{item.ext || '-'}</Text>
+        </div>
+      ),
+    },
+    { title: '对象 Key', dataIndex: 'key', render: (v) => <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>{v}</Text> },
+    { title: '类型', dataIndex: 'category', render: (v) => v || 'other', width: 80 },
+    { title: '大小', width: 80, render: (_, item) => formatBytes(item.size) },
+    { title: '最后修改', width: 140, render: (_, item) => item.last_modified ? formatDateTime(item.last_modified) : '--' },
+    {
+      title: '可处理', width: 70,
+      render: (_, item) => <Tag color={item.supported ? 'green' : 'gray'} size="small">{item.supported ? '支持' : '跳过'}</Tag>,
+    },
+  ]
+
+  return (
+    <div style={{ padding: 20, background: 'var(--color-fill-1)', minHeight: '100%' }}>
+      {/* ── 页头 ────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div>
+          <Title heading={5} style={{ margin: 0 }}>接入工作台</Title>
+          <Text type="secondary">S3/SFTP 远程来源接入 · 目录扫描 · 批量入湖 · 索引构建</Text>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button icon={<IconCloudDownload />} onClick={onNavigateUpload}>本地上传</Button>
+          <Button icon={<IconRefresh />} loading={refreshing} onClick={onRefresh}>刷新</Button>
         </div>
       </div>
 
-      {banner.message ? <div className={`${banner.type}-banner`}>{banner.message}</div> : null}
-      {error ? <div className="error-banner">{error}</div> : null}
+      {/* ── 提示条 ──────────────────────────────────────────────────── */}
+      {banner.message && (
+        <Alert
+          type={banner.type === 'success' ? 'success' : banner.type === 'warning' ? 'warning' : 'info'}
+          content={banner.message}
+          style={{ marginBottom: 12 }}
+        />
+      )}
+      {error && <Alert type="error" content={error} style={{ marginBottom: 12 }} />}
 
-      <section className="glass-card workbench-redesign-hero">
-        <div>
-          <div className="section-title">Lake Storage</div>
-          <h2 className="workbench-redesign-title">先连来源，再扫对象，最后发起导入</h2>
-          <p className="workbench-redesign-note">{selectionStatusText}</p>
-        </div>
-        <div className="workbench-redesign-actions">
-          <button type="button" className="button button-secondary" onClick={onSave} disabled={saving}>{saving ? '保存中...' : '保存配置'}</button>
-          <button type="button" className="button button-secondary" onClick={onTestConnection} disabled={testing}>{testing ? '测试中...' : '测试连接'}</button>
-          <button type="button" className="button button-primary" onClick={onScan} disabled={scanning}>{scanning ? '扫描中...' : '执行扫描'}</button>
-          <button type="button" className="button button-primary" onClick={onOpenStartConfirm} disabled={starting || (!scanResult.objects.length && !selectedScanKeys.length)}>{starting ? '启动中...' : '启动任务'}</button>
-          <button type="button" className="button button-ghost" onClick={onBuildIndex} disabled={buildingIndex || form.index_strategy === 'none' || (form.index_strategy === 'custom' && !form.index_type)}>{buildingIndex ? '构建中...' : '构建索引'}</button>
-        </div>
-      </section>
-
-      <section className="workbench-redesign-grid">
-        <InfoCard label="当前来源" value={sourceModeText} note={sourceLocationText} tone="semantic">
-          <button type="button" className="button button-small button-secondary" onClick={onOpenSourceModal}>编辑来源</button>
-        </InfoCard>
-        <InfoCard label="扫描结果" value={formatNumber(scanResult.returned_count)} note={scanStatusText} tone="kinetic">
-          <button type="button" className="button button-small button-secondary" onClick={onOpenScanModal}>扫描明细</button>
-        </InfoCard>
-        <InfoCard label="索引状态" value={currentIndexModeLabel} note={`文本 ${indexStatus.text.row_count} / 图像 ${indexStatus.image.row_count} / 索引 ${totalIndexCount}`} tone="dynamic">
-          <button type="button" className="button button-small button-secondary" onClick={onOpenIndexModal}>索引配置</button>
-        </InfoCard>
-        <InfoCard label="任务态势" value={formatNumber(activeJobs)} note={`完成 ${formatNumber(completedJobs)} / 失败 ${formatNumber(failedJobs)}`}>
-          {selectedJobId ? <button type="button" className="button button-small button-secondary" onClick={() => onOpenJobDetail(selectedJobId)}>当前任务</button> : <span className="badge is-muted">未选中任务</span>}
-        </InfoCard>
-      </section>
-
-      <section className="glass-card workbench-redesign-summary">
-        <div className="workbench-redesign-summary-main">
-          <div className="card-header">
-            <div>
-              <h2>导入准备度</h2>
-              <p>这里只回答一个问题：现在能不能发起任务。</p>
-            </div>
-          </div>
-          <div className="workbench-readiness-list">
-            <div className={`workbench-readiness-item ${connectionData ? 'is-ready' : ''}`}>
-              <span className="workbench-readiness-dot" />
-              <div>
-                <div className="table-primary">连接验证</div>
-                <div className="table-secondary">{connectionData ? '已拿到样本结果，可以继续扫描。' : '还没有完成连接验证。'}</div>
-              </div>
-            </div>
-            <div className={`workbench-readiness-item ${scanResult.objects.length ? 'is-ready' : ''}`}>
-              <span className="workbench-readiness-dot" />
-              <div>
-                <div className="table-primary">扫描结果</div>
-                <div className="table-secondary">{scanResult.objects.length ? scanStatusText : '还没有扫描结果。'}</div>
-              </div>
-            </div>
-            <div className={`workbench-readiness-item ${(selectedScanKeys.length || scanResult.eligible_count) ? 'is-ready' : ''}`}>
-              <span className="workbench-readiness-dot" />
-              <div>
-                <div className="table-primary">导入范围</div>
-                <div className="table-secondary">{selectionStatusText}</div>
-              </div>
-            </div>
-          </div>
-          {connectionData ? <div className="success-banner">{getConnectionSummary(connectionData)}</div> : null}
-        </div>
-
-        <div className="workbench-redesign-summary-side">
-          <div className="card-header">
-            <div>
-              <h2>已选对象预览</h2>
-              <p>主页面只展示结果，不再铺完整对象表。</p>
-            </div>
-            <button type="button" className="button button-small button-secondary" onClick={onOpenScanModal}>查看扫描明细</button>
-          </div>
-          <div className="workbench-preview-list">
-            {previewItems.length ? (
-              previewItems.map((item) => (
-                <div className="workbench-preview-item" key={item.key}>
-                  <div className="table-primary">{item.name || item.key}</div>
-                  <div className="table-secondary mono">{item.key}</div>
-                </div>
-              ))
-            ) : (
-              <div className="workbench-summary-note">还没有手动勾选对象。可以直接启动任务，也可以先打开扫描弹窗做更细的选择。</div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="glass-card">
-        <div className="card-header">
+      {/* ── 操作栏 ──────────────────────────────────────────────────── */}
+      <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           <div>
-            <h2>任务记录</h2>
-            <p>任务列表只做筛选和决策，日志与详情统一弹窗查看。</p>
+            <Text type="secondary" style={{ fontSize: 12 }}>Lake Storage</Text>
+            <div style={{ fontSize: 16, fontWeight: 600, margin: '4px 0' }}>先连来源，再扫对象，最后发起导入</div>
+            <Text type="secondary" style={{ fontSize: 13 }}>{selectionStatusText}</Text>
           </div>
-          <span className="badge">Jobs</span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Button onClick={onSave} loading={saving}>保存配置</Button>
+            <Button onClick={onTestConnection} loading={testing}>测试连接</Button>
+            <Button type="primary" onClick={onScan} loading={scanning}>执行扫描</Button>
+            <Button type="primary" onClick={onOpenStartConfirm} loading={starting} disabled={!scanResult.objects.length && !selectedScanKeys.length}>启动任务</Button>
+            <Button onClick={onBuildIndex} loading={buildingIndex} disabled={form.index_strategy === 'none' || (form.index_strategy === 'custom' && !form.index_type)}>构建索引</Button>
+          </div>
         </div>
-        <div className="toolbar workbench-table-toolbar">
-          <div className="toolbar-group">
-            <div className="field compact-field">
-              <label htmlFor="job_status_filter">状态</label>
-              <select id="job_status_filter" className="select" value={jobStatusFilter} onChange={(event) => onSetJobStatusFilter(event.target.value)}>
-                {jobStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
+      </Card>
+
+      {/* ── 状态卡片 ────────────────────────────────────────────────── */}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={6}>
+          <InfoCard label="当前来源" value={sourceModeText} note={sourceLocationText}>
+            <Button size="mini" onClick={onOpenSourceModal}>编辑来源</Button>
+          </InfoCard>
+        </Col>
+        <Col span={6}>
+          <InfoCard label="扫描结果" value={formatNumber(scanResult.returned_count)} note={scanStatusText}>
+            <Button size="mini" onClick={onOpenScanModal}>扫描明细</Button>
+          </InfoCard>
+        </Col>
+        <Col span={6}>
+          <InfoCard label="索引状态" value={currentIndexModeLabel} note={`文本 ${indexStatus.text.row_count} / 图像 ${indexStatus.image.row_count} / 索引 ${totalIndexCount}`}>
+            <Button size="mini" onClick={onOpenIndexModal}>索引配置</Button>
+          </InfoCard>
+        </Col>
+        <Col span={6}>
+          <InfoCard label="任务态势" value={formatNumber(activeJobs)} note={`完成 ${formatNumber(completedJobs)} / 失败 ${formatNumber(failedJobs)}`}>
+            {selectedJobId
+              ? <Button size="mini" onClick={() => onOpenJobDetail(selectedJobId)}>当前任务</Button>
+              : <Tag color="gray" size="small">未选中任务</Tag>}
+          </InfoCard>
+        </Col>
+      </Row>
+
+      {/* ── 导入准备度 + 预览 ───────────────────────────────────────── */}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={14}>
+          <Card title="导入准备度" extra={<Text type="secondary" style={{ fontSize: 12 }}>现在能不能发起任务</Text>}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { ready: !!connectionData, title: '连接验证', desc: connectionData ? '已拿到样本结果，可以继续扫描。' : '还没有完成连接验证。' },
+                { ready: scanResult.objects.length > 0, title: '扫描结果', desc: scanResult.objects.length ? scanStatusText : '还没有扫描结果。' },
+                { ready: !!(selectedScanKeys.length || scanResult.eligible_count), title: '导入范围', desc: selectionStatusText },
+              ].map((item) => (
+                <div key={item.title} style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                  borderRadius: 8, background: item.ready ? 'rgba(0,180,42,0.06)' : 'var(--color-fill-1)',
+                  border: `1px solid ${item.ready ? 'rgba(0,180,42,0.2)' : 'var(--color-border-1)'}`,
+                }}>
+                  {item.ready
+                    ? <IconCheckCircle style={{ color: '#00B42A', fontSize: 16, flexShrink: 0 }} />
+                    : <IconCloseCircle style={{ color: '#c9cdd4', fontSize: 16, flexShrink: 0 }} />}
+                  <div>
+                    <Text style={{ fontWeight: 500, fontSize: 13 }}>{item.title}</Text>
+                    <br />
+                    <Text type="secondary" style={{ fontSize: 12 }}>{item.desc}</Text>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="field compact-field">
-              <label htmlFor="job_sort">排序</label>
-              <select id="job_sort" className="select" value={jobSort} onChange={(event) => onSetJobSort(event.target.value)}>
-                {jobSortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </div>
-            <div className="field grow-field">
-              <label htmlFor="job_keyword">搜索任务</label>
-              <input id="job_keyword" className="input" value={jobKeyword} onChange={(event) => onSetJobKeyword(event.target.value)} placeholder="搜索 job_id、主机、Bucket 或路径" />
-            </div>
+            {connectionData && <Alert type="success" content={getConnectionSummary(connectionData)} style={{ marginTop: 12 }} />}
+          </Card>
+        </Col>
+        <Col span={10}>
+          <Card title="已选对象预览" extra={<Button size="mini" onClick={onOpenScanModal}>查看扫描明细</Button>}>
+            {previewItems.length ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {previewItems.map((item) => (
+                  <div key={item.key} style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--color-fill-1)' }}>
+                    <Text style={{ fontSize: 12 }}>{item.name || item.key}</Text>
+                    <br />
+                    <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>{item.key}</Text>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Text type="secondary" style={{ fontSize: 12 }}>还没有手动勾选对象。可以直接启动任务，也可以先打开扫描弹窗做更细的选择。</Text>
+            )}
+          </Card>
+        </Col>
+      </Row>
+
+      {/* ── 任务记录 ────────────────────────────────────────────────── */}
+      <Card title="任务记录" extra={<Text type="secondary" style={{ fontSize: 12 }}>任务列表只做筛选和决策，日志与详情统一弹窗查看</Text>}>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>状态</Text>
+            <Select value={jobStatusFilter} onChange={onSetJobStatusFilter} style={{ width: 120 }} size="small">
+              {jobStatusOptions.map((o) => <Option key={o.value} value={o.value}>{o.label}</Option>)}
+            </Select>
+          </div>
+          <div>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>排序</Text>
+            <Select value={jobSort} onChange={onSetJobSort} style={{ width: 150 }} size="small">
+              {jobSortOptions.map((o) => <Option key={o.value} value={o.value}>{o.label}</Option>)}
+            </Select>
+          </div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>搜索</Text>
+            <Input value={jobKeyword} onChange={onSetJobKeyword} size="small" placeholder="搜索 job_id、主机、Bucket 或路径" />
           </div>
         </div>
         {filteredJobs.length ? (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr><th>任务</th><th>来源</th><th>状态</th><th>进度</th><th>更新时间</th><th>操作</th></tr>
-              </thead>
-              <tbody>
-                {filteredJobs.map((job) => (
-                  <tr key={job.job_id} className={selectedJobId === job.job_id ? 'table-row-active' : ''}>
-                    <td><div className="table-primary mono">{job.job_id}</div><div className="table-secondary">{getJobCompactStats(job)}</div></td>
-                    <td><div className="table-primary">{getSourceTypeText(job.payload?.source_type)}</div><div className="table-secondary mono">{job.payload?.source_type === 'sftp' ? `${job.payload?.sftp_host || '--'} / ${job.payload?.sftp_path || '/'}` : `${job.payload?.bucket_name || '--'} / ${job.payload?.prefix || '/'}`}</div></td>
-                    <td><span className={`badge ${getJobBadgeClass(job.status)}`}>{getJobStatusText(job.status)}</span></td>
-                    <td><div className="job-progress-row"><div className="job-progress-track"><div className="job-progress-value" style={{ width: `${getJobProgress(job)}%` }} /></div><span className="mono">{getJobProgress(job)}%</span></div></td>
-                    <td>{job.updated_at ? formatDateTime(job.updated_at) : '--'}</td>
-                    <td><div className="toolbar-group"><button type="button" className="button button-small button-secondary" onClick={() => onSelectJob(job.job_id)}>选中</button><button type="button" className="button button-small button-ghost" onClick={() => onReuseJobConfig(job)}>复用</button><button type="button" className="button button-small button-ghost" onClick={() => onOpenJobDetail(job.job_id)}>详情</button>{['pending', 'running', 'cancelling'].includes(job.status) ? <button type="button" className="button button-small button-ghost" onClick={() => onCancelJob(job.job_id)}>取消</button> : null}</div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : <div className="empty-state small">当前没有任务记录。</div>}
-      </section>
+          <Table columns={jobColumns} data={filteredJobs} rowKey="job_id" pagination={false} size="small" scroll={{ x: 900 }} />
+        ) : (
+          <Empty description="当前没有任务记录" />
+        )}
+      </Card>
 
-      <ModalShell open={sourceModalOpen} title="编辑来源" subtitle="切换来源类型并维护连接参数" badge={sourceModeText} onClose={onCloseSourceModal}>
-        <div className="workbench-source-toggle">
-          {sourceTypeOptions.map((option) => (
-            <button key={option.value} type="button" className={`workbench-source-chip ${form.source_type === option.value ? 'is-active' : ''}`} onClick={() => onSourceTypeChange(option.value)}>
-              <span className="workbench-source-chip-title">{option.label}</span>
-              <span className="workbench-source-chip-hint">{option.hint}</span>
-            </button>
-          ))}
+      {/* ── 弹窗：编辑来源 ──────────────────────────────────────────── */}
+      <Modal title="编辑来源" visible={sourceModalOpen} onCancel={onCloseSourceModal} footer={null} style={{ width: 640 }}>
+        <div style={{ marginBottom: 12 }}>
+          <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>来源类型</Text>
+          <Radio.Group type="button" value={form.source_type} onChange={onSourceTypeChange}>
+            {sourceTypeOptions.map((o) => <Radio key={o.value} value={o.value}>{o.label}</Radio>)}
+          </Radio.Group>
         </div>
-        <div className="workbench-form-grid">
+        <Row gutter={[16, 12]}>
           {form.source_type === 's3' ? (
             <>
-              <div className="field"><label htmlFor="endpoint_url">S3 Endpoint</label><input id="endpoint_url" name="endpoint_url" className="input" value={form.endpoint_url} onChange={onInputChange} placeholder="http://127.0.0.1:8333" /></div>
-              <div className="field"><label htmlFor="bucket_name">Bucket</label><input id="bucket_name" name="bucket_name" className="input" value={form.bucket_name} onChange={onInputChange} placeholder="multimodal-lake-bucket" /></div>
-              <div className="field"><label htmlFor="prefix">目录前缀</label><input id="prefix" name="prefix" className="input" value={form.prefix} onChange={onInputChange} placeholder="raw/docs/2026" /></div>
-              <div className="field"><label htmlFor="access_key_id">Access Key</label><input id="access_key_id" name="access_key_id" className="input" value={form.access_key_id} onChange={onInputChange} placeholder="mykey" /></div>
-              <div className="field"><label htmlFor="secret_access_key">Secret Key</label><input id="secret_access_key" name="secret_access_key" type="password" className="input" value={form.secret_access_key} onChange={onInputChange} placeholder="请输入密钥" /></div>
+              <Col span={12}><Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>S3 Endpoint</Text><Input name="endpoint_url" value={form.endpoint_url} onChange={(v) => onInputChange({ target: { name: 'endpoint_url', value: v, type: 'text' } })} /></Col>
+              <Col span={12}><Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Bucket</Text><Input name="bucket_name" value={form.bucket_name} onChange={(v) => onInputChange({ target: { name: 'bucket_name', value: v, type: 'text' } })} /></Col>
+              <Col span={12}><Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>目录前缀</Text><Input name="prefix" value={form.prefix} onChange={(v) => onInputChange({ target: { name: 'prefix', value: v, type: 'text' } })} /></Col>
+              <Col span={12}><Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Access Key</Text><Input name="access_key_id" value={form.access_key_id} onChange={(v) => onInputChange({ target: { name: 'access_key_id', value: v, type: 'text' } })} /></Col>
+              <Col span={12}><Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Secret Key</Text><Input.Password name="secret_access_key" value={form.secret_access_key} onChange={(v) => onInputChange({ target: { name: 'secret_access_key', value: v, type: 'password' } })} /></Col>
             </>
           ) : (
             <>
-              <div className="field"><label htmlFor="sftp_host">SFTP 主机</label><input id="sftp_host" name="sftp_host" className="input" value={form.sftp_host} onChange={onInputChange} placeholder="192.168.20.10" /></div>
-              <div className="field"><label htmlFor="sftp_port">SFTP 端口</label><input id="sftp_port" name="sftp_port" type="number" min="1" max="65535" className="input" value={form.sftp_port} onChange={onInputChange} placeholder="22" /></div>
-              <div className="field"><label htmlFor="sftp_user">用户名</label><input id="sftp_user" name="sftp_user" className="input" value={form.sftp_user} onChange={onInputChange} placeholder="root" /></div>
-              <div className="field"><label htmlFor="sftp_password">密码</label><input id="sftp_password" name="sftp_password" type="password" className="input" value={form.sftp_password} onChange={onInputChange} placeholder="请输入密码" /></div>
-              <div className="field"><label htmlFor="sftp_path">远程路径</label><input id="sftp_path" name="sftp_path" className="input" value={form.sftp_path} onChange={onInputChange} placeholder="/tmp" /></div>
+              <Col span={12}><Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>SFTP 主机</Text><Input name="sftp_host" value={form.sftp_host} onChange={(v) => onInputChange({ target: { name: 'sftp_host', value: v, type: 'text' } })} /></Col>
+              <Col span={12}><Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>SFTP 端口</Text><InputNumber name="sftp_port" value={form.sftp_port} onChange={(v) => onInputChange({ target: { name: 'sftp_port', value: v, type: 'number' } })} style={{ width: '100%' }} /></Col>
+              <Col span={12}><Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>用户名</Text><Input name="sftp_user" value={form.sftp_user} onChange={(v) => onInputChange({ target: { name: 'sftp_user', value: v, type: 'text' } })} /></Col>
+              <Col span={12}><Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>密码</Text><Input.Password name="sftp_password" value={form.sftp_password} onChange={(v) => onInputChange({ target: { name: 'sftp_password', value: v, type: 'password' } })} /></Col>
+              <Col span={12}><Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>远程路径</Text><Input name="sftp_path" value={form.sftp_path} onChange={(v) => onInputChange({ target: { name: 'sftp_path', value: v, type: 'text' } })} /></Col>
             </>
           )}
-        </div>
-      </ModalShell>
+        </Row>
+      </Modal>
 
-      <ModalShell open={scanModalOpen} title="扫描明细" subtitle="在弹窗里完成筛选、勾选和分页浏览" onClose={onCloseScanModal}>
-        <div className="workbench-form-grid">
-          <div className="field"><label htmlFor="scan_limit">扫描上限</label><input id="scan_limit" name="scan_limit" type="number" min="1" max="2000" className="input" value={form.scan_limit} onChange={onInputChange} /></div>
-          <div className="field"><label htmlFor="max_files">导入文件数上限</label><input id="max_files" name="max_files" type="number" min="1" max="5000" className="input" value={form.max_files} onChange={onInputChange} /></div>
-        </div>
-        <div className="workbench-switch-grid">
-          <label className="checkbox-field"><input type="checkbox" name="overwrite_existing" checked={form.overwrite_existing} onChange={onInputChange} /><span>覆盖已存在文件</span></label>
-        </div>
-        <div className="toolbar workbench-table-toolbar workbench-scan-toolbar">
-          <div className="toolbar-group">
-            <div className="field compact-field"><label htmlFor="scan_category_filter">类型筛选</label><select id="scan_category_filter" className="select" value={scanCategoryFilter} onChange={(event) => onSetScanCategoryFilter(event.target.value)}>{scanCategories.map((option) => <option key={option} value={option}>{option === 'all' ? '全部类型' : option}</option>)}</select></div>
-            <div className="field compact-field"><label htmlFor="scan_page_size">每页条数</label><select id="scan_page_size" className="select" value={scanPageSize} onChange={(event) => onSetScanPageSize(Number(event.target.value))}>{scanPageSizeOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></div>
-            <div className="field grow-field"><label htmlFor="scan_keyword">扫描搜索</label><input id="scan_keyword" className="input" value={scanKeyword} onChange={(event) => onSetScanKeyword(event.target.value)} placeholder="搜索文件名、对象 Key、扩展名或类型" /></div>
-            <label className="checkbox-field"><input type="checkbox" checked={scanSupportedOnly} onChange={(event) => onSetScanSupportedOnly(event.target.checked)} /><span>仅看支持项</span></label>
+      {/* ── 弹窗：扫描明细 ──────────────────────────────────────────── */}
+      <Modal title="扫描明细" visible={scanModalOpen} onCancel={onCloseScanModal} footer={null} style={{ width: 900 }}>
+        <Row gutter={[16, 12]} style={{ marginBottom: 12 }}>
+          <Col span={8}>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>扫描上限</Text>
+            <InputNumber name="scan_limit" value={form.scan_limit} onChange={(v) => onInputChange({ target: { name: 'scan_limit', value: v, type: 'number' } })} style={{ width: '100%' }} />
+          </Col>
+          <Col span={8}>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>导入文件数上限</Text>
+            <InputNumber name="max_files" value={form.max_files} onChange={(v) => onInputChange({ target: { name: 'max_files', value: v, type: 'number' } })} style={{ width: '100%' }} />
+          </Col>
+          <Col span={8}>
+            <Checkbox checked={form.overwrite_existing} onChange={(v) => onInputChange({ target: { name: 'overwrite_existing', checked: v, type: 'checkbox' } })}>覆盖已存在文件</Checkbox>
+          </Col>
+        </Row>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>类型筛选</Text>
+            <Select value={scanCategoryFilter} onChange={onSetScanCategoryFilter} style={{ width: 120 }} size="small">
+              {scanCategories.map((o) => <Option key={o} value={o}>{o === 'all' ? '全部类型' : o}</Option>)}
+            </Select>
           </div>
-          <div className="toolbar-group">
-            <button type="button" className="button button-small button-secondary" onClick={onSelectAllScanObjects} disabled={!filteredSupportedScanObjects.length}>全选当前筛选</button>
-            <button type="button" className="button button-small button-ghost" onClick={onClearSelectedScanObjects} disabled={!selectedScanKeys.length}>清空勾选</button>
+          <div>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>每页条数</Text>
+            <Select value={scanPageSize} onChange={onSetScanPageSize} style={{ width: 100 }} size="small">
+              {scanPageSizeOptions.map((o) => <Option key={o} value={o}>{o}</Option>)}
+            </Select>
           </div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>搜索</Text>
+            <Input value={scanKeyword} onChange={onSetScanKeyword} size="small" placeholder="搜索文件名、对象 Key、扩展名或类型" />
+          </div>
+          <Checkbox checked={scanSupportedOnly} onChange={onSetScanSupportedOnly}>仅看支持项</Checkbox>
+          <Button size="small" onClick={onSelectAllScanObjects} disabled={!filteredSupportedScanObjects.length}>全选</Button>
+          <Button size="small" onClick={onClearSelectedScanObjects} disabled={!selectedScanKeys.length}>清空</Button>
         </div>
-        {connectionData ? <div className="success-banner workbench-inline-banner">{getConnectionSummary(connectionData)}</div> : null}
-        {scanResult.objects.length ? <div className="table-wrap"><table className="data-table"><thead><tr><th>选择</th><th>文件名</th><th>对象 Key</th><th>类型</th><th>大小</th><th>最后修改</th><th>可处理</th></tr></thead><tbody>{pagedScanObjects.map((item) => <tr key={item.key}><td>{item.supported ? <input type="checkbox" className="table-checkbox" checked={selectedScanKeys.includes(item.key)} onChange={() => onToggleScanSelection(item.key)} /> : null}</td><td><div className="table-primary">{item.name || '-'}</div><div className="table-secondary">扩展名：{item.ext || '-'}</div></td><td className="table-secondary mono">{item.key}</td><td>{item.category || 'other'}</td><td>{formatBytes(item.size)}</td><td>{item.last_modified ? formatDateTime(item.last_modified) : '--'}</td><td><span className={`badge ${item.supported ? 'is-success' : 'is-muted'}`}>{item.supported ? '支持' : '跳过'}</span></td></tr>)}</tbody></table></div> : <div className="empty-state small">先测试连接或执行扫描，这里会展示待处理对象清单。</div>}
-        {filteredScanObjects.length ? <div className="pagination"><span className="pagination-meta">第 {formatNumber(scanPage)} / {formatNumber(scanPageCount)} 页，共 {formatNumber(filteredScanObjects.length)} 条</span><div className="toolbar-group"><button type="button" className="button button-small button-secondary" onClick={() => onSetScanPage(Math.max(1, scanPage - 1))} disabled={scanPage <= 1}>上一页</button><button type="button" className="button button-small button-secondary" onClick={() => onSetScanPage(Math.min(scanPageCount, scanPage + 1))} disabled={scanPage >= scanPageCount}>下一页</button></div></div> : null}
-      </ModalShell>
-
-      <ModalShell open={indexModalOpen} title="索引策略" subtitle="设置向量索引构建模式与高级参数" onClose={onCloseIndexModal}>
-        <div className="workbench-form-grid">
-          <div className="field"><label htmlFor="index_mode">索引模式</label><select id="index_mode" name="index_mode" className="select" value={currentIndexMode} onChange={onInputChange}>{indexModeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
-          {showPartitionField(currentIndexMode) ? <div className="field"><label htmlFor="num_partitions">分区数</label><input id="num_partitions" name="num_partitions" type="number" min="1" className="input" value={form.num_partitions} onChange={onInputChange} placeholder="自动" /></div> : null}
-          {showSubVectorField(currentIndexMode) ? <div className="field"><label htmlFor="num_sub_vectors">PQ 子向量数</label><input id="num_sub_vectors" name="num_sub_vectors" type="number" min="1" className="input" value={form.num_sub_vectors} onChange={onInputChange} placeholder="IVF_PQ / IVF_HNSW_PQ 时生效" /></div> : null}
-        </div>
-        <div className="workbench-switch-grid">
-          <label className="checkbox-field"><input type="checkbox" name="build_text_index" checked={form.build_text_index} onChange={onInputChange} /><span>构建文本向量索引</span></label>
-          <label className="checkbox-field"><input type="checkbox" name="build_image_index" checked={form.build_image_index} onChange={onInputChange} /><span>构建图像向量索引</span></label>
-        </div>
-        <div className="table-secondary">当前索引明细：文本 {getIndicesText(indexStatus.text.indices)}；图像 {getIndicesText(indexStatus.image.indices)}</div>
-      </ModalShell>
-
-      <ModalShell open={startConfirmOpen} title="确认启动任务" subtitle="在启动前再次确认本次导入范围与策略" onClose={onCloseStartConfirm}>
-        <div className="detail-grid">
-          <InfoCard label="来源类型" value={sourceModeText} note={sourceLocationText} />
-          <InfoCard label="索引模式" value={currentIndexModeLabel} note={`导入上限 ${formatNumber(form.max_files)} / 已勾选 ${selectedScanKeys.length ? formatNumber(selectedScanKeys.length) : '未指定'}`} />
-        </div>
-        <div className="warning-banner">{selectionStatusText}</div>
-        <div className="page-actions">
-          <button type="button" className="button button-secondary" onClick={onCloseStartConfirm}>取消</button>
-          <button type="button" className="button button-primary" disabled={starting} onClick={onConfirmStart}>{starting ? '启动中...' : '确认启动'}</button>
-        </div>
-      </ModalShell>
-
-      <ModalShell open={jobModalOpen && Boolean(jobDetail)} title="任务详情" subtitle={jobDetail ? jobDetail.job_id : ''} badge={jobDetail ? getJobStatusText(jobDetail.status) : ''} onClose={onCloseJobModal}>
-        {jobDetail ? (
+        {connectionData && <Alert type="success" content={getConnectionSummary(connectionData)} style={{ marginBottom: 12 }} />}
+        {scanResult.objects.length ? (
           <>
-            <div className="detail-grid">
-              <DetailItem label="来源类型" value={getSourceTypeText(jobDetail.payload?.source_type)} />
-              <DetailItem label="来源主值" value={getSourcePrimaryValue(jobDetail.payload)} />
-              <DetailItem label="来源路径" value={getSourceSecondaryValue(jobDetail.payload)} mono />
-              <DetailItem label="结果摘要" value={getJobCompactStats(jobDetail)} />
-            </div>
-            <div className="success-banner">{getJobResultSummary(jobDetail)}</div>
-            <div className="toolbar workbench-table-toolbar">
-              <div className="toolbar-group">
-                <button type="button" className="button button-small button-secondary" onClick={() => onCopyLogs(jobDetail.logs)}>复制日志</button>
-                <button type="button" className="button button-small button-secondary" onClick={() => onExportLogs(jobDetail)}>导出日志</button>
+            <Table columns={scanColumns} data={pagedScanObjects} rowKey="key" pagination={false} size="small" scroll={{ x: 700 }} />
+            {filteredScanObjects.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>第 {scanPage} / {scanPageCount} 页，共 {formatNumber(filteredScanObjects.length)} 条</Text>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Button size="mini" disabled={scanPage <= 1} onClick={() => onSetScanPage(scanPage - 1)}>上一页</Button>
+                  <Button size="mini" disabled={scanPage >= scanPageCount} onClick={() => onSetScanPage(scanPage + 1)}>下一页</Button>
+                </div>
               </div>
-            </div>
-            <div className="log-viewer">{jobDetail.logs || '暂无任务日志。'}</div>
+            )}
           </>
-        ) : null}
-      </ModalShell>
+        ) : (
+          <Empty description="先测试连接或执行扫描，这里会展示待处理对象清单。" />
+        )}
+      </Modal>
+
+      {/* ── 弹窗：索引策略 ──────────────────────────────────────────── */}
+      <Modal title="索引策略" visible={indexModalOpen} onCancel={onCloseIndexModal} footer={null} style={{ width: 520 }}>
+        <Row gutter={[16, 12]}>
+          <Col span={24}>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>索引模式</Text>
+            <Select value={currentIndexMode} onChange={(v) => onInputChange({ target: { name: 'index_mode', value: v } })} style={{ width: '100%' }}>
+              {indexModeOptions.map((o) => <Option key={o.value} value={o.value}>{o.label}</Option>)}
+            </Select>
+          </Col>
+          {showPartitionField(currentIndexMode) && (
+            <Col span={12}>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>分区数</Text>
+              <InputNumber name="num_partitions" value={form.num_partitions} onChange={(v) => onInputChange({ target: { name: 'num_partitions', value: v, type: 'number' } })} style={{ width: '100%' }} />
+            </Col>
+          )}
+          {showSubVectorField(currentIndexMode) && (
+            <Col span={12}>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>PQ 子向量数</Text>
+              <InputNumber name="num_sub_vectors" value={form.num_sub_vectors} onChange={(v) => onInputChange({ target: { name: 'num_sub_vectors', value: v, type: 'number' } })} style={{ width: '100%' }} />
+            </Col>
+          )}
+        </Row>
+        <div style={{ marginTop: 12, display: 'flex', gap: 16 }}>
+          <Checkbox checked={form.build_text_index} onChange={(v) => onInputChange({ target: { name: 'build_text_index', checked: v, type: 'checkbox' } })}>构建文本向量索引</Checkbox>
+          <Checkbox checked={form.build_image_index} onChange={(v) => onInputChange({ target: { name: 'build_image_index', checked: v, type: 'checkbox' } })}>构建图像向量索引</Checkbox>
+        </div>
+        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 12 }}>当前索引明细：文本 {getIndicesText(indexStatus.text.indices)}；图像 {getIndicesText(indexStatus.image.indices)}</Text>
+      </Modal>
+
+      {/* ── 弹窗：确认启动 ──────────────────────────────────────────── */}
+      <Modal title="确认启动任务" visible={startConfirmOpen} onCancel={onCloseStartConfirm} footer={null} style={{ width: 520 }}>
+        <Row gutter={12} style={{ marginBottom: 12 }}>
+          <Col span={12}><InfoCard label="来源类型" value={sourceModeText} note={sourceLocationText} /></Col>
+          <Col span={12}><InfoCard label="索引模式" value={currentIndexModeLabel} note={`上限 ${formatNumber(form.max_files)} / 已勾选 ${selectedScanKeys.length ? formatNumber(selectedScanKeys.length) : '未指定'}`} /></Col>
+        </Row>
+        <Alert type="warning" content={selectionStatusText} style={{ marginBottom: 16 }} />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button onClick={onCloseStartConfirm}>取消</Button>
+          <Button type="primary" loading={starting} onClick={onConfirmStart}>确认启动</Button>
+        </div>
+      </Modal>
+
+      {/* ── 弹窗：任务详情 ──────────────────────────────────────────── */}
+      <Modal title={`任务详情 — ${jobDetail?.job_id || ''}`} visible={jobModalOpen && Boolean(jobDetail)} onCancel={onCloseJobModal} footer={null} style={{ width: 700 }}>
+        {jobDetail && (
+          <>
+            <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
+              <Col span={8}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>来源类型</Text>
+                <div style={{ marginTop: 4 }}>{getSourceTypeText(jobDetail.payload?.source_type)}</div>
+              </Col>
+              <Col span={8}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>来源主值</Text>
+                <div style={{ marginTop: 4, fontFamily: 'monospace', fontSize: 12 }}>{getSourcePrimaryValue(jobDetail.payload)}</div>
+              </Col>
+              <Col span={8}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>来源路径</Text>
+                <div style={{ marginTop: 4, fontFamily: 'monospace', fontSize: 12 }}>{getSourceSecondaryValue(jobDetail.payload)}</div>
+              </Col>
+            </Row>
+            <Alert type="success" content={getJobResultSummary(jobDetail)} style={{ marginBottom: 12 }} />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <Button size="small" onClick={() => onCopyLogs(jobDetail.logs)}>复制日志</Button>
+              <Button size="small" onClick={() => onExportLogs(jobDetail)}>导出日志</Button>
+            </div>
+            <pre style={{
+              background: '#1d2129', color: '#c9cdd4',
+              padding: 16, borderRadius: 6, fontSize: 12,
+              fontFamily: 'Consolas, monospace', maxHeight: 400, overflow: 'auto',
+              whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0,
+            }}>{jobDetail.logs || '暂无任务日志。'}</pre>
+          </>
+        )}
+      </Modal>
     </div>
   )
 }

@@ -1,49 +1,44 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  Grid,
+  Input,
+  InputNumber,
+  Message,
+  Radio,
+  Select,
+  Spin,
+  Tag,
+  Typography,
+} from '@arco-design/web-react'
+import { IconRefresh, IconSettings } from '@arco-design/web-react/icon'
 import api, { getErrorMessage } from '@/api'
-import { formatDateTime, formatNumber } from '@/utils/format'
+import { formatNumber } from '@/utils/format'
+
+const { Row, Col } = Grid
+const { Title, Text } = Typography
+const Option = Select.Option
 
 const defaultPlatformSettings = {
-  gravitino_url: '',
-  metalake: '',
-  ray_dashboard_url: '',
-  seaweedfs_master_url: '',
-  seaweedfs_s3_url: '',
-  doris_http_url: '',
-  doris_mysql_host: '',
-  doris_mysql_port: 9030,
-  doris_database: 'default',
-  doris_user: 'root',
-  doris_password: ''
+  gravitino_url: '', metalake: '', ray_dashboard_url: '',
+  seaweedfs_master_url: '', seaweedfs_s3_url: '',
+  doris_http_url: '', doris_mysql_host: '', doris_mysql_port: 9030,
+  doris_database: 'default', doris_user: 'root', doris_password: '',
 }
 
 const defaultWorkbenchSettings = {
-  source_type: 's3',
-  endpoint_url: '',
-  access_key_id: '',
-  secret_access_key: '',
-  bucket_name: '',
-  prefix: '',
-  sftp_host: '',
-  sftp_port: 22,
-  sftp_user: '',
-  sftp_password: '',
-  sftp_path: '/tmp',
-  scan_limit: 200,
-  max_files: 100,
-  overwrite_existing: false,
-  index_strategy: 'auto',
-  index_type: 'IVF_PQ',
-  build_text_index: true,
-  build_image_index: true,
-  num_partitions: '',
-  num_sub_vectors: ''
+  source_type: 's3', endpoint_url: '', access_key_id: '', secret_access_key: '',
+  bucket_name: '', prefix: '',
+  sftp_host: '', sftp_port: 22, sftp_user: '', sftp_password: '', sftp_path: '/tmp',
+  scan_limit: 200, max_files: 100, overwrite_existing: false,
+  index_strategy: 'auto', index_type: 'IVF_PQ',
+  build_text_index: true, build_image_index: true,
+  num_partitions: '', num_sub_vectors: '',
 }
-
-const sourceTypeOptions = [
-  { value: 's3', label: 'S3 / SeaweedFS', hint: '作为平台主接入路径的默认配置' },
-  { value: 'sftp', label: 'SFTP', hint: '作为补充来源的默认配置' }
-]
 
 const indexModeOptions = [
   { value: 'auto', label: '自动选择' },
@@ -54,14 +49,13 @@ const indexModeOptions = [
   { value: 'IVF_PQ', label: 'IVF_PQ' },
   { value: 'IVF_RQ', label: 'IVF_RQ' },
   { value: 'IVF_HNSW_SQ', label: 'IVF_HNSW_SQ' },
-  { value: 'IVF_HNSW_PQ', label: 'IVF_HNSW_PQ' }
+  { value: 'IVF_HNSW_PQ', label: 'IVF_HNSW_PQ' },
 ]
 
 function normalizeWorkbenchSettings(data = {}) {
   const sourceType = data?.source_type === 'sftp' ? 'sftp' : 's3'
   return {
-    ...defaultWorkbenchSettings,
-    ...data,
+    ...defaultWorkbenchSettings, ...data,
     source_type: sourceType,
     sftp_host: String(data?.sftp_host || ''),
     sftp_port: Number(data?.sftp_port ?? defaultWorkbenchSettings.sftp_port),
@@ -76,38 +70,20 @@ function normalizeWorkbenchSettings(data = {}) {
     build_text_index: data?.build_text_index ?? true,
     build_image_index: data?.build_image_index ?? true,
     num_partitions: data?.num_partitions ?? '',
-    num_sub_vectors: data?.num_sub_vectors ?? ''
+    num_sub_vectors: data?.num_sub_vectors ?? '',
   }
 }
 
 function getIndexModeValue(form) {
-  if (form.index_strategy === 'none') {
-    return 'none'
-  }
-  if (form.index_strategy === 'auto') {
-    return 'auto'
-  }
+  if (form.index_strategy === 'none') return 'none'
+  if (form.index_strategy === 'auto') return 'auto'
   return form.index_type || 'EMPTY'
 }
 
-function showPartitionField(indexModeValue) {
-  return indexModeValue !== 'none' && indexModeValue !== 'EMPTY'
-}
-
-function showSubVectorField(indexModeValue) {
-  return ['IVF_PQ', 'IVF_HNSW_PQ'].includes(indexModeValue)
-}
-
 function mapIndexModeToForm(modeValue, currentForm) {
-  if (modeValue === 'auto') {
-    return { ...currentForm, index_strategy: 'auto' }
-  }
-  if (modeValue === 'none') {
-    return { ...currentForm, index_strategy: 'none' }
-  }
-  if (modeValue === 'EMPTY') {
-    return { ...currentForm, index_strategy: 'custom', index_type: '' }
-  }
+  if (modeValue === 'auto') return { ...currentForm, index_strategy: 'auto' }
+  if (modeValue === 'none') return { ...currentForm, index_strategy: 'none' }
+  if (modeValue === 'EMPTY') return { ...currentForm, index_strategy: 'custom', index_type: '' }
   return { ...currentForm, index_strategy: 'custom', index_type: modeValue }
 }
 
@@ -118,378 +94,305 @@ function buildWorkbenchPayload(form) {
     scan_limit: Number(form.scan_limit || 0) || defaultWorkbenchSettings.scan_limit,
     max_files: Number(form.max_files || 0) || defaultWorkbenchSettings.max_files,
     num_partitions: form.num_partitions === '' ? null : Number(form.num_partitions),
-    num_sub_vectors: form.num_sub_vectors === '' ? null : Number(form.num_sub_vectors)
+    num_sub_vectors: form.num_sub_vectors === '' ? null : Number(form.num_sub_vectors),
   }
 }
 
 export default function ConfigCenterPage() {
   const navigate = useNavigate()
-  const [platformSettings, setPlatformSettings] = useState(defaultPlatformSettings)
-  const [workbenchSettings, setWorkbenchSettings] = useState(defaultWorkbenchSettings)
-  const [componentStatus, setComponentStatus] = useState([])
-  const [banner, setBanner] = useState({ type: '', message: '' })
-  const [error, setError] = useState('')
+  const [platform, setPlatform] = useState(defaultPlatformSettings)
+  const [workbench, setWorkbench] = useState(defaultWorkbenchSettings)
+  const [components, setComponents] = useState([])
   const [loading, setLoading] = useState(true)
   const [savingPlatform, setSavingPlatform] = useState(false)
   const [savingWorkbench, setSavingWorkbench] = useState(false)
   const [testingDoris, setTestingDoris] = useState(false)
 
   const loadData = async () => {
-    setError('')
     try {
-      const [platformResponse, workbenchResponse, componentResponse] = await Promise.all([
-        api.getPlatformSettings(),
-        api.getWorkbenchSettings(),
-        api.getPlatformComponentStatus()
+      const [pRes, wRes, cRes] = await Promise.all([
+        api.getPlatformSettings(), api.getWorkbenchSettings(), api.getPlatformComponentStatus(),
       ])
-
-      setPlatformSettings({ ...defaultPlatformSettings, ...(platformResponse?.data || {}) })
-      setWorkbenchSettings(normalizeWorkbenchSettings(workbenchResponse?.data || {}))
-      setComponentStatus(Array.isArray(componentResponse?.items) ? componentResponse.items : [])
-    } catch (requestError) {
-      setError(getErrorMessage(requestError, '加载配置中心失败。'))
-    } finally {
-      setLoading(false)
-    }
+      setPlatform({ ...defaultPlatformSettings, ...(pRes?.data || {}) })
+      setWorkbench(normalizeWorkbenchSettings(wRes?.data || {}))
+      setComponents(Array.isArray(cRes?.items) ? cRes.items : [])
+    } catch (e) {
+      Message.error(getErrorMessage(e, '加载配置中心失败'))
+    } finally { setLoading(false) }
   }
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  useEffect(() => { loadData() }, [])
 
-  const updatePlatformField = (key, value) => {
-    setPlatformSettings((current) => ({ ...current, [key]: value }))
-  }
-
-  const updateWorkbenchField = (key, value) => {
-    setWorkbenchSettings((current) => ({ ...current, [key]: value }))
-  }
-
-  const handleWorkbenchInputChange = (event) => {
-    const { name, value, type, checked } = event.target
-    if (type === 'checkbox') {
-      updateWorkbenchField(name, checked)
-      return
-    }
-
-    if (name === 'index_mode') {
-      setWorkbenchSettings((current) => mapIndexModeToForm(value, current))
-      return
-    }
-
-    if (['sftp_port', 'scan_limit', 'max_files', 'num_partitions', 'num_sub_vectors'].includes(name)) {
-      updateWorkbenchField(name, value === '' ? '' : Number(value))
-      return
-    }
-
-    updateWorkbenchField(name, value)
-  }
+  const updatePlatform = (key, value) => setPlatform((c) => ({ ...c, [key]: value }))
+  const updateWorkbench = (key, value) => setWorkbench((c) => ({ ...c, [key]: value }))
 
   const handleSavePlatform = async () => {
     setSavingPlatform(true)
-    setError('')
     try {
-      const response = await api.savePlatformSettings(platformSettings)
-      setPlatformSettings((current) => ({ ...current, ...(response?.data || {}) }))
-      setBanner({ type: 'success', message: response?.message || '平台配置已保存。' })
-      const componentResponse = await api.getPlatformComponentStatus()
-      setComponentStatus(Array.isArray(componentResponse?.items) ? componentResponse.items : [])
-    } catch (requestError) {
-      setError(getErrorMessage(requestError, '保存平台配置失败。'))
-    } finally {
-      setSavingPlatform(false)
-    }
+      const res = await api.savePlatformSettings(platform)
+      setPlatform((c) => ({ ...c, ...(res?.data || {}) }))
+      Message.success(res?.message || '平台配置已保存')
+      const cRes = await api.getPlatformComponentStatus()
+      setComponents(Array.isArray(cRes?.items) ? cRes.items : [])
+    } catch (e) { Message.error(getErrorMessage(e, '保存平台配置失败')) }
+    finally { setSavingPlatform(false) }
   }
 
   const handleSaveWorkbench = async () => {
     setSavingWorkbench(true)
-    setError('')
     try {
-      const response = await api.saveWorkbenchSettings(buildWorkbenchPayload(workbenchSettings))
-      setWorkbenchSettings(normalizeWorkbenchSettings(response?.data || workbenchSettings))
-      setBanner({ type: 'success', message: response?.message || '默认来源模板已保存。' })
-    } catch (requestError) {
-      setError(getErrorMessage(requestError, '保存默认来源模板失败。'))
-    } finally {
-      setSavingWorkbench(false)
-    }
+      const res = await api.saveWorkbenchSettings(buildWorkbenchPayload(workbench))
+      setWorkbench(normalizeWorkbenchSettings(res?.data || workbench))
+      Message.success(res?.message || '默认来源模板已保存')
+    } catch (e) { Message.error(getErrorMessage(e, '保存默认来源模板失败')) }
+    finally { setSavingWorkbench(false) }
   }
 
   const handleTestDoris = async () => {
     setTestingDoris(true)
-    setError('')
     try {
-      const response = await api.testDorisConnection(platformSettings)
-      setBanner({ type: response?.connected ? 'success' : 'warning', message: response?.message || 'Doris 连接测试完成。' })
-      const componentResponse = await api.getPlatformComponentStatus('doris')
-      const nextItem = Array.isArray(componentResponse?.items) ? componentResponse.items[0] : null
-      if (nextItem) {
-        setComponentStatus((current) => current.map((item) => (item.id === 'doris' ? nextItem : item)))
-      }
-    } catch (requestError) {
-      setError(getErrorMessage(requestError, '测试 Doris 连接失败。'))
-    } finally {
-      setTestingDoris(false)
-    }
+      const res = await api.testDorisConnection(platform)
+      if (res?.connected) Message.success(res?.message || 'Doris 连接成功')
+      else Message.warning(res?.message || 'Doris 连接测试完成')
+      const cRes = await api.getPlatformComponentStatus('doris')
+      const nextItem = Array.isArray(cRes?.items) ? cRes.items[0] : null
+      if (nextItem) setComponents((c) => c.map((item) => (item.id === 'doris' ? nextItem : item)))
+    } catch (e) { Message.error(getErrorMessage(e, '测试 Doris 连接失败')) }
+    finally { setTestingDoris(false) }
   }
 
   if (loading) {
-    return <div className="loading-state">配置中心加载中...</div>
+    return <div style={{ padding: 80, textAlign: 'center' }}><Spin tip="配置中心加载中..." /></div>
   }
 
-  const defaultSourceLabel = workbenchSettings.source_type === 'sftp' ? 'SFTP' : 'S3 / SeaweedFS'
-  const defaultSourceLocation = workbenchSettings.source_type === 'sftp'
-    ? `${workbenchSettings.sftp_host || '--'} / ${workbenchSettings.sftp_path || '/'}`
-    : `${workbenchSettings.bucket_name || '--'} / ${workbenchSettings.prefix || '/'}`
-  const currentIndexModeLabel = indexModeOptions.find((option) => option.value === getIndexModeValue(workbenchSettings))?.label || getIndexModeValue(workbenchSettings)
-  const onlineCount = componentStatus.filter((item) => item.online).length
+  const defaultSourceLabel = workbench.source_type === 'sftp' ? 'SFTP' : 'S3 / SeaweedFS'
+  const defaultSourceLocation = workbench.source_type === 'sftp'
+    ? `${workbench.sftp_host || '--'} / ${workbench.sftp_path || '/'}`
+    : `${workbench.bucket_name || '--'} / ${workbench.prefix || '/'}`
+  const currentIndexModeLabel = indexModeOptions.find((o) => o.value === getIndexModeValue(workbench))?.label || getIndexModeValue(workbench)
+  const onlineCount = components.filter((item) => item.online).length
+  const indexMode = getIndexModeValue(workbench)
 
   return (
-    <div className="content-wrap">
-      <div className="page-header">
+    <div style={{ padding: 20, background: 'var(--color-fill-1)', minHeight: '100%' }}>
+      {/* 页头 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
-          <h1 className="page-title">来源配置</h1>
-          <p className="page-subtitle">统一维护平台连接和默认来源模板。接入与扫描、查询分析等页面只消费这里的保存结果，不再各自承担配置入口。</p>
+          <Title heading={5} style={{ margin: 0 }}>来源配置</Title>
+          <Text type="secondary">统一维护平台连接和默认来源模板。接入与扫描、查询分析等页面只消费这里的保存结果。</Text>
         </div>
-        <div className="page-actions">
-          <button type="button" className="button button-secondary" onClick={loadData}>
-            刷新配置
-          </button>
-          <button type="button" className="button button-primary" onClick={() => navigate('/workbench')}>
-            前往接入与扫描
-          </button>
-        </div>
+        <Space>
+          <Button icon={<IconRefresh />} onClick={loadData}>刷新配置</Button>
+          <Button type="primary" onClick={() => navigate('/ingestion/source')}>前往接入与扫描</Button>
+        </Space>
       </div>
 
-      {banner.message ? <div className={`${banner.type}-banner`}>{banner.message}</div> : null}
-      {error ? <div className="error-banner">{error}</div> : null}
+      {/* 概览卡片 */}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={6}>
+          <Card style={{ height: '100%' }} bodyStyle={{ padding: 16 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>默认来源</Text>
+            <div style={{ fontSize: 18, fontWeight: 700, margin: '6px 0 4px' }}>{defaultSourceLabel}</div>
+            <Text type="secondary" style={{ fontSize: 12, fontFamily: 'monospace' }}>{defaultSourceLocation}</Text>
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card style={{ height: '100%' }} bodyStyle={{ padding: 16 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>默认索引策略</Text>
+            <div style={{ fontSize: 18, fontWeight: 700, margin: '6px 0 4px' }}>{currentIndexModeLabel}</div>
+            <Text type="secondary" style={{ fontSize: 12 }}>文本 {workbench.build_text_index ? '开' : '关'} / 图像 {workbench.build_image_index ? '开' : '关'}</Text>
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card style={{ height: '100%' }} bodyStyle={{ padding: 16 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>SeaweedFS S3</Text>
+            <div style={{ fontSize: 18, fontWeight: 700, margin: '6px 0 4px' }}>{platform.seaweedfs_s3_url ? '已配置' : '未配置'}</div>
+            <Text type="secondary" style={{ fontSize: 12, fontFamily: 'monospace' }}>{platform.seaweedfs_s3_url || '--'}</Text>
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card style={{ height: '100%' }} bodyStyle={{ padding: 16 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>组件在线数</Text>
+            <div style={{ fontSize: 18, fontWeight: 700, margin: '6px 0 4px' }}>{formatNumber(onlineCount)}</div>
+            <Text type="secondary" style={{ fontSize: 12 }}>共 {formatNumber(components.length)} 个组件</Text>
+          </Card>
+        </Col>
+      </Row>
 
-      <section className="glass-card workbench-console-panel">
-        <div className="workbench-guide-strip">
-          <span className="badge">Source Config</span>
-          <span className="workbench-guide-copy">这里维护的是全局来源配置和平台连接，不直接执行扫描或导入任务。真正的扫描、筛选和批量入湖请去"接入与扫描"。</span>
-        </div>
+      {/* 配置表单 */}
+      <Row gutter={16}>
+        {/* 平台连接 */}
+        <Col span={12}>
+          <Card title="平台连接" style={{ height: '100%' }}>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 16 }}>
+              统一管理 Gravitino、Ray、SeaweedFS 和 Doris 的地址与连接参数。
+            </Text>
+            <Row gutter={[16, 12]}>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Gravitino URL</Text>
+                <Input value={platform.gravitino_url} onChange={(v) => updatePlatform('gravitino_url', v)} />
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Metalake</Text>
+                <Input value={platform.metalake} onChange={(v) => updatePlatform('metalake', v)} />
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Ray Dashboard</Text>
+                <Input value={platform.ray_dashboard_url} onChange={(v) => updatePlatform('ray_dashboard_url', v)} />
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>SeaweedFS Master</Text>
+                <Input value={platform.seaweedfs_master_url} onChange={(v) => updatePlatform('seaweedfs_master_url', v)} />
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>SeaweedFS S3</Text>
+                <Input value={platform.seaweedfs_s3_url} onChange={(v) => updatePlatform('seaweedfs_s3_url', v)} />
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Doris HTTP</Text>
+                <Input value={platform.doris_http_url} onChange={(v) => updatePlatform('doris_http_url', v)} />
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Doris MySQL Host</Text>
+                <Input value={platform.doris_mysql_host} onChange={(v) => updatePlatform('doris_mysql_host', v)} />
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Doris MySQL Port</Text>
+                <InputNumber value={platform.doris_mysql_port} onChange={(v) => updatePlatform('doris_mysql_port', v || 9030)} style={{ width: '100%' }} />
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Doris Database</Text>
+                <Input value={platform.doris_database} onChange={(v) => updatePlatform('doris_database', v)} />
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Doris User</Text>
+                <Input value={platform.doris_user} onChange={(v) => updatePlatform('doris_user', v)} />
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Doris Password</Text>
+                <Input.Password value={platform.doris_password} onChange={(v) => updatePlatform('doris_password', v)} />
+              </Col>
+            </Row>
+            <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+              <Button type="primary" loading={savingPlatform} onClick={handleSavePlatform}>保存平台配置</Button>
+              <Button loading={testingDoris} onClick={handleTestDoris}>测试 Doris 连接</Button>
+            </div>
+          </Card>
+        </Col>
 
-        <div className="workbench-summary-grid">
-          <div className="workbench-summary-card">
-            <div className="kpi-label">默认来源</div>
-            <div className="workbench-summary-value">{defaultSourceLabel}</div>
-            <div className="workbench-summary-note mono">{defaultSourceLocation}</div>
-          </div>
-          <div className="workbench-summary-card">
-            <div className="kpi-label">默认索引策略</div>
-            <div className="workbench-summary-value">{currentIndexModeLabel}</div>
-            <div className="workbench-summary-note">文本索引 {workbenchSettings.build_text_index ? '开启' : '关闭'} / 图像索引 {workbenchSettings.build_image_index ? '开启' : '关闭'}</div>
-          </div>
-          <div className="workbench-summary-card">
-            <div className="kpi-label">SeaweedFS S3</div>
-            <div className="workbench-summary-value">{platformSettings.seaweedfs_s3_url ? '已配置' : '未配置'}</div>
-            <div className="workbench-summary-note mono">{platformSettings.seaweedfs_s3_url || '--'}</div>
-          </div>
-          <div className="workbench-summary-card">
-            <div className="kpi-label">组件在线数</div>
-            <div className="workbench-summary-value">{formatNumber(onlineCount)}</div>
-            <div className="workbench-summary-note">共 {formatNumber(componentStatus.length)} 个组件已纳入巡检视图</div>
-          </div>
-        </div>
-      </section>
+        {/* 默认来源模板 */}
+        <Col span={12}>
+          <Card title="默认来源模板" style={{ height: '100%' }}>
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 16 }}>
+              统一管理接入与扫描页面默认来源、扫描和索引策略。
+            </Text>
 
-      <div className="query-top-grid">
-        <section className="glass-card">
-          <div className="card-header">
-            <div>
-              <h2>平台连接</h2>
-              <p>统一管理 Gravitino、Ray、SeaweedFS 和 Doris 的地址与连接参数，避免散落在各个功能页里。</p>
-            </div>
-          </div>
+            {/* 来源类型切换 */}
+            <Radio.Group
+              type="button"
+              value={workbench.source_type}
+              onChange={(v) => updateWorkbench('source_type', v)}
+              style={{ marginBottom: 16 }}
+            >
+              <Radio value="s3">S3 / SeaweedFS</Radio>
+              <Radio value="sftp">SFTP</Radio>
+            </Radio.Group>
 
-          <div className="query-settings-grid">
-            <div className="field">
-              <label htmlFor="gravitino_url">Gravitino URL</label>
-              <input id="gravitino_url" className="input" value={platformSettings.gravitino_url} onChange={(event) => updatePlatformField('gravitino_url', event.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="metalake">Metalake</label>
-              <input id="metalake" className="input" value={platformSettings.metalake} onChange={(event) => updatePlatformField('metalake', event.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="ray_dashboard_url">Ray Dashboard</label>
-              <input id="ray_dashboard_url" className="input" value={platformSettings.ray_dashboard_url} onChange={(event) => updatePlatformField('ray_dashboard_url', event.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="seaweedfs_master_url">SeaweedFS Master</label>
-              <input id="seaweedfs_master_url" className="input" value={platformSettings.seaweedfs_master_url} onChange={(event) => updatePlatformField('seaweedfs_master_url', event.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="seaweedfs_s3_url">SeaweedFS S3</label>
-              <input id="seaweedfs_s3_url" className="input" value={platformSettings.seaweedfs_s3_url} onChange={(event) => updatePlatformField('seaweedfs_s3_url', event.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="doris_http_url">Doris HTTP</label>
-              <input id="doris_http_url" className="input" value={platformSettings.doris_http_url} onChange={(event) => updatePlatformField('doris_http_url', event.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="doris_mysql_host">Doris MySQL Host</label>
-              <input id="doris_mysql_host" className="input" value={platformSettings.doris_mysql_host} onChange={(event) => updatePlatformField('doris_mysql_host', event.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="doris_mysql_port">Doris MySQL Port</label>
-              <input id="doris_mysql_port" className="input" type="number" value={platformSettings.doris_mysql_port} onChange={(event) => updatePlatformField('doris_mysql_port', Number(event.target.value || 9030))} />
-            </div>
-            <div className="field">
-              <label htmlFor="doris_database">Doris Database</label>
-              <input id="doris_database" className="input" value={platformSettings.doris_database} onChange={(event) => updatePlatformField('doris_database', event.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="doris_user">Doris User</label>
-              <input id="doris_user" className="input" value={platformSettings.doris_user} onChange={(event) => updatePlatformField('doris_user', event.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor="doris_password">Doris Password</label>
-              <input id="doris_password" className="input" type="password" value={platformSettings.doris_password} onChange={(event) => updatePlatformField('doris_password', event.target.value)} />
-            </div>
-          </div>
+            <Row gutter={[16, 12]}>
+              {workbench.source_type === 's3' ? (
+                <>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>S3 Endpoint</Text>
+                    <Input value={workbench.endpoint_url} onChange={(v) => updateWorkbench('endpoint_url', v)} />
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Bucket</Text>
+                    <Input value={workbench.bucket_name} onChange={(v) => updateWorkbench('bucket_name', v)} />
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Prefix</Text>
+                    <Input value={workbench.prefix} onChange={(v) => updateWorkbench('prefix', v)} />
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Access Key</Text>
+                    <Input value={workbench.access_key_id} onChange={(v) => updateWorkbench('access_key_id', v)} />
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Secret Key</Text>
+                    <Input.Password value={workbench.secret_access_key} onChange={(v) => updateWorkbench('secret_access_key', v)} />
+                  </Col>
+                </>
+              ) : (
+                <>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>SFTP Host</Text>
+                    <Input value={workbench.sftp_host} onChange={(v) => updateWorkbench('sftp_host', v)} />
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>SFTP Port</Text>
+                    <InputNumber value={workbench.sftp_port} onChange={(v) => updateWorkbench('sftp_port', v)} style={{ width: '100%' }} />
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>SFTP User</Text>
+                    <Input value={workbench.sftp_user} onChange={(v) => updateWorkbench('sftp_user', v)} />
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>SFTP Password</Text>
+                    <Input.Password value={workbench.sftp_password} onChange={(v) => updateWorkbench('sftp_password', v)} />
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>SFTP Path</Text>
+                    <Input value={workbench.sftp_path} onChange={(v) => updateWorkbench('sftp_path', v)} />
+                  </Col>
+                </>
+              )}
 
-          <div className="toolbar-group">
-            <button type="button" className="button button-primary" onClick={handleSavePlatform} disabled={savingPlatform}>
-              {savingPlatform ? '保存中...' : '保存平台配置'}
-            </button>
-            <button type="button" className="button button-secondary" onClick={handleTestDoris} disabled={testingDoris}>
-              {testingDoris ? '测试中...' : '测试 Doris 连接'}
-            </button>
-          </div>
-        </section>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>扫描上限</Text>
+                <InputNumber value={workbench.scan_limit} onChange={(v) => updateWorkbench('scan_limit', v)} style={{ width: '100%' }} />
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>导入文件数上限</Text>
+                <InputNumber value={workbench.max_files} onChange={(v) => updateWorkbench('max_files', v)} style={{ width: '100%' }} />
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>索引模式</Text>
+                <Select value={indexMode} onChange={(v) => setWorkbench((c) => mapIndexModeToForm(v, c))} style={{ width: '100%' }}>
+                  {indexModeOptions.map((o) => <Option key={o.value} value={o.value}>{o.label}</Option>)}
+                </Select>
+              </Col>
+              {indexMode !== 'none' && indexMode !== 'EMPTY' && (
+                <Col span={12}>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>分区数</Text>
+                  <InputNumber value={workbench.num_partitions} onChange={(v) => updateWorkbench('num_partitions', v)} style={{ width: '100%' }} />
+                </Col>
+              )}
+              {['IVF_PQ', 'IVF_HNSW_PQ'].includes(indexMode) && (
+                <Col span={12}>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>PQ 子向量数</Text>
+                  <InputNumber value={workbench.num_sub_vectors} onChange={(v) => updateWorkbench('num_sub_vectors', v)} style={{ width: '100%' }} />
+                </Col>
+              )}
+            </Row>
 
-        <section className="glass-card">
-          <div className="card-header">
-            <div>
-              <h2>默认来源模板</h2>
-              <p>统一管理接入与扫描页面默认来源、扫描和索引策略，避免每次进入工作台都手工重填。</p>
+            <div style={{ marginTop: 16, display: 'flex', gap: 16 }}>
+              <Checkbox checked={workbench.overwrite_existing} onChange={(v) => updateWorkbench('overwrite_existing', v)}>覆盖已存在文件</Checkbox>
+              <Checkbox checked={workbench.build_text_index} onChange={(v) => updateWorkbench('build_text_index', v)}>构建文本向量索引</Checkbox>
+              <Checkbox checked={workbench.build_image_index} onChange={(v) => updateWorkbench('build_image_index', v)}>构建图像向量索引</Checkbox>
             </div>
-          </div>
 
-          <div className="workbench-source-toggle">
-            {sourceTypeOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={`workbench-source-chip ${workbenchSettings.source_type === option.value ? 'is-active' : ''}`}
-                onClick={() => setWorkbenchSettings((current) => ({ ...current, source_type: option.value }))}
-              >
-                <span className="workbench-source-chip-title">{option.label}</span>
-                <span className="workbench-source-chip-hint">{option.hint}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="workbench-form-grid">
-            {workbenchSettings.source_type === 's3' ? (
-              <>
-                <div className="field">
-                  <label htmlFor="endpoint_url">S3 Endpoint</label>
-                  <input id="endpoint_url" name="endpoint_url" className="input" value={workbenchSettings.endpoint_url} onChange={handleWorkbenchInputChange} />
-                </div>
-                <div className="field">
-                  <label htmlFor="bucket_name">Bucket</label>
-                  <input id="bucket_name" name="bucket_name" className="input" value={workbenchSettings.bucket_name} onChange={handleWorkbenchInputChange} />
-                </div>
-                <div className="field">
-                  <label htmlFor="prefix">Prefix</label>
-                  <input id="prefix" name="prefix" className="input" value={workbenchSettings.prefix} onChange={handleWorkbenchInputChange} />
-                </div>
-                <div className="field">
-                  <label htmlFor="access_key_id">Access Key</label>
-                  <input id="access_key_id" name="access_key_id" className="input" value={workbenchSettings.access_key_id} onChange={handleWorkbenchInputChange} />
-                </div>
-                <div className="field">
-                  <label htmlFor="secret_access_key">Secret Key</label>
-                  <input id="secret_access_key" name="secret_access_key" type="password" className="input" value={workbenchSettings.secret_access_key} onChange={handleWorkbenchInputChange} />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="field">
-                  <label htmlFor="sftp_host">SFTP Host</label>
-                  <input id="sftp_host" name="sftp_host" className="input" value={workbenchSettings.sftp_host} onChange={handleWorkbenchInputChange} />
-                </div>
-                <div className="field">
-                  <label htmlFor="sftp_port">SFTP Port</label>
-                  <input id="sftp_port" name="sftp_port" type="number" className="input" value={workbenchSettings.sftp_port} onChange={handleWorkbenchInputChange} />
-                </div>
-                <div className="field">
-                  <label htmlFor="sftp_user">SFTP User</label>
-                  <input id="sftp_user" name="sftp_user" className="input" value={workbenchSettings.sftp_user} onChange={handleWorkbenchInputChange} />
-                </div>
-                <div className="field">
-                  <label htmlFor="sftp_password">SFTP Password</label>
-                  <input id="sftp_password" name="sftp_password" type="password" className="input" value={workbenchSettings.sftp_password} onChange={handleWorkbenchInputChange} />
-                </div>
-                <div className="field">
-                  <label htmlFor="sftp_path">SFTP Path</label>
-                  <input id="sftp_path" name="sftp_path" className="input" value={workbenchSettings.sftp_path} onChange={handleWorkbenchInputChange} />
-                </div>
-              </>
-            )}
-
-            <div className="field">
-              <label htmlFor="scan_limit">扫描上限</label>
-              <input id="scan_limit" name="scan_limit" type="number" className="input" value={workbenchSettings.scan_limit} onChange={handleWorkbenchInputChange} />
+            <div style={{ marginTop: 16 }}>
+              <Button type="primary" loading={savingWorkbench} onClick={handleSaveWorkbench}>保存默认来源模板</Button>
             </div>
-            <div className="field">
-              <label htmlFor="max_files">导入文件数上限</label>
-              <input id="max_files" name="max_files" type="number" className="input" value={workbenchSettings.max_files} onChange={handleWorkbenchInputChange} />
-            </div>
-            <div className="field">
-              <label htmlFor="index_mode">索引模式</label>
-              <select id="index_mode" name="index_mode" className="select" value={getIndexModeValue(workbenchSettings)} onChange={handleWorkbenchInputChange}>
-                {indexModeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {showPartitionField(getIndexModeValue(workbenchSettings)) ? (
-              <div className="field">
-                <label htmlFor="num_partitions">分区数</label>
-                <input id="num_partitions" name="num_partitions" type="number" className="input" value={workbenchSettings.num_partitions} onChange={handleWorkbenchInputChange} />
-              </div>
-            ) : null}
-            {showSubVectorField(getIndexModeValue(workbenchSettings)) ? (
-              <div className="field">
-                <label htmlFor="num_sub_vectors">PQ 子向量数</label>
-                <input id="num_sub_vectors" name="num_sub_vectors" type="number" className="input" value={workbenchSettings.num_sub_vectors} onChange={handleWorkbenchInputChange} />
-              </div>
-            ) : null}
-          </div>
+          </Card>
+        </Col>
+      </Row>
 
-          <div className="workbench-switch-grid">
-            <label className="checkbox-field">
-              <input type="checkbox" name="overwrite_existing" checked={workbenchSettings.overwrite_existing} onChange={handleWorkbenchInputChange} />
-              <span>覆盖已存在文件</span>
-            </label>
-            <label className="checkbox-field">
-              <input type="checkbox" name="build_text_index" checked={workbenchSettings.build_text_index} onChange={handleWorkbenchInputChange} />
-              <span>构建文本向量索引</span>
-            </label>
-            <label className="checkbox-field">
-              <input type="checkbox" name="build_image_index" checked={workbenchSettings.build_image_index} onChange={handleWorkbenchInputChange} />
-              <span>构建图像向量索引</span>
-            </label>
-          </div>
-
-          <div className="toolbar-group">
-            <button type="button" className="button button-primary" onClick={handleSaveWorkbench} disabled={savingWorkbench}>
-              {savingWorkbench ? '保存中...' : '保存默认来源模板'}
-            </button>
-          </div>
-        </section>
-      </div>
-
-      <div className="info-banner">
-        组件运行状态请前往「湖总览 → 平台服务」查看，本页只负责配置参数维护。
-        <a href="#/dashboard" style={{ marginLeft: 8 }}>查看运行状态</a>
-      </div>
+      <Alert
+        type="info"
+        style={{ marginTop: 16 }}
+        content={<span>组件运行状态请前往「湖总览」查看，本页只负责配置参数维护。<a href="#/dashboard" style={{ marginLeft: 8 }}>查看运行状态</a></span>}
+      />
     </div>
   )
 }

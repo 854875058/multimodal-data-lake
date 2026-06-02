@@ -24,41 +24,13 @@ import {
   IconStorage,
 } from '@arco-design/web-react/icon'
 import { PrdCard, PrdTag, StatCard } from '@/components/PrdWidgets.jsx'
+import { dorisGet, dorisPost, dorisDelete } from '@/api/doris'
 import { formatNumber } from '@/utils/format'
 
 const { Title, Text } = Typography
 const { TextArea } = Input
 const TabPane = Tabs.TabPane
 const Option = Select.Option
-
-const DORIS_BASE = '/api/doris'
-
-async function dorisGet(path, params = {}) {
-  const url = new URL(DORIS_BASE + path, window.location.origin)
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  const res = await fetch(url.toString(), { credentials: 'include' })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
-
-async function dorisPost(path, body = {}) {
-  const res = await fetch(DORIS_BASE + path, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
-
-async function dorisDelete(path, params = {}) {
-  const url = new URL(DORIS_BASE + path, window.location.origin)
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  const res = await fetch(url.toString(), { method: 'DELETE', credentials: 'include' })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
 
 function summarizeSql(sql = '') {
   return String(sql).replace(/\s+/g, ' ').trim()

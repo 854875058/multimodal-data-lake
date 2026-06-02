@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import {
   Avatar,
@@ -8,6 +8,7 @@ import {
   Layout,
   Menu,
   Space,
+  Spin,
   Tag,
   Typography,
 } from '@arco-design/web-react'
@@ -35,26 +36,36 @@ import {
 } from '@arco-design/web-react/icon'
 import { clearAuthSession, loadAuthSession, saveAuthSession, subscribeAuthSession } from '@/auth/session'
 import boncLogo from '@/assets/bonc.jpg'
-import ComputeJobsOverviewPage from './pages/ComputeJobsOverviewPage.jsx'
-import ConfigCenterPage from './pages/ConfigCenterPage.jsx'
-import DataGovernancePage from './pages/DataGovernancePage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
-import FilesPage from './pages/FilesPage.jsx'
-import IngestionCenterPage from './pages/IngestionCenterPage.jsx'
-import LakeQueryPage from './pages/LakeQueryPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
-import LogsPage from './pages/LogsPage.jsx'
-import OperatorCenterPage from './pages/OperatorCenterPage.jsx'
-import PermissionManagementPage from './pages/PermissionManagementPage.jsx'
-import RayJobsPage from './pages/RayJobsPage.jsx'
-import TaskCenterPage from './pages/TaskCenterPage.jsx'
-import TemplateLibraryPage from './pages/TemplateLibraryPage.jsx'
-import UserManagementPage from './pages/UserManagementPage.jsx'
-import WorkflowCenterPage from './pages/WorkflowCenterPage.jsx'
-import AlertPage from './pages/mpp/AlertPage.jsx'
-import ClusterPage from './pages/mpp/ClusterPage.jsx'
-import InspectionPage from './pages/mpp/InspectionPage.jsx'
-import SqlEditorPage from './pages/mpp/SqlEditorPage.jsx'
+
+// 懒加载：只在用户访问对应路由时才加载
+const ComputeJobsOverviewPage = lazy(() => import('./pages/ComputeJobsOverviewPage.jsx'))
+const ConfigCenterPage = lazy(() => import('./pages/ConfigCenterPage.jsx'))
+const DataGovernancePage = lazy(() => import('./pages/DataGovernancePage.jsx'))
+const FilesPage = lazy(() => import('./pages/FilesPage.jsx'))
+const IngestionCenterPage = lazy(() => import('./pages/IngestionCenterPage.jsx'))
+const LakeQueryPage = lazy(() => import('./pages/LakeQueryPage.jsx'))
+const LogsPage = lazy(() => import('./pages/LogsPage.jsx'))
+const OperatorCenterPage = lazy(() => import('./pages/OperatorCenterPage.jsx'))
+const PermissionManagementPage = lazy(() => import('./pages/PermissionManagementPage.jsx'))
+const RayJobsPage = lazy(() => import('./pages/RayJobsPage.jsx'))
+const TaskCenterPage = lazy(() => import('./pages/TaskCenterPage.jsx'))
+const TemplateLibraryPage = lazy(() => import('./pages/TemplateLibraryPage.jsx'))
+const UserManagementPage = lazy(() => import('./pages/UserManagementPage.jsx'))
+const WorkflowCenterPage = lazy(() => import('./pages/WorkflowCenterPage.jsx'))
+const AlertPage = lazy(() => import('./pages/mpp/AlertPage.jsx'))
+const ClusterPage = lazy(() => import('./pages/mpp/ClusterPage.jsx'))
+const InspectionPage = lazy(() => import('./pages/mpp/InspectionPage.jsx'))
+const SqlEditorPage = lazy(() => import('./pages/mpp/SqlEditorPage.jsx'))
+
+function PageLoading() {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
+      <Spin size={32} tip="加载中..." />
+    </div>
+  )
+}
 
 const { Sider, Header, Content } = Layout
 const { SubMenu, Item: MenuItem } = Menu
@@ -406,6 +417,7 @@ function AppShell({ authSession, onLogout }) {
         </Header>
 
         <Content style={{ overflow: 'auto', background: 'var(--color-fill-1)' }}>
+          <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -451,6 +463,7 @@ function AppShell({ authSession, onLogout }) {
             <Route path="/ray/jobs" element={<RayJobsPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
+          </Suspense>
         </Content>
       </Layout>
     </Layout>

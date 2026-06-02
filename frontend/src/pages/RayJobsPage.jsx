@@ -6,32 +6,13 @@ import {
 import {
   IconPlus, IconRefresh, IconStop, IconFile, IconCheckCircle, IconCloseCircle
 } from '@arco-design/web-react/icon'
+import { rayGet, rayPost, rayDelete } from '@/api/ray'
 
 const { Title, Text } = Typography
 const { Row, Col } = Grid
 const TabPane = Tabs.TabPane
 const FormItem = Form.Item
 const TextArea = Input.TextArea
-
-async function rayGet(path) {
-  const res = await fetch('/api/ray' + path, { credentials: 'include' })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
-async function rayPost(path, body = {}) {
-  const res = await fetch('/api/ray' + path, {
-    method: 'POST', credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
-async function rayDelete(path) {
-  const res = await fetch('/api/ray' + path, { method: 'DELETE', credentials: 'include' })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
 
 function StatusTag({ status }) {
   const map = {

@@ -6,39 +6,13 @@ import {
 import {
   IconRefresh, IconDelete, IconPlus, IconNotification
 } from '@arco-design/web-react/icon'
+import { dorisGet, dorisPost, dorisDelete } from '@/api/doris'
 
 const { Row, Col } = Grid
 const { Title, Text } = Typography
 const TabPane = Tabs.TabPane
 const FormItem = Form.Item
 const Option = Select.Option
-
-const DORIS_BASE = '/api/doris'
-
-async function dorisGet(path, params = {}) {
-  const url = new URL(DORIS_BASE + path, window.location.origin)
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  const res = await fetch(url.toString(), { credentials: 'include' })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
-
-async function dorisPost(path, body = {}) {
-  const res = await fetch(DORIS_BASE + path, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
-
-async function dorisDelete(path) {
-  const res = await fetch(DORIS_BASE + path, { method: 'DELETE', credentials: 'include' })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
 
 function LevelTag({ level }) {
   const map = {

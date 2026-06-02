@@ -8,49 +8,12 @@ import {
   IconCloseCircle, IconStorage, IconSync
 } from '@arco-design/web-react/icon'
 import { ClusterTopology, HealthRing, PrdTag } from '@/components/PrdWidgets.jsx'
+import { dorisGet, dorisPost, dorisPut, dorisDelete } from '@/api/doris'
 
 const { Row, Col } = Grid
 const { Title, Text } = Typography
 const TabPane = Tabs.TabPane
 const FormItem = Form.Item
-
-const API = '/api/doris'
-
-async function dorisGet(path, params = {}) {
-  const url = new URL(API + path, window.location.origin)
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  const res = await fetch(url.toString(), { credentials: 'include' })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
-
-async function dorisPost(path, body = {}) {
-  const res = await fetch(API + path, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
-
-async function dorisPut(path, body = {}) {
-  const res = await fetch(API + path, {
-    method: 'PUT',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
-
-async function dorisDelete(path) {
-  const res = await fetch(API + path, { method: 'DELETE', credentials: 'include' })
-  if (!res.ok) throw new Error(`请求失败: ${res.status}`)
-  return res.json()
-}
 
 function AliveTag({ alive }) {
   if (alive === true || alive === 'true')

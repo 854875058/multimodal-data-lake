@@ -159,14 +159,48 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
     for (const edge of incomingEdges) {
       const sourceNode = canvasNodes.find(n => n.id === edge.source)
       if (!sourceNode) continue
-      for (const [srcField, tgtField] of Object.entries(AUTO_PARAM_MAP)) {
-        if (sourceNode.paramsSchema?.[srcField] || tgtField) {
-          result[tgtField] = `${sourceNode.config?.alias || sourceNode.label}.${srcField}`
+      const sourceLabel = sourceNode.config?.alias || sourceNode.label
+      if (edge.mappings && edge.mappings.length > 0) {
+        // 使用 edge 上的显式映射
+        for (const m of edge.mappings) {
+          result[m.targetField] = `${sourceLabel}.${m.sourceField}`
+        }
+      } else {
+        // 回退到默认映射
+        for (const [srcField, tgtField] of Object.entries(AUTO_PARAM_MAP)) {
+          if (sourceNode.paramsSchema?.[srcField] || tgtField) {
+            result[tgtField] = `${sourceLabel}.${srcField}`
+          }
         }
       }
     }
     return result
   }, [edges, canvasNodes])
+
+  // 连线映射弹窗状态
+  const [mappingDialog, setMappingDialog] = useState(null) // { edgeId, sourceNode, targetNode }
+
+  // 自动推断最佳映射
+  const inferMappings = useCallback((sourceNode, targetNode) => {
+    const srcKeys = Object.keys(sourceNode.paramsSchema || {})
+    const tgtKeys = Object.keys(targetNode.paramsSchema || {})
+    const mappings = []
+    // 1. 精确匹配 output_path -> source_path
+    for (const [s, t] of Object.entries(AUTO_PARAM_MAP)) {
+      if (srcKeys.includes(s) && tgtKeys.includes(t)) {
+        mappings.push({ sourceField: s, targetField: t })
+      }
+    }
+    // 2. 名称匹配
+    for (const sk of srcKeys) {
+      for (const tk of tgtKeys) {
+        if (sk === tk && !mappings.some(m => m.sourceField === sk)) {
+          mappings.push({ sourceField: sk, targetField: tk })
+        }
+      }
+    }
+    return mappings
+  }, [])
 
   useEffect(() => {
     if (!orderedNodes.length) { setJobSpec(null); return }
@@ -252,10 +286,20 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
       if (target) {
         const targetId = target.dataset.nodeId
         if (targetId && targetId !== c.sourceId) {
-          setEdges(prev => {
-            if (prev.some(ed => ed.source === c.sourceId && ed.target === targetId)) return prev
-            return [...prev, { id: `edge-${c.sourceId}-${targetId}`, source: c.sourceId, target: targetId }]
-          })
+          const sourceNode = nodesRef.current.find(n => n.id === c.sourceId)
+          const targetNode = nodesRef.current.find(n => n.id === targetId)
+          if (sourceNode && targetNode) {
+            const mappings = inferMappings(sourceNode, targetNode)
+            const edgeId = `edge-${c.sourceId}-${targetId}`
+            setEdges(prev => {
+              if (prev.some(ed => ed.source === c.sourceId && ed.target === targetId)) return prev
+              return [...prev, { id: edgeId, source: c.sourceId, target: targetId, mappings }]
+            })
+            // 如果有可映射参数，弹出映射编辑
+            if (mappings.length > 0 || Object.keys(sourceNode.paramsSchema || {}).length > 0) {
+              setMappingDialog({ edgeId, sourceNode, targetNode, mappings })
+            }
+          }
         }
       }
       connectRef.current = null
