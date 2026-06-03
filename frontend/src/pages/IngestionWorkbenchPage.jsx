@@ -533,61 +533,6 @@ export default function IngestionWorkbenchPage() {
   const sourceSummaryMeta = form.source_type === 's3'
     ? (form.endpoint_url || '未设置 Endpoint')
     : `${form.sftp_user || '未设置用户'} @ ${form.sftp_port || 22}`
-  const readinessBadge = connectionData
-    ? '连接已验证'
-    : scanResult.objects.length
-      ? '已完成扫描'
-      : '待建立连接'
-  const orchestrationHint = selectedScanKeys.length
-    ? `本次已手动勾选 ${formatNumber(selectedScanKeys.length)} 个对象，启动任务时将优先导入这些对象。`
-    : `当前未启用勾选导入，启动任务时会按扫描结果和上限 ${formatNumber(form.max_files)} 自动选取。`
-  const taskPressureText = activeJobs
-    ? `当前有 ${formatNumber(activeJobs)} 个活动任务，建议优先查看任务详情和索引状态。`
-    : '当前没有活动任务，可以直接执行一次来源测试、扫描或批量导入。'
-  const platformServiceCards = [
-    {
-      title: 'Gravitino',
-      value: platformSettings?.gravitino_url || '--',
-      note: platformSettings?.metalake ? `Metalake: ${platformSettings.metalake}` : '目录治理与资产注册'
-    },
-    {
-      title: 'SeaweedFS S3',
-      value: form.source_type === 's3' ? (form.endpoint_url || platformSettings?.seaweedfs_s3_url || '--') : (platformSettings?.seaweedfs_s3_url || '--'),
-      note: '对象存储入口与 Lance 数据承载'
-    },
-    {
-      title: 'Ray Dashboard',
-      value: platformSettings?.ray_dashboard_url || '--',
-      note: '工作流编排与批量任务执行入口'
-    },
-    {
-      title: 'Doris',
-      value: platformSettings?.doris_mysql_host ? `${platformSettings.doris_mysql_host}:${platformSettings.doris_mysql_port}` : '--',
-      note: '联邦查询与结果消费层'
-    }
-  ]
-  const governanceCards = [
-    {
-      title: '来源合同',
-      copy: form.source_type === 's3'
-        ? '统一描述 SeaweedFS / S3 来源、扫描范围和可复用配置，降低接入过程中的解释成本。'
-        : '保留 SFTP 作为补充接入路径，但整体展示仍以对象存储和 Lance 为主线。'
-    },
-    {
-      title: '编排标准',
-      copy: '通过 Daft ETL 工作流和 Ray Job 预览，把接入、清洗、向量化、回写这些动作组织成平台流程，而不是脚本堆叠。'
-    },
-    {
-      title: '执行治理',
-      copy: '优先展示任务状态、索引结果和日志闭环，保证工作台更像商业平台控制面，而不是单次操作面板。'
-    }
-  ]
-  const workspaceSections = [
-    { id: 'overview', label: '总控', hint: '平台视角' },
-    { id: 'source', label: '来源配置', hint: '接入与扫描' },
-    { id: 'index', label: '索引资产', hint: '索引与容量' }
-  ]
-
   const loadSettings = async () => {
     const response = await api.getWorkbenchSettings()
     setForm(normalizeForm(response?.data || {}))

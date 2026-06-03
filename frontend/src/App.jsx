@@ -340,39 +340,6 @@ function AppShell({ authSession, onLogout }) {
             </SubMenu>
           ))}
         </Menu>
-        <div
-          className="sidebar-hover-trigger"
-          onClick={() => setCollapsed(!collapsed)}
-          style={{
-            position: 'absolute',
-            top: 0,
-            right: -32,
-            width: 32,
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            zIndex: 100,
-            background: 'transparent',
-            opacity: 0,
-            transition: 'opacity 0.2s',
-          }}
-        >
-          <div style={{
-            width: 24,
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'var(--color-fill-2)',
-            borderRight: '1px solid var(--color-border-2)',
-          }}>
-            <span style={{ fontSize: 14, color: 'var(--color-text-3)', fontWeight: 600 }}>
-              {collapsed ? '›' : '‹'}
-            </span>
-          </div>
-        </div>
       </Sider>
 
       <Layout>

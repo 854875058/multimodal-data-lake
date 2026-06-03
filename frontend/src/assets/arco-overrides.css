@@ -105,8 +105,6 @@
 
 .badge.is-success { background: rgba(0, 180, 42, 0.1) !important; color: rgb(0, 180, 42) !important; }
 .badge.is-warning { background: rgba(255, 125, 0, 0.1) !important; color: rgb(255, 125, 0) !important; }
-.badge.is-error { background: rgba(245, 63, 63, 0.1) !important; color: rgb(245, 63, 63) !important; }
-.badge.is-accent { background: rgba(22, 93, 255, 0.1) !important; color: rgb(22, 93, 255) !important; }
 .badge.is-muted { background: var(--color-fill-2, #f2f3f5); color: var(--color-text-3, #86909c); }
 
 /* Banner */
@@ -121,7 +119,6 @@
 .success-banner { background: rgba(0, 180, 42, 0.1) !important; color: rgb(0, 180, 42) !important; border-color: rgba(0, 180, 42, 0.2) !important; }
 .error-banner { background: rgba(245, 63, 63, 0.1) !important; color: rgb(245, 63, 63) !important; border-color: rgba(245, 63, 63, 0.2) !important; }
 .warning-banner { background: rgba(255, 125, 0, 0.1) !important; color: rgb(255, 125, 0) !important; border-color: rgba(255, 125, 0, 0.2) !important; }
-.info-banner { background: rgba(22, 93, 255, 0.1) !important; color: rgb(22, 93, 255) !important; border-color: rgba(22, 93, 255, 0.2) !important; }
 
 /* 状态 */
 .empty-state, .loading-state { padding: 40px 16px !important; text-align: center !important; color: var(--color-text-3, #86909c) !important; font-size: 14px !important; }

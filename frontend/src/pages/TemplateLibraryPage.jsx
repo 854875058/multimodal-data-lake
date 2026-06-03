@@ -1,90 +1,170 @@
-import { Button, Card, Grid, Space, Table, Tag, Typography } from '@arco-design/web-react'
-import { IconCopy, IconExport, IconPlus } from '@arco-design/web-react/icon'
+import { useEffect, useMemo, useState } from 'react'
+import { Button, Card, Empty, Grid, Space, Spin, Table, Tag, Typography } from '@arco-design/web-react'
+import { IconCopy, IconExport, IconPlus, IconRefresh } from '@arco-design/web-react/icon'
+import { useNavigate } from 'react-router-dom'
+import api, { getErrorMessage } from '@/api'
+import { Message } from '@arco-design/web-react'
 
 const { Row, Col } = Grid
 const { Title, Text } = Typography
 
-const templateCards = [
-  { label: '已发布模板', value: '15', note: '覆盖入湖增强、质量治理与自动标注场景。' },
-  { label: '跨团队复用', value: '9', note: '模板参数与资源规格已标准化。' },
-  { label: '最近更新', value: '3', note: '本周新增视频抽帧和版面解析模板。' },
-]
-
-const templateColumns = [
-  { title: '模板名称', dataIndex: 'name', render: (_, item) => <Space direction="vertical" size={2}><Text bold>{item.name}</Text><Text type="secondary">{item.desc}</Text></Space> },
-  { title: '场景', dataIndex: 'scenario', width: 140, render: (value) => <Tag color="arcoblue">{value}</Tag> },
-  { title: '默认链路', dataIndex: 'flow', width: 220 },
-  { title: '资源基线', dataIndex: 'resource', width: 140 },
-  { title: '维护人', dataIndex: 'owner', width: 120 },
-  { title: '状态', dataIndex: 'status', width: 100, render: (value) => <Tag color={value === '稳定' ? 'green' : 'orange'}>{value}</Tag> },
-]
-
-const templateData = [
-  {
-    key: '1',
-    name: '票据解析标准模板',
-    desc: '适配扫描票据、合同与报告的 OCR + 清洗 + 向量化流程。',
-    scenario: '文档解析',
-    flow: 'OCR -> 清洗 -> 结构化 -> Embedding',
-    resource: 'CPU 4 / GPU 1',
-    owner: '数据平台组',
-    status: '稳定',
-  },
-  {
-    key: '2',
-    name: '视频抽帧质检模板',
-    desc: '适配安防与巡检视频的抽帧、去重与质量筛查。',
-    scenario: '视频处理',
-    flow: '抽帧 -> 质检 -> 去重 -> 入库',
-    resource: 'CPU 8 / GPU 1',
-    owner: '视觉算法组',
-    status: '稳定',
-  },
-  {
-    key: '3',
-    name: '自动标注增强模板',
-    desc: '适配图文数据集的预标注、复核与结果回写。',
-    scenario: '标注增强',
-    flow: '预标注 -> 人审 -> 回写 -> 追踪',
-    resource: 'CPU 4 / GPU 0',
-    owner: '治理运营组',
-    status: '试运行',
-  },
-]
+const kindLabels = { source: '输入', transform: '处理', ai: '智能', sink: '输出' }
+const kindColors = { source: 'blue', transform: 'green', ai: 'purple', sink: 'orange' }
 
 export default function TemplateLibraryPage() {
+  const navigate = useNavigate()
+  const [presets, setPresets] = useState([])
+  const [library, setLibrary] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const res = await api.getWorkflowPresets()
+      setPresets(Array.isArray(res?.presets) ? res.presets : [])
+      setLibrary(Array.isArray(res?.library) ? res.library : [])
+    } catch (e) {
+      Message.error(getErrorMessage(e, '加载模板数据失败'))
+    } finally { setLoading(false) }
+  }
+
+  useEffect(() => { loadData() }, [])
+
+  const operatorStats = useMemo(() => {
+    const byKind = { source: 0, transform: 0, ai: 0, sink: 0 }
+    library.forEach((op) => { byKind[op.kind || 'transform'] = (byKind[op.kind || 'transform'] || 0) + 1 })
+    return byKind
+  }, [library])
+
+  const summaryCards = [
+    { label: '工作流模板', value: String(presets.length), note: '预设工作流，可直接使用或派生。' },
+    { label: '算子总数', value: String(library.length), note: `输入 ${operatorStats.source} / 处理 ${operatorStats.transform} / 智能 ${operatorStats.ai} / 输出 ${operatorStats.sink}` },
+    { label: '健康算子', value: String(library.filter((op) => op.health?.state === 'runnable').length), note: '可直接用于工作流编排。' },
+  ]
+
+  const presetColumns = [
+    {
+      title: '模板名称', width: 200,
+      render: (_, preset) => (
+        <div>
+          <Text style={{ fontWeight: 600 }}>{preset.label || preset.id}</Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 12 }}>{preset.description || '暂无描述'}</Text>
+        </div>
+      ),
+    },
+    {
+      title: '节点数', width: 80,
+      render: (_, preset) => <Text style={{ fontFeatureSettings: '"tnum"' }}>{(preset.nodes || []).length}</Text>,
+    },
+    {
+      title: '资源', width: 140,
+      render: (_, preset) => {
+        const r = preset.resources || {}
+        return `CPU ${r.cpu || 4} / GPU ${r.gpu || 0} / ${r.memory_gb || 16}GB`
+      },
+    },
+    {
+      title: '算子链路',
+      render: (_, preset) => {
+        const nodes = preset.nodes || []
+        if (!nodes.length) return <Text type="secondary">—</Text>
+        return (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {nodes.slice(0, 6).map((nodeId) => {
+              const op = library.find((o) => o.id === nodeId)
+              return <Tag key={nodeId} color={kindColors[op?.kind] || 'gray'} size="small">{op?.label || nodeId}</Tag>
+            })}
+            {nodes.length > 6 && <Tag size="small">+{nodes.length - 6}</Tag>}
+          </div>
+        )
+      },
+    },
+    {
+      title: '操作', width: 120,
+      render: (_, preset) => (
+        <Button size="mini" type="primary" onClick={() => {
+          navigate('/workflow')
+        }}>使用模板</Button>
+      ),
+    },
+  ]
+
+  const operatorColumns = [
+    {
+      title: '算子名称',
+      render: (_, op) => (
+        <div>
+          <Text style={{ fontWeight: 500 }}>{op.label || op.id}</Text>
+          <br />
+          <Text type="secondary" style={{ fontSize: 11 }}>{op.description || '暂无描述'}</Text>
+        </div>
+      ),
+    },
+    {
+      title: '类型', width: 80,
+      render: (_, op) => <Tag color={kindColors[op.kind] || 'gray'} size="small">{kindLabels[op.kind] || op.kind || '—'}</Tag>,
+    },
+    { title: '模态', width: 100, render: (_, op) => op.modality || '—' },
+    { title: '分类', width: 100, render: (_, op) => op.category || '—' },
+    { title: '运行时', width: 100, render: (_, op) => <Text style={{ fontSize: 12, fontFamily: 'monospace' }}>{op.runtime || '—'}</Text> },
+    {
+      title: '健康状态', width: 100,
+      render: (_, op) => {
+        const state = op.health?.state
+        const colorMap = { runnable: 'green', staged: 'orange', missing_env: 'red', missing_dependency: 'red', import_error: 'red' }
+        const labelMap = { runnable: '可运行', staged: '待集成', missing_env: '缺环境', missing_dependency: '缺依赖', import_error: '导入失败' }
+        return <Tag color={colorMap[state] || 'gray'} size="small">{labelMap[state] || state || '未知'}</Tag>
+      },
+    },
+  ]
+
   return (
-    <div style={{ padding: 24, background: 'var(--color-fill-1)', minHeight: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+    <div style={{ padding: 20, background: 'var(--color-fill-1)', minHeight: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
           <Title heading={5} style={{ margin: 0 }}>模板库</Title>
           <Text type="secondary">复用成熟的数据处理模板，减少重复编排并统一参数基线。</Text>
         </div>
         <Space>
-          <Button icon={<IconExport />}>导出模板</Button>
-          <Button type="primary" icon={<IconPlus />}>新建模板</Button>
+          <Button icon={<IconRefresh />} loading={loading} onClick={loadData}>刷新</Button>
+          <Button type="primary" icon={<IconPlus />} onClick={() => navigate('/workflow')}>新建工作流</Button>
         </Space>
       </div>
 
       <Row gutter={16} style={{ marginBottom: 16 }}>
-        {templateCards.map((item) => (
+        {summaryCards.map((item) => (
           <Col key={item.label} span={8}>
-            <Card bodyStyle={{ padding: 20 }}>
-              <div style={{ fontSize: 12, color: 'var(--color-text-3)' }}>{item.label}</div>
-              <div style={{ marginTop: 8, fontSize: 28, fontWeight: 700, color: 'var(--color-text-1)' }}>{item.value}</div>
-              <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.7, color: 'var(--color-text-2)' }}>{item.note}</div>
+            <Card bodyStyle={{ padding: 16 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>{item.label}</Text>
+              <div style={{ marginTop: 8, fontSize: 28, fontWeight: 700, fontFeatureSettings: '"tnum"' }}>{item.value}</div>
+              <Text type="secondary" style={{ fontSize: 12 }}>{item.note}</Text>
             </Card>
           </Col>
         ))}
       </Row>
 
-      <Card
-        title="模板目录"
-        extra={<Button type="text" icon={<IconCopy />}>从模板派生工作流</Button>}
-        bodyStyle={{ padding: 0 }}
-      >
-        <Table rowKey="key" columns={templateColumns} data={templateData} pagination={false} borderCell />
-      </Card>
+      {loading ? (
+        <div style={{ padding: 60, textAlign: 'center' }}><Spin size={32} /></div>
+      ) : (
+        <>
+          <Card title="工作流模板" bodyStyle={{ padding: 0 }} style={{ marginBottom: 16 }}>
+            {presets.length ? (
+              <Table rowKey="id" columns={presetColumns} data={presets} pagination={false} size="small" />
+            ) : (
+              <div style={{ padding: 40 }}><Empty description="暂无工作流模板" /></div>
+            )}
+          </Card>
+
+          <Card title="算子目录" bodyStyle={{ padding: 0 }} extra={<Text type="secondary" style={{ fontSize: 12 }}>共 {library.length} 个算子</Text>}>
+            {library.length ? (
+              <Table rowKey="id" columns={operatorColumns} data={library} pagination={{ pageSize: 10 }} size="small" />
+            ) : (
+              <div style={{ padding: 40 }}><Empty description="暂无算子数据" /></div>
+            )}
+          </Card>
+        </>
+      )}
     </div>
   )
 }
