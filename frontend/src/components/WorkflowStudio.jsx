@@ -92,7 +92,7 @@ function NodeParamForm({ node, onUpdate, llmModels = [], connectedParams = {} })
   )
 }
 
-export default function WorkflowStudio({ sourceHint = '', platformSettings = null, onBanner }) {
+export default function WorkflowStudio({ sourceHint = '', platformSettings = null, onBanner, initialPresetId = '' }) {
   const canvasRef = useRef(null)
   const nodesRef = useRef([])
   const edgesRef = useRef([])
@@ -132,12 +132,15 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
       const pre = Array.isArray(r?.presets) ? r.presets : []
       setLibrary(lib); setPresets(pre)
       if (pre.length) {
-        const lm = new Map(lib.map(i => [i.id, i]))
-        const { presetNodes, presetEdges } = buildPresetGraph(pre[0], lm)
-        setSelectedPresetId(pre[0].id); setWorkflowName(pre[0].id)
-        setCanvasNodes(presetNodes); setEdges(presetEdges)
-        setResources(pre[0].resources || defaultResources)
-        setSelectedNodeId(presetNodes[0]?.id || '')
+        const targetPreset = initialPresetId ? pre.find(p => p.id === initialPresetId) : pre[0]
+        if (targetPreset) {
+          const lm = new Map(lib.map(i => [i.id, i]))
+          const { presetNodes, presetEdges } = buildPresetGraph(targetPreset, lm)
+          setSelectedPresetId(targetPreset.id); setWorkflowName(targetPreset.id)
+          setCanvasNodes(presetNodes); setEdges(presetEdges)
+          setResources(targetPreset.resources || defaultResources)
+          setSelectedNodeId(presetNodes[0]?.id || '')
+        }
       }
     }).catch(e => setError(getErrorMessage(e, '加载失败'))).finally(() => setLoading(false))
   }, [])

@@ -7,8 +7,18 @@ export default function WorkflowCenterPage() {
   const [platformSettings, setPlatformSettings] = useState(null)
   const [workbenchSettings, setWorkbenchSettings] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [initialPresetId, setInitialPresetId] = useState('')
 
   useEffect(() => {
+    // 读取从模板库传来的 preset ID
+    try {
+      const pid = sessionStorage.getItem('workflow_preset_id')
+      if (pid) {
+        setInitialPresetId(pid)
+        sessionStorage.removeItem('workflow_preset_id')
+      }
+    } catch {}
+
     const load = async () => {
       try {
         const [p, w] = await Promise.all([
@@ -39,6 +49,7 @@ export default function WorkflowCenterPage() {
       <WorkflowStudio
         sourceHint={sourceHint}
         platformSettings={platformSettings}
+        initialPresetId={initialPresetId}
         onBanner={(type, message) => {
           if (type === 'error') Message.error(message)
           else if (type === 'success') Message.success(message)
