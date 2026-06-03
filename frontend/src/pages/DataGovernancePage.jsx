@@ -13,6 +13,7 @@ import {
 } from '@arco-design/web-react'
 import {
   IconCheckCircle,
+  IconEdit,
   IconFile,
   IconHistory,
   IconRefresh,
@@ -194,6 +195,7 @@ export default function DataGovernancePage() {
   const [versionStats, setVersionStats] = useState([])
   const [externalTables, setExternalTables] = useState([])
   const [versionList, setVersionList] = useState([])
+  const [entityData, setEntityData] = useState(null)
   const [selectedCatalog, setSelectedCatalog] = useState('')
   const [selectedSchema, setSelectedSchema] = useState('')
   const [selectedTable, setSelectedTable] = useState('')
@@ -373,10 +375,19 @@ export default function DataGovernancePage() {
     }
   }
 
+  const loadEntities = async () => {
+    try {
+      const response = await api.getEntities()
+      setEntityData(response?.data || response || null)
+    } catch {
+      setEntityData(null)
+    }
+  }
+
   const refreshPage = async () => {
     setRefreshing(true)
     try {
-      await Promise.all([loadCatalogs(), loadVersionStats(), loadExternalTables()])
+      await Promise.all([loadCatalogs(), loadVersionStats(), loadExternalTables(), loadEntities()])
     } catch (error) {
       Message.error(getErrorMessage(error, '刷新数据治理目录失败'))
     } finally {
@@ -452,6 +463,14 @@ export default function DataGovernancePage() {
                 {tag.text}
               </PrdTag>
             ))}
+            <Button
+              size="small"
+              type="outline"
+              icon={<IconEdit />}
+              onClick={() => Message.info('功能开发中')}
+            >
+              编辑标签
+            </Button>
           </div>
         </div>
         <div className="dataset-hero-side">

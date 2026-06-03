@@ -25,6 +25,7 @@ import {
   IconUp,
 } from '@arco-design/web-react/icon'
 import api, { getErrorMessage } from '@/api'
+import { dorisGet } from '@/api/doris'
 import ChartPanel from '@/components/ChartPanel.jsx'
 import { formatNumber, formatPercent } from '@/utils/format'
 
@@ -192,7 +193,9 @@ export default function DashboardPage() {
   const [dorisStatus, setDorisStatus] = useState(null)
   const [activeAlerts, setActiveAlerts] = useState([])
   const [refreshing, setRefreshing] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [user, setUser] = useState(null)
+  const [knowledgeGraph, setKnowledgeGraph] = useState(null)
 
   const loadData = async () => {
     setRefreshing(true)
@@ -213,16 +216,20 @@ export default function DashboardPage() {
       })
       setDorisStatus(items.find((item) => item.id === 'doris') || null)
       try {
-        const clusters = await fetch('/api/doris/clusters', { credentials: 'include' }).then((r) => r.json())
+        const clusters = await dorisGet('/clusters')
         const clusterId = clusters?.clusters?.[0]?.id
         if (clusterId) {
-          const alerts = await fetch(`/api/doris/alerts/records?cluster_id=${clusterId}&limit=5`, { credentials: 'include' }).then((r) => r.json())
+          const alerts = await dorisGet('/alerts/records', { cluster_id: clusterId, limit: 5 })
           setActiveAlerts(alerts?.records || [])
         } else { setActiveAlerts([]) }
       } catch { setActiveAlerts([]) }
+      try {
+        const kg = await api.getKnowledgeGraph()
+        setKnowledgeGraph(kg || null)
+      } catch { setKnowledgeGraph(null) }
     } catch (error) {
       Message.error(getErrorMessage(error, '加载平台总览失败'))
-    } finally { setRefreshing(false) }
+    } finally { setRefreshing(false); setLoaded(true) }
   }
 
   useEffect(() => {
@@ -292,6 +299,40 @@ export default function DashboardPage() {
         </div>
       </Card>
 
+      {/* ── 新手引导 ──────────────────────────────────────────────────── */}
+      {loaded && stats.total_files === 0 && (
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '20px 24px' }}>
+          <Title heading={6} style={{ margin: '0 0 4px' }}>欢迎使用多模态数据湖仓</Title>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 20 }}>平台尚未接入任何数据，按以下步骤快速开始：</Text>
+          <Row gutter={24}>
+            <Col span={8}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '16px 0' }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#E8F3FF', color: '#165DFF', display: 'grid', placeItems: 'center', fontSize: 18, fontWeight: 700 }}>1</div>
+                <Text style={{ fontWeight: 600 }}>上传第一个文件</Text>
+                <Text type="secondary" style={{ fontSize: 12, textAlign: 'center' }}>支持文档、图片、音视频等多种格式</Text>
+                <Button type="primary" size="small" onClick={() => navigate('/ingestion/upload')}>去上传</Button>
+              </div>
+            </Col>
+            <Col span={8}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '16px 0' }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#F5E8FF', color: '#722ED1', display: 'grid', placeItems: 'center', fontSize: 18, fontWeight: 700 }}>2</div>
+                <Text style={{ fontWeight: 600 }}>配置数据来源</Text>
+                <Text type="secondary" style={{ fontSize: 12, textAlign: 'center' }}>接入数据库、API 或文件系统等数据源</Text>
+                <Button type="outline" size="small" onClick={() => navigate('/settings/access')}>去配置</Button>
+              </div>
+            </Col>
+            <Col span={8}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '16px 0' }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#E8F8EA', color: '#00B42A', display: 'grid', placeItems: 'center', fontSize: 18, fontWeight: 700 }}>3</div>
+                <Text style={{ fontWeight: 600 }}>开始查询分析</Text>
+                <Text type="secondary" style={{ fontSize: 12, textAlign: 'center' }}>使用 SQL 或自然语言探索您的数据</Text>
+                <Button type="outline" size="small" onClick={() => navigate('/lake-query/sql')}>去查询</Button>
+              </div>
+            </Col>
+          </Row>
+        </Card>
+      )}
+
       {/* ── KPI 卡片 ────────────────────────────────────────────────── */}
       <Row gutter={16}>
         <Col span={6}>
@@ -327,7 +368,7 @@ export default function DashboardPage() {
             label="数据资产总量"
             value={formatNumber(stats.total_files)}
             sub={`今日新增 ${formatNumber(stats.today_files)}`}
-            sparkPoints={fileSpark.length > 1 ? fileSpark : [12, 14, 13, 18, 22, 26, 24]}
+            sparkPoints={fileSpark.length > 1 ? fileSpark : []}
             sparkColor="#722ED1"
           />
         </Col>
@@ -340,7 +381,7 @@ export default function DashboardPage() {
             label="本周任务成功率"
             value={formatPercent(stats.week_success_rate || 0)}
             sub={`${formatNumber(stats.week_tasks_success)} / ${formatNumber(stats.week_tasks_total)} 成功`}
-            sparkPoints={taskSpark.length > 1 ? taskSpark : [2, 3, 4, 6, 5, 7, 6]}
+            sparkPoints={taskSpark.length > 1 ? taskSpark : []}
             sparkColor="#00B42A"
           />
         </Col>
@@ -395,6 +436,14 @@ export default function DashboardPage() {
             <StatusItem title="入湖任务" meta={`近 7 天 ${formatNumber(stats.week_tasks_total)} 次，成功率 ${formatPercent(stats.week_success_rate || 0)}`} tag={componentSummary.offline ? '需关注' : '稳定'} color={componentSummary.offline ? 'orange' : 'green'} />
             <StatusItem title="组件状态" meta={`${componentSummary.online}/${componentSummary.total} 在线`} tag={componentSummary.offline ? `${componentSummary.offline} 异常` : '正常'} color={componentSummary.offline ? 'red' : 'green'} />
             <StatusItem title="向量资产" meta={`文本 ${formatNumber(stats.text_rows)} / 图像 ${formatNumber(stats.image_rows)}`} tag="可检索" color="blue" />
+            {knowledgeGraph && (
+              <StatusItem
+                title="知识图谱"
+                meta={`${Array.isArray(knowledgeGraph.entities) ? knowledgeGraph.entities.length : (knowledgeGraph.entity_count ?? 0)} 个实体 / ${Array.isArray(knowledgeGraph.relationships) ? knowledgeGraph.relationships.length : (knowledgeGraph.relationship_count ?? 0)} 个关系`}
+                tag="已构建"
+                color="purple"
+              />
+            )}
           </Card>
         </Col>
       </Row>

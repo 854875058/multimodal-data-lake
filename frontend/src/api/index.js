@@ -343,6 +343,10 @@ const api = {
     return apiClient.get(`/multimodal/traces/${encodeURIComponent(traceId)}`)
   },
 
+  getMultimodalTraces(params = {}) {
+    return apiClient.get('/multimodal/traces', { params })
+  },
+
   getMultimodalMediaUrl(path, kind = 'image') {
     const params = new URLSearchParams()
     params.set('path', path || '')

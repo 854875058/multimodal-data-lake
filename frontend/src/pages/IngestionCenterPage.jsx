@@ -22,27 +22,17 @@ const TAB_MAP = {
   upload: '本地上传',
 }
 
-function StatCard({ title, value, note }) {
-  return (
-    <Card bodyStyle={{ padding: 18 }}>
-      <div style={{ fontSize: 12, color: 'var(--color-text-3)' }}>{title}</div>
-      <div style={{ marginTop: 8, fontSize: 28, fontWeight: 700, color: 'var(--color-text-1)' }}>{value}</div>
-      <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-text-2)', lineHeight: 1.7 }}>{note}</div>
-    </Card>
-  )
-}
-
-function StepCard({ index, title, copy, active }) {
+function StepCard({ index, title, copy, active, current }) {
   return (
     <div
       style={{
         padding: 16,
         borderRadius: 14,
-        border: `1px solid ${active ? 'rgba(22, 93, 255, 0.22)' : 'var(--color-border-2)'}`,
-        background: active ? 'rgba(22, 93, 255, 0.05)' : '#fff',
+        border: `1px solid ${current ? 'rgba(22, 93, 255, 0.4)' : active ? 'rgba(22, 93, 255, 0.22)' : 'var(--color-border-2)'}`,
+        background: current ? 'rgba(22, 93, 255, 0.08)' : active ? 'rgba(22, 93, 255, 0.05)' : '#fff',
       }}
     >
-      <div style={{ fontSize: 12, color: 'var(--color-text-3)' }}>{index}</div>
+      <div style={{ fontSize: 12, color: current ? '#165dff' : 'var(--color-text-3)' }}>{index}{current ? ' ← 当前' : ''}</div>
       <div style={{ marginTop: 6, fontSize: 15, fontWeight: 700, color: 'var(--color-text-1)' }}>{title}</div>
       <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.7, color: 'var(--color-text-2)' }}>{copy}</div>
     </div>
@@ -87,27 +77,12 @@ function OverviewTab({ summary, onGoTab, onGoWorkflow, onGoTasks, refreshing, on
         </div>
       </div>
 
-      <Row gutter={16}>
-        <Col span={6}>
-          <StatCard title="来源类型" value={summary.sourceType} note="对象存储与 SFTP 接入统一纳入同一接入规范。" />
-        </Col>
-        <Col span={6}>
-          <StatCard title="活动任务" value={formatNumber(summary.activeJobs)} note="用于快速判断当前是否适合继续发起新的批量任务。" />
-        </Col>
-        <Col span={6}>
-          <StatCard title="任务总量" value={formatNumber(summary.totalJobs)} note="用于观察接入执行规模和最近一段时间的入湖频率。" />
-        </Col>
-        <Col span={6}>
-          <StatCard title="计算入口" value={summary.rayShort} note="复杂流程已迁移到湖计算，接入中心聚焦来源接入与上传。" />
-        </Col>
-      </Row>
-
       <Card title="推荐流程" bodyStyle={{ padding: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-          <StepCard index="01" title="来源接入" copy="验证数据源、扫描对象并筛选待入湖数据。" active />
-          <StepCard index="02" title="本地上传" copy="处理离线交付文件、压缩包和一次性批量资料。" active />
-          <StepCard index="03" title="湖计算编排" copy="复杂任务切入湖计算域进行工作流编排与资源调度。" active />
-          <StepCard index="04" title="任务治理" copy="进入任务中心统一观察执行状态、结果摘要和异常定位。" active />
+          <StepCard index="01" title="来源接入" copy="验证数据源、扫描对象并筛选待入湖数据。" active current={summary.activeJobs === 0 && summary.totalJobs === 0} />
+          <StepCard index="02" title="本地上传" copy="处理离线交付文件、压缩包和一次性批量资料。" active={summary.totalJobs > 0} current={summary.activeJobs === 0 && summary.totalJobs > 0} />
+          <StepCard index="03" title="湖计算编排" copy="复杂任务切入湖计算域进行工作流编排与资源调度。" active={summary.activeJobs > 0} current={summary.activeJobs > 0} />
+          <StepCard index="04" title="任务治理" copy="进入任务中心统一观察执行状态、结果摘要和异常定位。" active={summary.totalJobs > 0 && summary.activeJobs === 0} current={false} />
         </div>
       </Card>
 

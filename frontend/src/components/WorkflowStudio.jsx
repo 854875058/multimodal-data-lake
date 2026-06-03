@@ -100,6 +100,11 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
   const dragRef = useRef(null)
   const connectRef = useRef(null)
   const minimapRef = useRef(null)
+  const skipHistoryRef = useRef(false)
+  const lastSnapRef = useRef('')
+  const historyRef = useRef([])
+  const historyIdxRef = useRef(-1)
+  const savedTimerRef = useRef(null)
 
   const [library, setLibrary] = useState([])
   const [presets, setPresets] = useState([])
@@ -120,6 +125,9 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
   const [llmModels, setLlmModels] = useState([])
   const [zoom, setZoom] = useState(1)
   const [, forceUpdate] = useState(0)
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
+  const [savedIndicator, setSavedIndicator] = useState(false)
 
   nodesRef.current = canvasNodes
   edgesRef.current = edges
@@ -131,6 +139,20 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
       const lib = Array.isArray(r?.library) ? r.library : []
       const pre = Array.isArray(r?.presets) ? r.presets : []
       setLibrary(lib); setPresets(pre)
+      if (!initialPresetId) {
+        try {
+          const saved = localStorage.getItem('workflow_studio_autosave')
+          if (saved) {
+            const data = JSON.parse(saved)
+            if (data.nodes?.length) {
+              setCanvasNodes(data.nodes); setEdges(data.edges || [])
+              if (data.workflowName) setWorkflowName(data.workflowName)
+              if (data.resources) setResources(data.resources)
+              setSelectedNodeId(''); return
+            }
+          }
+        } catch {}
+      }
       if (pre.length) {
         const targetPreset = initialPresetId ? pre.find(p => p.id === initialPresetId) : pre[0]
         if (targetPreset) {
@@ -144,6 +166,64 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
       }
     }).catch(e => setError(getErrorMessage(e, '加载失败'))).finally(() => setLoading(false))
   }, [])
+
+  const undo = useCallback(() => {
+    if (historyIdxRef.current <= 0) return
+    historyIdxRef.current -= 1
+    const snap = historyRef.current[historyIdxRef.current]
+    skipHistoryRef.current = true
+    lastSnapRef.current = JSON.stringify({ nodes: snap.nodes, edges: snap.edges })
+    setCanvasNodes(snap.nodes); setEdges(snap.edges)
+    setCanUndo(historyIdxRef.current > 0)
+    setCanRedo(historyIdxRef.current < historyRef.current.length - 1)
+  }, [])
+
+  const redo = useCallback(() => {
+    if (historyIdxRef.current >= historyRef.current.length - 1) return
+    historyIdxRef.current += 1
+    const snap = historyRef.current[historyIdxRef.current]
+    skipHistoryRef.current = true
+    lastSnapRef.current = JSON.stringify({ nodes: snap.nodes, edges: snap.edges })
+    setCanvasNodes(snap.nodes); setEdges(snap.edges)
+    setCanUndo(historyIdxRef.current > 0)
+    setCanRedo(historyIdxRef.current < historyRef.current.length - 1)
+  }, [])
+
+  useEffect(() => {
+    if (skipHistoryRef.current) { skipHistoryRef.current = false; return }
+    const snap = JSON.stringify({ nodes: canvasNodes, edges })
+    if (snap === lastSnapRef.current) return
+    lastSnapRef.current = snap
+    const trimmed = historyRef.current.slice(0, historyIdxRef.current + 1)
+    trimmed.push({ nodes: JSON.parse(JSON.stringify(canvasNodes)), edges: JSON.parse(JSON.stringify(edges)) })
+    while (trimmed.length > 50) trimmed.shift()
+    historyRef.current = trimmed
+    historyIdxRef.current = trimmed.length - 1
+    setCanUndo(historyIdxRef.current > 0)
+    setCanRedo(false)
+  }, [canvasNodes, edges])
+
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [undo, redo])
+
+  useEffect(() => {
+    if (!canvasNodes.length && !edges.length) return
+    try {
+      localStorage.setItem('workflow_studio_autosave', JSON.stringify({ nodes: canvasNodes, edges, workflowName, resources }))
+      setSavedIndicator(true)
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+      savedTimerRef.current = setTimeout(() => setSavedIndicator(false), 2000)
+    } catch {}
+  }, [canvasNodes, edges, workflowName, resources])
 
   const libraryMap = useMemo(() => new Map(library.map(i => [i.id, i])), [library])
   const filteredLibrary = useMemo(() => {
@@ -341,7 +421,11 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
     setCanvasNodes(p => [...p, n]); setSelectedNodeId(n.id)
   }
 
-  const clearAll = () => { setCanvasNodes([]); setEdges([]); setSelectedPresetId(''); setSelectedNodeId(''); setConnectSourceId(''); setJobSpec(null) }
+  const clearAll = () => {
+    if (!window.confirm('确定要清空画布吗？所有未导出的内容将丢失。')) return
+    setCanvasNodes([]); setEdges([]); setSelectedPresetId(''); setSelectedNodeId(''); setConnectSourceId(''); setJobSpec(null)
+    try { localStorage.removeItem('workflow_studio_autosave') } catch {}
+  }
 
   const updateNodeConfig = (patch) => {
     if (!selectedNodeId) return
@@ -490,6 +574,7 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
           <span className="badge">{nodeStats.total} 节点</span>
           <span className="badge subtle">{nodeStats.edges} 连线</span>
           {connectSourceId && <span className="badge warning">连线中</span>}
+          {savedIndicator && <span className="badge" style={{ background: '#e8ffea', color: '#1B9E5C' }}>已自动保存</span>}
         </div>
         <div className="workflow-toolbar-right">
           <button className="button button-small button-secondary" onClick={loadPipeline}>导入</button>
@@ -507,6 +592,9 @@ export default function WorkflowStudio({ sourceHint = '', platformSettings = nul
             <span>{Math.round(zoom * 100)}%</span>
             <button onClick={() => setZoom(z => Math.max(0.3, z - 0.1))} title="缩小">−</button>
             <button onClick={() => setZoom(1)} title="重置">↺</button>
+            <span style={{ width: 1, height: 16, background: 'var(--color-border-2)', margin: '0 4px' }} />
+            <button onClick={undo} disabled={!canUndo} title="撤销 (Ctrl+Z)">↩</button>
+            <button onClick={redo} disabled={!canRedo} title="重做 (Ctrl+Shift+Z)">↪</button>
           </div>
 
           {/* 小地图 - 跟随画布位置 */}

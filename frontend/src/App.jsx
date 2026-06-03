@@ -13,6 +13,7 @@ import {
   Typography,
 } from '@arco-design/web-react'
 import {
+  IconApps,
   IconBug,
   IconCalendarClock,
   IconCaretDown,
@@ -27,6 +28,7 @@ import {
   IconLock,
   IconNotification,
   IconRobot,
+  IconSafe,
   IconSearch,
   IconSettings,
   IconStorage,
@@ -36,6 +38,8 @@ import {
 } from '@arco-design/web-react/icon'
 import { clearAuthSession, loadAuthSession, saveAuthSession, subscribeAuthSession } from '@/auth/session'
 import boncLogo from '@/assets/bonc.jpg'
+import CommandPalette from './components/CommandPalette.jsx'
+import NotificationCenter from './components/NotificationCenter.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 
@@ -88,9 +92,9 @@ const navGroups = [
     items: [
       { path: '/lake-query/sql', label: 'SQL 查询', icon: <IconCommand /> },
       { path: '/lake-query/retrieval', label: '统一检索', icon: <IconSearch /> },
-      { path: '/lake-query/vector', label: '向量检索', icon: <IconSearch />, hidden: true },
-      { path: '/lake-query/multimodal', label: '多模态检索', icon: <IconLayout />, hidden: true },
-      { path: '/lake-query/hybrid', label: '混合检索', icon: <IconCommon />, hidden: true },
+      { path: '/lake-query/vector', label: '向量检索', icon: <IconSearch /> },
+      { path: '/lake-query/multimodal', label: '多模态检索', icon: <IconLayout /> },
+      { path: '/lake-query/hybrid', label: '混合检索', icon: <IconCommon /> },
       { path: '/lake-query/copilot', label: 'AI 数据副驾驶', icon: <IconRobot /> },
       { path: '/lake-query/annotation', label: '自动化标注', icon: <IconExport /> },
     ],
@@ -98,7 +102,7 @@ const navGroups = [
   {
     key: 'lake-compute',
     title: '湖计算',
-    icon: <IconCommand />,
+    icon: <IconApps />,
     items: [
       { path: '/workflow', label: '工作流编排', icon: <IconLayout /> },
       { path: '/compute/operators', label: '算子中心', icon: <IconCommon /> },
@@ -120,15 +124,15 @@ const navGroups = [
   {
     key: 'lake-governance',
     title: '湖治理',
-    icon: <IconCalendarClock />,
+    icon: <IconSafe />,
     items: [
-      { path: '/governance', label: '数据治理', icon: <IconCalendarClock /> },
+      { path: '/governance', label: '数据治理', icon: <IconSafe /> },
     ],
   },
   {
     key: 'mpp-database',
     title: '湖运维',
-    icon: <IconCommon />,
+    icon: <IconDashboard />,
     items: [
       { path: '/mpp/cluster', label: '集群管理', icon: <IconCommon /> },
       { path: '/mpp/sql', label: 'SQL 编辑器', icon: <IconCommand /> },
@@ -223,6 +227,18 @@ function AppShell({ authSession, onLogout }) {
     }))
     .filter((group) => group.items.length > 0)
   const [collapsed, setCollapsed] = useState(false)
+  const [paletteVisible, setPaletteVisible] = useState(false)
+
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setPaletteVisible((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const handleLogoutClick = () => {
     onLogout()
@@ -358,29 +374,41 @@ function AppShell({ authSession, onLogout }) {
             <Breadcrumb.Item>{currentNav.groupTitle}</Breadcrumb.Item>
             <Breadcrumb.Item>{currentNav.label}</Breadcrumb.Item>
           </Breadcrumb>
-          <Dropdown droplist={userMenu} trigger="click" position="br">
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                cursor: 'pointer',
-                padding: '4px 8px',
-                borderRadius: 6,
-              }}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Button
+              type="text"
+              icon={<IconSearch />}
+              onClick={() => setPaletteVisible(true)}
+              style={{ color: 'var(--color-text-2)', fontSize: 16 }}
             >
-              <Avatar size={28} style={{ backgroundColor: currentUser?.is_admin ? '#165dff' : '#7bc616' }}>
-                {getUserInitials(currentUser)}
-              </Avatar>
-              <div style={{ lineHeight: 1.2 }}>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{getDisplayName(currentUser)}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-3)' }}>
-                  {currentUser?.is_admin ? '系统管理员' : '平台用户'}
+              <span style={{ fontSize: 12, marginLeft: 4, color: 'var(--color-text-3)' }}>⌘K</span>
+            </Button>
+            <NotificationCenter onNavigate={(path) => navigate(path)} />
+            <div style={{ width: 1, height: 20, background: 'var(--color-border-2)', margin: '0 6px' }} />
+            <Dropdown droplist={userMenu} trigger="click" position="br">
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  cursor: 'pointer',
+                  padding: '4px 8px',
+                  borderRadius: 6,
+                }}
+              >
+                <Avatar size={28} style={{ backgroundColor: currentUser?.is_admin ? '#165dff' : '#7bc616' }}>
+                  {getUserInitials(currentUser)}
+                </Avatar>
+                <div style={{ lineHeight: 1.2 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{getDisplayName(currentUser)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-3)' }}>
+                    {currentUser?.is_admin ? '系统管理员' : '平台用户'}
+                  </div>
                 </div>
+                <IconCaretDown style={{ color: 'var(--color-text-3)' }} />
               </div>
-              <IconCaretDown style={{ color: 'var(--color-text-3)' }} />
-            </div>
-          </Dropdown>
+            </Dropdown>
+          </div>
         </Header>
 
         <Content style={{ overflow: 'auto', background: 'var(--color-fill-1)' }}>
@@ -433,6 +461,12 @@ function AppShell({ authSession, onLogout }) {
           </Suspense>
         </Content>
       </Layout>
+
+      <CommandPalette
+        visible={paletteVisible}
+        onClose={() => setPaletteVisible(false)}
+        onNavigate={(path) => navigate(path)}
+      />
     </Layout>
   )
 }

@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Button,
+  Checkbox,
   Descriptions,
   Form,
   Input,
+  InputNumber,
   Message,
   Modal,
+  Select,
   Space,
   Spin,
   Table,
@@ -111,6 +114,7 @@ export default function OperatorCenterPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [selectedOperatorDetail, setSelectedOperatorDetail] = useState(null)
   const [form] = Form.useForm()
+  const [advancedMode, setAdvancedMode] = useState(false)
 
   const loadCatalog = async () => {
     setLoading(true)
@@ -173,11 +177,19 @@ export default function OperatorCenterPage() {
 
   const openExecuteModal = (operator) => {
     setSelectedOperator(operator)
-    form.setFieldsValue({
+    setAdvancedMode(false)
+    const fieldValues = {
       source_path: '',
       sink_path: '',
       params_json: buildDefaultParamsText(operator),
-    })
+    }
+    const schema = operator?.params_schema || {}
+    for (const [key, meta] of Object.entries(schema)) {
+      if (Object.prototype.hasOwnProperty.call(meta || {}, 'default')) {
+        fieldValues[`param_${key}`] = meta.default
+      }
+    }
+    form.setFieldsValue(fieldValues)
     setExecuteModalVisible(true)
   }
 
@@ -186,11 +198,24 @@ export default function OperatorCenterPage() {
     try {
       const values = await form.validate()
       let params = {}
-      try {
-        params = values.params_json ? JSON.parse(values.params_json) : {}
-      } catch {
-        Message.error('参数 JSON 格式不正确')
-        return
+
+      const schema = selectedOperator?.params_schema || {}
+      const hasSchema = Object.keys(schema).length > 0
+
+      if (hasSchema && !advancedMode) {
+        for (const [key, meta] of Object.entries(schema)) {
+          const val = values[`param_${key}`]
+          if (val !== undefined && val !== null && val !== '') {
+            params[key] = val
+          }
+        }
+      } else {
+        try {
+          params = values.params_json ? JSON.parse(values.params_json) : {}
+        } catch {
+          Message.error('参数 JSON 格式不正确')
+          return
+        }
       }
 
       setSubmitting(true)
@@ -540,9 +565,51 @@ export default function OperatorCenterPage() {
           <FormItem label="输出目录" field="sink_path" rules={[{ required: true, message: '请输入 sink_path' }]}>
             <Input placeholder="例如：E:\\data\\clean_texts" />
           </FormItem>
-          <FormItem label="参数 JSON" field="params_json">
-            <Input.TextArea autoSize={{ minRows: 8, maxRows: 16 }} style={{ fontFamily: 'monospace', fontSize: 12 }} />
-          </FormItem>
+          {selectedOperator?.params_schema && Object.keys(selectedOperator.params_schema).length > 0 && !advancedMode ? (
+            Object.entries(selectedOperator.params_schema).map(([key, meta]) => {
+              const type = meta?.type || 'string'
+              const isBool = type === 'boolean'
+              const isNum = type === 'integer' || type === 'number'
+              const hasEnum = Array.isArray(meta?.enum) && meta.enum.length > 0
+
+              return (
+                <FormItem
+                  key={key}
+                  label={key}
+                  field={`param_${key}`}
+                  initialValue={isBool ? (meta?.default ?? false) : meta?.default}
+                  triggerPropName={isBool ? 'checked' : undefined}
+                  rules={meta?.required ? [{ required: true, message: `请输入 ${key}` }] : []}
+                  extra={meta?.description}
+                >
+                  {hasEnum ? (
+                    <Select placeholder="请选择">
+                      {meta.enum.map((v) => (
+                        <Select.Option key={String(v)} value={v}>{String(v)}</Select.Option>
+                      ))}
+                    </Select>
+                  ) : isBool ? (
+                    <Checkbox />
+                  ) : isNum ? (
+                    <InputNumber placeholder={meta?.description || '请输入数字'} style={{ width: '100%' }} />
+                  ) : (
+                    <Input placeholder={meta?.description || '请输入'} />
+                  )}
+                </FormItem>
+              )
+            })
+          ) : (
+            <FormItem label="参数 JSON" field="params_json">
+              <Input.TextArea autoSize={{ minRows: 8, maxRows: 16 }} style={{ fontFamily: 'monospace', fontSize: 12 }} />
+            </FormItem>
+          )}
+          {selectedOperator?.params_schema && Object.keys(selectedOperator.params_schema).length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <Checkbox checked={advancedMode} onChange={setAdvancedMode}>
+                <Text type="secondary" style={{ fontSize: 12 }}>高级模式（直接编辑 JSON）</Text>
+              </Checkbox>
+            </div>
+          )}
         </Form>
       </Modal>
     </div>

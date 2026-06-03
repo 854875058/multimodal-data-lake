@@ -4,6 +4,7 @@ import {
   Descriptions,
   Empty,
   Grid,
+  Input,
   Message,
   Popconfirm,
   Select,
@@ -158,6 +159,7 @@ export default function FilesPage() {
   const [rollingVersion, setRollingVersion] = useState(null)
   const [compacting, setCompacting] = useState(false)
   const [fileTypes, setFileTypes] = useState([])
+  const [searchKeyword, setSearchKeyword] = useState('')
 
   const versionStatsMap = useMemo(
     () => Object.fromEntries((versionStats || []).map((item) => [item.table, item])),
@@ -168,6 +170,18 @@ export default function FilesPage() {
     () => (tables || []).map((item) => normalizeDataset(item, versionStatsMap)),
     [tables, versionStatsMap],
   )
+
+  const filteredDatasets = useMemo(() => {
+    const query = searchKeyword.trim().toLowerCase()
+    if (!query) return datasets
+    return datasets.filter((item) => {
+      const haystack = [item.name, item.label, item.description, item.engine]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [datasets, searchKeyword])
 
   const selectedDataset = useMemo(
     () => datasets.find((item) => item.name === selectedTable) || null,
@@ -540,11 +554,19 @@ export default function FilesPage() {
             sub="按当前 Schema 查看统一数据集清单，优先承接 Lance / 外表 / 目录视图"
             extra={<PrdTag kind="info">{selectedSchema || '未选择'}</PrdTag>}
           >
+            <div style={{ marginBottom: 12 }}>
+              <Input.Search
+                allowClear
+                placeholder="搜索数据集名称、描述或引擎"
+                value={searchKeyword}
+                onChange={setSearchKeyword}
+              />
+            </div>
             <div className="dataset-list">
-              {datasets.length === 0 ? (
-                <Empty description="当前目录下暂无数据集" />
+              {filteredDatasets.length === 0 ? (
+                <Empty description={searchKeyword ? '无匹配的数据集' : '当前目录下暂无数据集'} />
               ) : (
-                datasets.map((item) => (
+                filteredDatasets.map((item) => (
                   <button
                     key={item.name}
                     type="button"

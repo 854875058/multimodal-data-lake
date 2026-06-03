@@ -33,6 +33,7 @@ import {
 import api, { getErrorMessage } from '@/api'
 import { dorisGet, dorisPost, dorisDelete } from '@/api/doris'
 import { truncateText } from '@/utils/format'
+import SqlEditor from '@/components/SqlEditor'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
@@ -297,6 +298,17 @@ function SqlWorkspaceTab() {
   const [generatedSql, setGeneratedSql] = useState('')
   const [converting, setConverting] = useState(false)
 
+  const sqlEditorTables = useMemo(() => {
+    const tables = []
+    databases.forEach((db) => {
+      const tableList = tablesByDb[db] || []
+      tableList.forEach((tableName) => {
+        tables.push(`${db}.${tableName}`)
+      })
+    })
+    return tables
+  }, [databases, tablesByDb])
+
   useEffect(() => {
     dorisGet('/clusters')
       .then((data) => {
@@ -474,11 +486,18 @@ function SqlWorkspaceTab() {
                 <Button type="primary" icon={<IconPlayArrow />} onClick={handleExecute} loading={executing} disabled={!clusterId}>执行 SQL</Button>
                 <Text type="secondary">支持 Ctrl + Enter</Text>
               </Space>
-              <TextArea value={sql} onChange={setSql} autoSize={{ minRows: 10, maxRows: 18 }} style={{ fontFamily: 'Consolas, Monaco, monospace', fontSize: 13 }} />
+              <SqlEditor
+                value={sql}
+                onChange={setSql}
+                onExecute={handleExecute}
+                height="320px"
+                dialect="MySQL"
+                tables={sqlEditorTables}
+              />
               {result ? (
                 <div style={{ marginTop: 16 }}>
                   <ResultSummary result={result} />
-                  {result.columns.length > 0 ? <Table columns={buildTableColumns(result.columns)} data={result.rows} rowKey={(_, index) => index} pagination={{ pageSize: 20 }} scroll={{ x: 'max-content' }} size="small" border /> : <Empty description="无结果集" />}
+                  {result.columns.length > 0 ? <Table columns={buildTableColumns(result.columns)} data={result.rows} rowKey={(_, index) => index} pagination={{ pageSize: 50 }} scroll={{ x: 'max-content' }} size="small" border /> : <Empty description="无结果集" />}
                 </div>
               ) : null}
             </div>
