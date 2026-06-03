@@ -98,9 +98,22 @@ def _open_or_create_table(db, table_name: str, schema: pa.Schema, required_colum
     return fallback_table
 
 
+def _get_lancedb_connection():
+    """Get cached LanceDB connection."""
+    return lancedb.connect(LANCE_DB_URI, storage_options=_storage_options())
+
+
+# Cache for LanceDB tables to avoid repeated S3 connections
+_lancedb_tables_cache = None
+
+
 def get_lancedb_tables():
-    """Open or create the existing business tables in LanceDB."""
-    db = lancedb.connect(LANCE_DB_URI, storage_options=_storage_options())
+    """Open or create the existing business tables in LanceDB (cached)."""
+    global _lancedb_tables_cache
+    if _lancedb_tables_cache is not None:
+        return _lancedb_tables_cache
+
+    db = _get_lancedb_connection()
 
     text_schema = pa.schema([
         pa.field("id", pa.string()),
@@ -146,7 +159,8 @@ def get_lancedb_tables():
         files_schema,
         required_columns=["file_hash", "doc_name", "doc_type", "source_uri", "file_bytes", "text_full"],
     )
-    return tbl_text, tbl_image, tbl_files
+    _lancedb_tables_cache = (tbl_text, tbl_image, tbl_files)
+    return _lancedb_tables_cache
 
 
 def get_file_entities_table():

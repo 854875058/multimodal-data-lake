@@ -290,10 +290,19 @@ async def get_stats():
         image_rows = 0
         total_files = 0
         try:
-            tbl_text, tbl_image, tbl_files = get_lancedb_tables()
-            text_rows = tbl_text.count_rows()
-            image_rows = tbl_image.count_rows()
-            total_files = tbl_files.count_rows()
+            import asyncio
+            # Run LanceDB query with timeout to avoid blocking
+            def _query_lancedb():
+                tbl_text, tbl_image, tbl_files = get_lancedb_tables()
+                return tbl_text.count_rows(), tbl_image.count_rows(), tbl_files.count_rows()
+
+            loop = asyncio.get_event_loop()
+            text_rows, image_rows, total_files = await asyncio.wait_for(
+                loop.run_in_executor(None, _query_lancedb),
+                timeout=5.0
+            )
+        except asyncio.TimeoutError:
+            logger.warning('Dashboard stats timeout: LanceDB query took too long')
         except Exception as storage_error:
             logger.warning('Dashboard stats fallback to zero rows because LanceDB is unavailable: %s', storage_error)
         return DashboardStats(
