@@ -27,7 +27,7 @@ import {
 } from '@arco-design/web-react/icon'
 import api, { getErrorMessage } from '@/api'
 import PreviewModal from '@/components/PreviewModal.jsx'
-import { PrdCard, PrdTag, StatCard } from '@/components/PrdWidgets.jsx'
+import { PrdCard, PrdTag } from '@/components/PrdWidgets.jsx'
 import { formatDateTime, formatNumber } from '@/utils/format'
 
 const { Title, Text } = Typography
@@ -459,26 +459,26 @@ export default function FilesPage() {
 
   return (
     <div className="dataset-page">
-      <div className="prd-page-head">
-        <div className="prd-page-head-copy">
-          <Title heading={5} style={{ margin: 0 }}>数据集管理</Title>
-          <Text type="secondary">
-            以数据集为中心统一查看目录、结构、样本、版本与回滚状态，版本能力优先对齐 Lance Dataset 语义。
-          </Text>
-        </div>
-        <div className="prd-page-actions">
-          <Select value={selectedCatalog} onChange={setSelectedCatalog} style={{ width: 180 }}>
-            {catalogs.map((item) => (
-              <Option key={item.name} value={item.name}>{item.label}</Option>
-            ))}
-          </Select>
-          <Select value={selectedSchema} onChange={setSelectedSchema} style={{ width: 180 }}>
-            {schemas.map((item) => (
-              <Option key={item.name} value={item.name}>{item.label}</Option>
-            ))}
-          </Select>
-          <Button icon={<IconRefresh />} loading={refreshing} onClick={refreshPage}>刷新</Button>
-        </div>
+      {/* 页面头部 */}
+      <div className="ap-page__header">
+        <h1 className="ap-page__title">数据集管理</h1>
+        <p className="ap-page__subtitle">以数据集为中心统一查看目录、结构、样本、版本与回滚状态</p>
+      </div>
+
+      {/* 工具栏 */}
+      <div className="ap-toolbar">
+        <Select value={selectedCatalog} onChange={setSelectedCatalog} style={{ width: 180 }} placeholder="选择 Catalog">
+          {catalogs.map((item) => (
+            <Option key={item.name} value={item.name}>{item.label}</Option>
+          ))}
+        </Select>
+        <Select value={selectedSchema} onChange={setSelectedSchema} style={{ width: 180 }} placeholder="选择 Schema">
+          {schemas.map((item) => (
+            <Option key={item.name} value={item.name}>{item.label}</Option>
+          ))}
+        </Select>
+        <span style={{ flex: 1 }} />
+        <Button icon={<IconRefresh />} loading={refreshing} onClick={refreshPage}>刷新</Button>
       </div>
 
       <div className="prd-summary-band">
@@ -515,39 +515,24 @@ export default function FilesPage() {
         </div>
       </div>
 
-      <div className="prd-kpi-grid">
-        <StatCard
-          label="目录数据集"
-          value={topStats.totalDatasets}
-          sub="当前 Catalog / Schema 下已纳入统一管理的数据集数量"
-          icon={<IconStorage />}
-          iconBg="rgba(22, 93, 255, 0.12)"
-          iconColor="#165dff"
-        />
-        <StatCard
-          label="累计样本行数"
-          value={formatNumber(topStats.totalRows)}
-          sub="基于当前可见数据集聚合的样本规模，用于汇报容量与活跃度"
-          icon={<IconArchive />}
-          iconBg="rgba(27, 158, 92, 0.12)"
-          iconColor="#1b9e5c"
-        />
-        <StatCard
-          label="版本托管数据集"
-          value={topStats.versionedCount}
-          sub="当前已经接入 Lance 版本管理的核心数据集数量"
-          icon={<IconHistory />}
-          iconBg="rgba(123, 31, 162, 0.12)"
-          iconColor="#7b1fa2"
-        />
-        <StatCard
-          label="多模态资产"
-          value={formatNumber(fileAssetCount)}
-          sub="来自当前资产池的文件总量，可继续用于检索、训练与治理"
-          icon={<IconFile />}
-          iconBg="rgba(230, 139, 0, 0.14)"
-          iconColor="#e68b00"
-        />
+      {/* KPI 统计 */}
+      <div className="ap-stats">
+        <div className="ap-stat-item">
+          <div className="ap-stat-label">目录数据集</div>
+          <div className="ap-stat-value">{topStats.totalDatasets}</div>
+        </div>
+        <div className="ap-stat-item">
+          <div className="ap-stat-label">累计样本行数</div>
+          <div className="ap-stat-value ap-stat-value--blue">{formatNumber(topStats.totalRows)}</div>
+        </div>
+        <div className="ap-stat-item">
+          <div className="ap-stat-label">版本托管</div>
+          <div className="ap-stat-value ap-stat-value--purple">{topStats.versionedCount}</div>
+        </div>
+        <div className="ap-stat-item">
+          <div className="ap-stat-label">多模态资产</div>
+          <div className="ap-stat-value ap-stat-value--amber">{formatNumber(fileAssetCount)}</div>
+        </div>
       </div>
 
       <Row gutter={16} className="dataset-layout">
@@ -622,17 +607,41 @@ export default function FilesPage() {
                       data-type={item.datasetType}
                       onClick={() => setSelectedTable(item.name)}
                     >
+                      {/* 第一行：名称 + 类型标签 */}
                       <div className="dataset-grid-card-header">
                         <div className="dataset-grid-card-title">{item.label}</div>
                         <PrdTag kind={item.versioned ? 'ok' : item.datasetType === 'external' ? 'warn' : 'info'}>
                           {item.versioned ? 'Lance' : item.datasetType === 'external' ? 'External' : 'Catalog'}
                         </PrdTag>
                       </div>
+
+                      {/* 描述（2 行省略） */}
                       <div className="dataset-grid-card-desc">{item.description || '暂无描述'}</div>
+
+                      {/* 底部：行数 / 引擎 / 版本 */}
                       <div className="dataset-grid-card-meta">
-                        <span>{formatNumber(item.rowCount)} 行</span>
+                        <span>
+                          <span className="ap-muted">记录:</span>
+                          <span className="dataset-grid-card-num">{formatNumber(item.rowCount)}</span>
+                        </span>
                         <span>{item.engine || 'Catalog View'}</span>
-                        {item.versioned ? <span>{`v${item.currentVersion ?? 0}`}</span> : null}
+                      </div>
+
+                      {/* 版本信息 */}
+                      {item.versioned ? (
+                        <div className="dataset-grid-card-meta" style={{ marginTop: 4, paddingTop: 0, border: 'none' }}>
+                          <span>
+                            <span className="ap-muted">版本:</span>
+                            <span className="dataset-grid-card-num">{`v${item.currentVersion ?? 0}`}</span>
+                          </span>
+                        </div>
+                      ) : null}
+
+                      {/* 悬停操作按钮 */}
+                      <div className="dataset-grid-card-actions" onClick={(e) => e.stopPropagation()}>
+                        <Button size="mini" type="text">详情</Button>
+                        <Button size="mini" type="text">Schema</Button>
+                        <Button size="mini" type="text">预览</Button>
                       </div>
                     </div>
                   ))
