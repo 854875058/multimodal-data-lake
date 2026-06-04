@@ -22,6 +22,8 @@ import {
   IconRefresh,
   IconStorage,
   IconSync,
+  IconList,
+  IconApps,
 } from '@arco-design/web-react/icon'
 import api, { getErrorMessage } from '@/api'
 import PreviewModal from '@/components/PreviewModal.jsx'
@@ -160,6 +162,7 @@ export default function FilesPage() {
   const [compacting, setCompacting] = useState(false)
   const [fileTypes, setFileTypes] = useState([])
   const [searchKeyword, setSearchKeyword] = useState('')
+  const [viewMode, setViewMode] = useState('list') // 'list' | 'grid'
 
   const versionStatsMap = useMemo(
     () => Object.fromEntries((versionStats || []).map((item) => [item.table, item])),
@@ -552,7 +555,23 @@ export default function FilesPage() {
           <PrdCard
             title="数据集目录"
             sub="按当前 Schema 查看统一数据集清单，优先承接 Lance / 外表 / 目录视图"
-            extra={<PrdTag kind="info">{selectedSchema || '未选择'}</PrdTag>}
+            extra={
+              <Space>
+                <PrdTag kind="info">{selectedSchema || '未选择'}</PrdTag>
+                <Button.Group size="small">
+                  <Button
+                    type={viewMode === 'list' ? 'primary' : 'secondary'}
+                    icon={<IconList />}
+                    onClick={() => setViewMode('list')}
+                  />
+                  <Button
+                    type={viewMode === 'grid' ? 'primary' : 'secondary'}
+                    icon={<IconApps />}
+                    onClick={() => setViewMode('grid')}
+                  />
+                </Button.Group>
+              </Space>
+            }
           >
             <div style={{ marginBottom: 12 }}>
               <Input.Search
@@ -562,33 +581,64 @@ export default function FilesPage() {
                 onChange={setSearchKeyword}
               />
             </div>
-            <div className="dataset-list">
-              {filteredDatasets.length === 0 ? (
-                <Empty description={searchKeyword ? '无匹配的数据集' : '当前目录下暂无数据集'} />
-              ) : (
-                filteredDatasets.map((item) => (
-                  <button
-                    key={item.name}
-                    type="button"
-                    className={`dataset-list-item ${selectedTable === item.name ? 'is-active' : ''}`}
-                    onClick={() => setSelectedTable(item.name)}
-                  >
-                    <div className="dataset-list-head">
-                      <div className="dataset-list-title">{item.label}</div>
-                      <PrdTag kind={item.versioned ? 'ok' : item.datasetType === 'external' ? 'warn' : 'info'}>
-                        {item.versioned ? 'Lance' : item.datasetType === 'external' ? 'External' : 'Catalog'}
-                      </PrdTag>
+            {viewMode === 'list' ? (
+              <div className="dataset-list">
+                {filteredDatasets.length === 0 ? (
+                  <Empty description={searchKeyword ? '无匹配的数据集' : '当前目录下暂无数据集'} />
+                ) : (
+                  filteredDatasets.map((item) => (
+                    <button
+                      key={item.name}
+                      type="button"
+                      className={`dataset-list-item ${selectedTable === item.name ? 'is-active' : ''}`}
+                      data-type={item.datasetType}
+                      onClick={() => setSelectedTable(item.name)}
+                    >
+                      <div className="dataset-list-head">
+                        <div className="dataset-list-title">{item.label}</div>
+                        <PrdTag kind={item.versioned ? 'ok' : item.datasetType === 'external' ? 'warn' : 'info'}>
+                          {item.versioned ? 'Lance' : item.datasetType === 'external' ? 'External' : 'Catalog'}
+                        </PrdTag>
+                      </div>
+                      <div className="dataset-list-desc">{item.description || '暂无描述'}</div>
+                      <div className="dataset-list-meta">
+                        <span>{formatNumber(item.rowCount)} 行</span>
+                        <span>{item.engine || 'Catalog View'}</span>
+                        {item.versioned ? <span>{`v${item.currentVersion ?? 0}`}</span> : null}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : (
+              <div className="dataset-grid">
+                {filteredDatasets.length === 0 ? (
+                  <Empty description={searchKeyword ? '无匹配的数据集' : '当前目录下暂无数据集'} />
+                ) : (
+                  filteredDatasets.map((item) => (
+                    <div
+                      key={item.name}
+                      className={`dataset-grid-card ${selectedTable === item.name ? 'is-active' : ''}`}
+                      data-type={item.datasetType}
+                      onClick={() => setSelectedTable(item.name)}
+                    >
+                      <div className="dataset-grid-card-header">
+                        <div className="dataset-grid-card-title">{item.label}</div>
+                        <PrdTag kind={item.versioned ? 'ok' : item.datasetType === 'external' ? 'warn' : 'info'}>
+                          {item.versioned ? 'Lance' : item.datasetType === 'external' ? 'External' : 'Catalog'}
+                        </PrdTag>
+                      </div>
+                      <div className="dataset-grid-card-desc">{item.description || '暂无描述'}</div>
+                      <div className="dataset-grid-card-meta">
+                        <span>{formatNumber(item.rowCount)} 行</span>
+                        <span>{item.engine || 'Catalog View'}</span>
+                        {item.versioned ? <span>{`v${item.currentVersion ?? 0}`}</span> : null}
+                      </div>
                     </div>
-                    <div className="dataset-list-desc">{item.description || '暂无描述'}</div>
-                    <div className="dataset-list-meta">
-                      <span>{formatNumber(item.rowCount)} 行</span>
-                      <span>{item.engine || 'Catalog View'}</span>
-                      {item.versioned ? <span>{`v${item.currentVersion ?? 0}`}</span> : null}
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
+                  ))
+                )}
+              </div>
+            )}
           </PrdCard>
         </Col>
 
