@@ -3402,12 +3402,25 @@ pre {
   color: var(--semantic-600);
 }
 
+.ap-stat-value--green {
+  color: var(--status-success);
+}
+
 .ap-stat-value--purple {
   color: var(--tier2-primary);
 }
 
 .ap-stat-value--amber {
   color: var(--kinetic-600);
+}
+
+/* ── Tab 标签页 ── */
+.ap-tabs {
+  background: var(--neutral-0);
+  padding: 0 16px;
+  border-radius: var(--radius-lg);
+  margin-bottom: 16px;
+  border: 1px solid var(--neutral-100);
 }
 
 /* ── 数据集卡片网格视图 ── */
@@ -3523,6 +3536,111 @@ pre {
 }
 
 .dataset-grid-card:hover .dataset-grid-card-actions {
+  opacity: 1;
+}
+
+/* ── 资产目录页面 ── */
+.asset-page {
+  padding: 24px;
+}
+
+/* ── 资产网格卡片 ── */
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.asset-grid-card {
+  position: relative;
+  height: 100%;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--neutral-100);
+  background: var(--neutral-0);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.asset-grid-card:hover {
+  border-color: var(--semantic-300);
+  box-shadow: 0 4px 12px rgba(76, 110, 245, 0.08);
+  transform: translateY(-2px);
+}
+
+.asset-grid-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.asset-grid-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.asset-grid-card-icon[data-type="document"] {
+  background: var(--semantic-50);
+  color: var(--semantic-600);
+}
+
+.asset-grid-card-icon[data-type="image"] {
+  background: var(--status-success-bg);
+  color: var(--status-success);
+}
+
+.asset-grid-card-icon[data-type="audio"] {
+  background: var(--tier2-bg);
+  color: var(--tier2-primary);
+}
+
+.asset-grid-card-icon[data-type="video"] {
+  background: var(--kinetic-50);
+  color: var(--kinetic-600);
+}
+
+.asset-grid-card-icon[data-type="other"] {
+  background: var(--neutral-100);
+  color: var(--neutral-600);
+}
+
+.asset-grid-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--neutral-900);
+  line-height: 1.4;
+  margin-bottom: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-grid-card-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--neutral-500);
+  padding-top: 10px;
+  border-top: 1px dashed var(--neutral-100);
+}
+
+.asset-grid-card-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--neutral-100);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.asset-grid-card:hover .asset-grid-card-actions {
   opacity: 1;
 }
 

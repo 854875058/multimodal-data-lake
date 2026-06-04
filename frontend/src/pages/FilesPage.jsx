@@ -1,290 +1,101 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Button,
-  Descriptions,
   Empty,
-  Grid,
   Input,
   Message,
-  Popconfirm,
   Select,
   Space,
   Spin,
   Table,
   Tabs,
+  Tag,
   Typography,
 } from '@arco-design/web-react'
 import {
-  IconArchive,
-  IconEye,
   IconFile,
-  IconHistory,
-  IconRefresh,
-  IconStorage,
-  IconSync,
+  IconFileAudio,
+  IconFileImage,
+  IconFilePdf,
+  IconFileVideo,
   IconList,
   IconApps,
+  IconRefresh,
+  IconSearch,
+  IconEye,
+  IconDownload,
+  IconDelete,
 } from '@arco-design/web-react/icon'
 import api, { getErrorMessage } from '@/api'
 import PreviewModal from '@/components/PreviewModal.jsx'
-import { PrdCard, PrdTag } from '@/components/PrdWidgets.jsx'
 import { formatDateTime, formatNumber } from '@/utils/format'
 
-const { Title, Text } = Typography
-const { Row, Col } = Grid
+const { Text } = Typography
 const TabPane = Tabs.TabPane
 const Option = Select.Option
 
 const initialPreview = { open: false, loading: false, preview: null, error: '' }
 
-const versionTableMap = {
-  files: 'files',
-  text_chunks: 'text',
-  image_chunks: 'image',
+// 文件类型配置
+const FILE_TYPE_CONFIG = {
+  document: { label: '文档', color: 'blue', icon: <IconFilePdf /> },
+  image: { label: '图片', color: 'green', icon: <IconFileImage /> },
+  audio: { label: '音频', color: 'purple', icon: <IconFileAudio /> },
+  video: { label: '视频', color: 'orange', icon: <IconFileVideo /> },
+  other: { label: '其他', color: 'gray', icon: <IconFile /> },
 }
 
-function normalizeDataset(item, versionStatsMap) {
-  const tableName = item.name
-  const versionKey = versionTableMap[tableName] || null
-  const versionInfo = versionKey ? versionStatsMap[versionKey] : null
-  const rowCount = Number(item.row_count ?? versionInfo?.num_rows ?? 0)
-  const schemaCount = Array.isArray(versionInfo?.schema) ? versionInfo.schema.length : undefined
-  return {
-    ...item,
-    rowCount,
-    schemaCount,
-    versionKey,
-    currentVersion: versionInfo?.version ?? null,
-    versioned: Boolean(versionKey),
-    datasetType: versionKey ? 'lance' : item.engine === 'Doris External' ? 'external' : 'catalog',
-  }
+function getFileType(docType) {
+  if (!docType) return 'other'
+  const type = docType.toLowerCase()
+  if (['pdf', 'doc', 'docx', 'txt', 'md', 'ppt', 'pptx', 'xls', 'xlsx'].includes(type)) return 'document'
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(type)) return 'image'
+  if (['mp3', 'wav', 'flac', 'aac', 'ogg'].includes(type)) return 'audio'
+  if (['mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv'].includes(type)) return 'video'
+  return 'other'
 }
 
-function buildDatasetSummary(detail, dataset) {
-  if (!detail || !dataset) return []
-  const summary = [
-    { label: '数据集路径', value: `${detail.catalog}.${detail.schema}.${detail.table}` },
-    { label: '存储位置', value: detail.storage_path || '--' },
-    { label: '文件格式', value: detail.file_format || detail.engine || '--' },
-    { label: '字段数量', value: formatNumber(detail.columns?.length || 0) },
-  ]
-  if (dataset.versioned) {
-    summary.push({ label: '当前版本', value: `v${dataset.currentVersion ?? 0}` })
+function formatFileSize(bytes) {
+  if (!bytes) return '--'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let size = bytes
+  let unitIndex = 0
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex++
   }
-  return summary
-}
-
-function buildVersionCompare(selectedVersions, currentVersion) {
-  if (!Array.isArray(selectedVersions) || selectedVersions.length < 2) return null
-  const ordered = [...selectedVersions].sort((a, b) => Number(a.version) - Number(b.version))
-  const [base, target] = ordered
-  const delta = base.num_rows != null && target.num_rows != null
-    ? Number(target.num_rows || 0) - Number(base.num_rows || 0)
-    : null
-  return {
-    base,
-    target,
-    delta,
-    currentVersion,
-  }
-}
-
-function MiniSchemaTable({ rows }) {
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return <Empty description="暂无结构信息" />
-  }
-
-  return (
-    <Table
-      size="small"
-      pagination={false}
-      border={false}
-      rowKey={(record, index) => `${record.name}-${index}`}
-      columns={[
-        {
-          title: '字段名',
-          dataIndex: 'name',
-          render: (value) => <Text style={{ fontWeight: 700 }}>{value}</Text>,
-        },
-        {
-          title: '类型',
-          dataIndex: 'type',
-          render: (value) => <Text code>{String(value || '--')}</Text>,
-        },
-      ]}
-      data={rows}
-    />
-  )
-}
-
-function MiniSampleTable({ rows }) {
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return <Empty description="暂无样本数据" />
-  }
-
-  const keys = Object.keys(rows[0] || {}).slice(0, 6)
-  const columns = keys.map((key) => ({
-    title: key,
-    dataIndex: key,
-    ellipsis: true,
-    render: (value) => <Text style={{ fontSize: 12 }}>{String(value ?? '--')}</Text>,
-  }))
-
-  return (
-    <Table
-      size="small"
-      border={false}
-      pagination={false}
-      rowKey={(_, index) => index}
-      columns={columns}
-      data={rows}
-      scroll={{ x: 'max-content' }}
-    />
-  )
+  return `${size.toFixed(1)} ${units[unitIndex]}`
 }
 
 export default function FilesPage() {
-  const [catalogs, setCatalogs] = useState([])
-  const [schemas, setSchemas] = useState([])
-  const [tables, setTables] = useState([])
-  const [selectedCatalog, setSelectedCatalog] = useState('')
-  const [selectedSchema, setSelectedSchema] = useState('')
-  const [selectedTable, setSelectedTable] = useState('')
-  const [assetDetail, setAssetDetail] = useState(null)
-  const [detailLoading, setDetailLoading] = useState(false)
+  const [files, setFiles] = useState([])
+  const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [previewState, setPreviewState] = useState(initialPreview)
-  const [versionStats, setVersionStats] = useState([])
-  const [versionList, setVersionList] = useState([])
-  const [versionLoading, setVersionLoading] = useState(false)
-  const [versionSelection, setVersionSelection] = useState([])
-  const [rollingVersion, setRollingVersion] = useState(null)
-  const [compacting, setCompacting] = useState(false)
-  const [fileTypes, setFileTypes] = useState([])
   const [searchKeyword, setSearchKeyword] = useState('')
-  const [viewMode, setViewMode] = useState('list') // 'list' | 'grid'
+  const [viewMode, setViewMode] = useState('grid') // 'list' | 'grid'
+  const [activeCategory, setActiveCategory] = useState('all') // 'all' | 'document' | 'image' | 'audio' | 'video'
+  const [previewState, setPreviewState] = useState(initialPreview)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [fileTypes, setFileTypes] = useState([])
 
-  const versionStatsMap = useMemo(
-    () => Object.fromEntries((versionStats || []).map((item) => [item.table, item])),
-    [versionStats],
-  )
-
-  const datasets = useMemo(
-    () => (tables || []).map((item) => normalizeDataset(item, versionStatsMap)),
-    [tables, versionStatsMap],
-  )
-
-  const filteredDatasets = useMemo(() => {
-    const query = searchKeyword.trim().toLowerCase()
-    if (!query) return datasets
-    return datasets.filter((item) => {
-      const haystack = [item.name, item.label, item.description, item.engine]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      return haystack.includes(query)
-    })
-  }, [datasets, searchKeyword])
-
-  const selectedDataset = useMemo(
-    () => datasets.find((item) => item.name === selectedTable) || null,
-    [datasets, selectedTable],
-  )
-
-  const compareData = useMemo(
-    () => buildVersionCompare(versionList.filter((item) => versionSelection.includes(item.version)), selectedDataset?.currentVersion),
-    [selectedDataset?.currentVersion, versionList, versionSelection],
-  )
-
-  const fileAssetCount = useMemo(
-    () => fileTypes.reduce((sum, item) => sum + Number(item.count || 0), 0),
-    [fileTypes],
-  )
-
-  const loadCatalogs = async () => {
-    const response = await api.getAssetCatalogs()
-    const list = Array.isArray(response?.items) ? response.items : []
-    setCatalogs(list)
-    setSelectedCatalog((current) => current || list[0]?.name || '')
-  }
-
-  const loadSchemas = async (catalog) => {
-    if (!catalog) {
-      setSchemas([])
-      setSelectedSchema('')
-      return
-    }
-    const response = await api.getAssetSchemas(catalog)
-    const list = Array.isArray(response?.items) ? response.items : []
-    setSchemas(list)
-    setSelectedSchema((current) => {
-      if (current && list.some((item) => item.name === current)) return current
-      return list[0]?.name || ''
-    })
-  }
-
-  const loadTables = async (catalog, schema) => {
-    if (!catalog || !schema) {
-      setTables([])
-      setSelectedTable('')
-      return
-    }
-    const response = await api.getAssetTables(catalog, schema)
-    const list = Array.isArray(response?.items) ? response.items : []
-    setTables(list)
-    setSelectedTable((current) => {
-      if (current && list.some((item) => item.name === current)) return current
-      return list[0]?.name || ''
-    })
-  }
-
-  const loadDetail = async (catalog, schema, table) => {
-    if (!catalog || !schema || !table) {
-      setAssetDetail(null)
-      return
-    }
-    setDetailLoading(true)
+  // 加载文件列表
+  const loadFiles = async (page = 1, docType = 'all') => {
+    setLoading(true)
     try {
-      const response = await api.getAssetDetail(catalog, schema, table, 8)
-      setAssetDetail(response?.data || null)
+      const response = await api.getFiles(page, 20, docType)
+      setFiles(Array.isArray(response?.items) ? response.items : [])
+      setTotal(response?.total || 0)
+      setCurrentPage(page)
     } catch (error) {
-      setAssetDetail(null)
-      Message.error(getErrorMessage(error, '加载数据集详情失败'))
+      setFiles([])
+      Message.error(getErrorMessage(error, '加载文件列表失败'))
     } finally {
-      setDetailLoading(false)
+      setLoading(false)
     }
   }
 
-  const loadVersionStats = async () => {
-    try {
-      const response = await api.getVersionStats()
-      setVersionStats(Array.isArray(response?.stats) ? response.stats : [])
-    } catch {
-      setVersionStats([])
-    }
-  }
-
-  const loadVersionList = async (tableKey) => {
-    if (!tableKey) {
-      setVersionList([])
-      setVersionSelection([])
-      return
-    }
-    setVersionLoading(true)
-    try {
-      const response = await api.getTableVersions(tableKey)
-      const versions = Array.isArray(response?.versions) ? response.versions : []
-      setVersionList(versions)
-      setVersionSelection(versions.slice(0, 2).map((item) => item.version))
-    } catch (error) {
-      setVersionList([])
-      setVersionSelection([])
-      Message.error(getErrorMessage(error, '加载版本历史失败'))
-    } finally {
-      setVersionLoading(false)
-    }
-  }
-
+  // 加载文件类型统计
   const loadFileTypes = async () => {
     try {
       const response = await api.getFileTypes()
@@ -294,16 +105,16 @@ export default function FilesPage() {
     }
   }
 
+  // 刷新页面
   const refreshPage = async () => {
     setRefreshing(true)
     try {
       await Promise.all([
-        loadCatalogs(),
-        loadVersionStats(),
+        loadFiles(1, activeCategory),
         loadFileTypes(),
       ])
     } catch (error) {
-      Message.error(getErrorMessage(error, '刷新数据集页面失败'))
+      Message.error(getErrorMessage(error, '刷新失败'))
     } finally {
       setRefreshing(false)
     }
@@ -314,21 +125,10 @@ export default function FilesPage() {
   }, [])
 
   useEffect(() => {
-    loadSchemas(selectedCatalog).catch(() => {})
-  }, [selectedCatalog])
+    loadFiles(1, activeCategory)
+  }, [activeCategory])
 
-  useEffect(() => {
-    loadTables(selectedCatalog, selectedSchema).catch(() => {})
-  }, [selectedCatalog, selectedSchema])
-
-  useEffect(() => {
-    loadDetail(selectedCatalog, selectedSchema, selectedTable).catch(() => {})
-  }, [selectedCatalog, selectedSchema, selectedTable])
-
-  useEffect(() => {
-    loadVersionList(selectedDataset?.versionKey || null).catch(() => {})
-  }, [selectedDataset?.versionKey])
-
+  // 预览文件
   const handlePreview = async (fileHash) => {
     setPreviewState({ open: true, loading: true, preview: null, error: '' })
     try {
@@ -344,518 +144,231 @@ export default function FilesPage() {
     }
   }
 
-  const handleRollback = async (tableKey, version) => {
-    setRollingVersion(version)
-    try {
-      const response = await api.rollbackTableVersion({ table: tableKey, version })
-      Message.success(response?.message || `已回滚到版本 ${version}`)
-      await Promise.all([
-        loadVersionStats(),
-        loadVersionList(tableKey),
-        loadDetail(selectedCatalog, selectedSchema, selectedTable),
-      ])
-    } catch (error) {
-      Message.error(getErrorMessage(error, '版本回滚失败'))
-    } finally {
-      setRollingVersion(null)
-    }
-  }
-
-  const handleCompact = async (tableKey) => {
-    setCompacting(true)
-    try {
-      const response = await api.compactTableVersion(tableKey)
-      Message.success(response?.message || '已完成数据集整理')
-      await loadVersionList(tableKey)
-    } catch (error) {
-      Message.error(getErrorMessage(error, '数据集整理失败'))
-    } finally {
-      setCompacting(false)
-    }
-  }
-
-  const topStats = useMemo(() => {
-    const totalRows = datasets.reduce((sum, item) => sum + Number(item.rowCount || 0), 0)
-    const versionedCount = datasets.filter((item) => item.versioned).length
-    const liveCount = datasets.filter((item) => item.engine !== 'Doris External').length
+  // KPI 统计
+  const stats = useMemo(() => {
+    const typeCounts = {}
+    fileTypes.forEach(item => {
+      const type = getFileType(item.doc_type)
+      typeCounts[type] = (typeCounts[type] || 0) + Number(item.count || 0)
+    })
     return {
-      totalDatasets: datasets.length,
-      totalRows,
-      versionedCount,
-      liveCount,
+      total: fileTypes.reduce((sum, item) => sum + Number(item.count || 0), 0),
+      document: typeCounts.document || 0,
+      image: typeCounts.image || 0,
+      audio: typeCounts.audio || 0,
+      video: typeCounts.video || 0,
     }
-  }, [datasets])
+  }, [fileTypes])
 
-  const summaryItems = useMemo(() => [
-    {
-      key: 'scope',
-      label: '当前目录范围',
-      value: selectedCatalog && selectedSchema ? `${selectedCatalog} / ${selectedSchema}` : '等待目录加载',
-      meta: '目录切换后，左侧数据集清单和右侧详情会同步刷新到当前 Catalog / Schema。',
-    },
-    {
-      key: 'dataset',
-      label: '当前数据集',
-      value: selectedDataset?.label || selectedDataset?.name || '未选择数据集',
-      meta: selectedDataset ? `${formatNumber(selectedDataset.rowCount)} 行样本，${selectedDataset.engine || 'Catalog View'}` : '从左侧目录选择一个数据集后，这里会显示当前聚焦对象。',
-    },
-    {
-      key: 'version',
-      label: '版本状态',
-      value: selectedDataset?.versioned ? `Lance v${selectedDataset.currentVersion ?? 0}` : '非版本托管数据集',
-      meta: selectedDataset?.versioned ? `当前可用版本 ${formatNumber(versionList.length)} 个，支持回滚与整理。` : '当前数据集仍保留详情、Schema 和样本视图，但不启用 Lance 版本能力。',
-    },
-    {
-      key: 'compare',
-      label: '对比就绪度',
-      value: compareData ? `v${compareData.base.version} -> v${compareData.target.version}` : '等待选择两个版本',
-      meta: compareData ? `行数变化 ${compareData.delta == null ? '--' : compareData.delta > 0 ? '+' : ''}${compareData.delta == null ? '--' : formatNumber(compareData.delta)}` : '在版本中心选择两个快照后，这里会生成摘要对比结果。',
-    },
-  ], [compareData, selectedCatalog, selectedDataset, selectedSchema, versionList.length])
+  // 过滤文件
+  const filteredFiles = useMemo(() => {
+    const query = searchKeyword.trim().toLowerCase()
+    if (!query) return files
+    return files.filter((item) => {
+      const haystack = [item.file_name, item.doc_name, item.doc_type]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [files, searchKeyword])
 
-  const versionColumns = [
+  // 文件类型统计选项
+  const categoryOptions = useMemo(() => [
+    { key: 'all', label: `全部 (${stats.total})` },
+    { key: 'document', label: `文档 (${stats.document})` },
+    { key: 'image', label: `图片 (${stats.image})` },
+    { key: 'audio', label: `音频 (${stats.audio})` },
+    { key: 'video', label: `视频 (${stats.video})` },
+  ], [stats])
+
+  // 表格列定义
+  const columns = [
     {
-      title: '版本',
-      dataIndex: 'version',
-      width: 90,
-      render: (value) => (
+      title: '文件名',
+      dataIndex: 'file_name',
+      render: (value, record) => (
         <Space>
-          <Text style={{ fontWeight: 800 }}>{`v${value}`}</Text>
-          {selectedDataset?.currentVersion === value ? <PrdTag kind="ok">当前</PrdTag> : null}
+          {FILE_TYPE_CONFIG[getFileType(record.doc_type)]?.icon}
+          <Text>{value || record.doc_name || '--'}</Text>
         </Space>
       ),
     },
     {
-      title: '时间',
-      dataIndex: 'timestamp',
-      render: (value) => <Text type="secondary">{value ? formatDateTime(value) : '系统快照'}</Text>,
+      title: '类型',
+      dataIndex: 'doc_type',
+      width: 100,
+      render: (value) => {
+        const type = getFileType(value)
+        const config = FILE_TYPE_CONFIG[type]
+        return <Tag color={config.color}>{value || config.label}</Tag>
+      },
     },
     {
-      title: '行数',
-      dataIndex: 'num_rows',
-      width: 120,
-      render: (value) => <Text>{value == null ? '--' : formatNumber(value)}</Text>,
+      title: '大小',
+      dataIndex: 'file_size',
+      width: 100,
+      render: (value) => <Text>{formatFileSize(value)}</Text>,
+    },
+    {
+      title: '上传时间',
+      dataIndex: 'created_at',
+      width: 160,
+      render: (value) => <Text type="secondary">{value ? formatDateTime(value) : '--'}</Text>,
     },
     {
       title: '操作',
-      width: 130,
+      width: 120,
       render: (_, record) => (
-        <Popconfirm
-          title={`确认将 ${selectedDataset?.label || selectedDataset?.name} 回滚到 v${record.version}？`}
-          onOk={() => handleRollback(selectedDataset?.versionKey, record.version)}
-        >
+        <Space>
           <Button
-            size="small"
             type="text"
-            disabled={selectedDataset?.currentVersion === record.version}
-            loading={rollingVersion === record.version}
+            size="small"
+            icon={<IconEye />}
+            onClick={() => handlePreview(record.file_hash)}
           >
-            回滚到此版本
+            预览
           </Button>
-        </Popconfirm>
+        </Space>
       ),
     },
   ]
 
   return (
-    <div className="dataset-page">
+    <div className="asset-page">
       {/* 页面头部 */}
       <div className="ap-page__header">
-        <h1 className="ap-page__title">数据集管理</h1>
-        <p className="ap-page__subtitle">以数据集为中心统一查看目录、结构、样本、版本与回滚状态</p>
-      </div>
-
-      {/* 工具栏 */}
-      <div className="ap-toolbar">
-        <Select value={selectedCatalog} onChange={setSelectedCatalog} style={{ width: 180 }} placeholder="选择 Catalog">
-          {catalogs.map((item) => (
-            <Option key={item.name} value={item.name}>{item.label}</Option>
-          ))}
-        </Select>
-        <Select value={selectedSchema} onChange={setSelectedSchema} style={{ width: 180 }} placeholder="选择 Schema">
-          {schemas.map((item) => (
-            <Option key={item.name} value={item.name}>{item.label}</Option>
-          ))}
-        </Select>
-        <span style={{ flex: 1 }} />
-        <Button icon={<IconRefresh />} loading={refreshing} onClick={refreshPage}>刷新</Button>
-      </div>
-
-      <div className="prd-summary-band">
-        {summaryItems.map((item) => (
-          <div key={item.key} className="prd-summary-item">
-            <div className="k">{item.label}</div>
-            <div className="v">{item.value}</div>
-            <div className="m">{item.meta}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="dataset-hero">
-        <div>
-          <div className="dataset-hero-kicker">Dataset Control Plane</div>
-          <div className="dataset-hero-title">
-            当前目录下共 {formatNumber(topStats.totalDatasets)} 个数据集，核心 Lance 数据集 {formatNumber(topStats.versionedCount)} 个
-          </div>
-          <div className="dataset-hero-copy">
-            数据集管理页负责统一承接数据集详情、Schema 浏览、样本预览与版本回滚，不再停留在单纯的文件列表层面。
-          </div>
-          <div className="dataset-hero-tags">
-            <PrdTag kind="info">Catalog / Schema 视图</PrdTag>
-            <PrdTag kind="ok">Lance 版本管理</PrdTag>
-            <PrdTag kind="purple">多模态样本预览</PrdTag>
-          </div>
-        </div>
-        <div className="dataset-hero-side">
-          <div className="dataset-hero-side-label">版本语义</div>
-          <div className="dataset-hero-side-value">Lance-first</div>
-          <div className="dataset-hero-side-copy">
-            `files / text_chunks / image_chunks` 对应的版本中心直接走 Lance 表版本能力，更适合做数据快照与回滚。
-          </div>
-        </div>
+        <h1 className="ap-page__title">资产目录</h1>
+        <p className="ap-page__subtitle">统一管理可用数据资产</p>
       </div>
 
       {/* KPI 统计 */}
       <div className="ap-stats">
         <div className="ap-stat-item">
-          <div className="ap-stat-label">目录数据集</div>
-          <div className="ap-stat-value">{topStats.totalDatasets}</div>
+          <div className="ap-stat-label">资产总数</div>
+          <div className="ap-stat-value">{stats.total}</div>
         </div>
         <div className="ap-stat-item">
-          <div className="ap-stat-label">累计样本行数</div>
-          <div className="ap-stat-value ap-stat-value--blue">{formatNumber(topStats.totalRows)}</div>
+          <div className="ap-stat-label">文档</div>
+          <div className="ap-stat-value ap-stat-value--blue">{stats.document}</div>
         </div>
         <div className="ap-stat-item">
-          <div className="ap-stat-label">版本托管</div>
-          <div className="ap-stat-value ap-stat-value--purple">{topStats.versionedCount}</div>
+          <div className="ap-stat-label">图片</div>
+          <div className="ap-stat-value ap-stat-value--green">{stats.image}</div>
         </div>
         <div className="ap-stat-item">
-          <div className="ap-stat-label">多模态资产</div>
-          <div className="ap-stat-value ap-stat-value--amber">{formatNumber(fileAssetCount)}</div>
+          <div className="ap-stat-label">音视频</div>
+          <div className="ap-stat-value ap-stat-value--purple">{stats.audio + stats.video}</div>
         </div>
       </div>
 
-      <Row gutter={16} className="dataset-layout">
-        <Col span={8}>
-          <PrdCard
-            title="数据集目录"
-            sub="按当前 Schema 查看统一数据集清单，优先承接 Lance / 外表 / 目录视图"
-            extra={
-              <Space>
-                <PrdTag kind="info">{selectedSchema || '未选择'}</PrdTag>
-                <Button.Group size="small">
-                  <Button
-                    type={viewMode === 'list' ? 'primary' : 'secondary'}
-                    icon={<IconList />}
-                    onClick={() => setViewMode('list')}
-                  />
-                  <Button
-                    type={viewMode === 'grid' ? 'primary' : 'secondary'}
-                    icon={<IconApps />}
-                    onClick={() => setViewMode('grid')}
-                  />
-                </Button.Group>
-              </Space>
-            }
-          >
-            <div style={{ marginBottom: 12 }}>
-              <Input.Search
-                allowClear
-                placeholder="搜索数据集名称、描述或引擎"
-                value={searchKeyword}
-                onChange={setSearchKeyword}
-              />
-            </div>
-            {viewMode === 'list' ? (
-              <div className="dataset-list">
-                {filteredDatasets.length === 0 ? (
-                  <Empty description={searchKeyword ? '无匹配的数据集' : '当前目录下暂无数据集'} />
-                ) : (
-                  filteredDatasets.map((item) => (
-                    <button
-                      key={item.name}
-                      type="button"
-                      className={`dataset-list-item ${selectedTable === item.name ? 'is-active' : ''}`}
-                      data-type={item.datasetType}
-                      onClick={() => setSelectedTable(item.name)}
-                    >
-                      <div className="dataset-list-head">
-                        <div className="dataset-list-title">{item.label}</div>
-                        <PrdTag kind={item.versioned ? 'ok' : item.datasetType === 'external' ? 'warn' : 'info'}>
-                          {item.versioned ? 'Lance' : item.datasetType === 'external' ? 'External' : 'Catalog'}
-                        </PrdTag>
-                      </div>
-                      <div className="dataset-list-desc">{item.description || '暂无描述'}</div>
-                      <div className="dataset-list-meta">
-                        <span>{formatNumber(item.rowCount)} 行</span>
-                        <span>{item.engine || 'Catalog View'}</span>
-                        {item.versioned ? <span>{`v${item.currentVersion ?? 0}`}</span> : null}
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            ) : (
-              <div className="dataset-grid">
-                {filteredDatasets.length === 0 ? (
-                  <Empty description={searchKeyword ? '无匹配的数据集' : '当前目录下暂无数据集'} />
-                ) : (
-                  filteredDatasets.map((item) => (
-                    <div
-                      key={item.name}
-                      className={`dataset-grid-card ${selectedTable === item.name ? 'is-active' : ''}`}
-                      data-type={item.datasetType}
-                      onClick={() => setSelectedTable(item.name)}
-                    >
-                      {/* 第一行：名称 + 类型标签 */}
-                      <div className="dataset-grid-card-header">
-                        <div className="dataset-grid-card-title">{item.label}</div>
-                        <PrdTag kind={item.versioned ? 'ok' : item.datasetType === 'external' ? 'warn' : 'info'}>
-                          {item.versioned ? 'Lance' : item.datasetType === 'external' ? 'External' : 'Catalog'}
-                        </PrdTag>
-                      </div>
+      {/* Tab 分类 */}
+      <Tabs
+        activeTab={activeCategory}
+        onChange={setActiveCategory}
+        className="ap-tabs"
+      >
+        {categoryOptions.map(item => (
+          <TabPane key={item.key} title={item.label} />
+        ))}
+      </Tabs>
 
-                      {/* 描述（2 行省略） */}
-                      <div className="dataset-grid-card-desc">{item.description || '暂无描述'}</div>
+      {/* 工具栏 */}
+      <div className="ap-toolbar">
+        <Input.Search
+          placeholder="搜索文件名 / 类型..."
+          style={{ width: 340 }}
+          allowClear
+          value={searchKeyword}
+          onChange={setSearchKeyword}
+        />
+        <span style={{ flex: 1 }} />
+        <Space>
+          <Button.Group size="small">
+            <Button
+              type={viewMode === 'list' ? 'primary' : 'secondary'}
+              icon={<IconList />}
+              onClick={() => setViewMode('list')}
+            />
+            <Button
+              type={viewMode === 'grid' ? 'primary' : 'secondary'}
+              icon={<IconApps />}
+              onClick={() => setViewMode('grid')}
+            />
+          </Button.Group>
+          <Button icon={<IconRefresh />} loading={refreshing} onClick={refreshPage}>
+            刷新
+          </Button>
+        </Space>
+      </div>
 
-                      {/* 底部：行数 / 引擎 / 版本 */}
-                      <div className="dataset-grid-card-meta">
-                        <span>
-                          <span className="ap-muted">记录:</span>
-                          <span className="dataset-grid-card-num">{formatNumber(item.rowCount)}</span>
-                        </span>
-                        <span>{item.engine || 'Catalog View'}</span>
-                      </div>
-
-                      {/* 版本信息 */}
-                      {item.versioned ? (
-                        <div className="dataset-grid-card-meta" style={{ marginTop: 4, paddingTop: 0, border: 'none' }}>
-                          <span>
-                            <span className="ap-muted">版本:</span>
-                            <span className="dataset-grid-card-num">{`v${item.currentVersion ?? 0}`}</span>
-                          </span>
-                        </div>
-                      ) : null}
-
-                      {/* 悬停操作按钮 */}
-                      <div className="dataset-grid-card-actions" onClick={(e) => e.stopPropagation()}>
-                        <Button size="mini" type="text">详情</Button>
-                        <Button size="mini" type="text">Schema</Button>
-                        <Button size="mini" type="text">预览</Button>
-                      </div>
+      {/* 文件列表 */}
+      <Spin loading={loading}>
+        {filteredFiles.length === 0 ? (
+          <Empty description="暂无资产" style={{ padding: '64px 0' }} />
+        ) : viewMode === 'grid' ? (
+          // 卡片网格视图
+          <div className="asset-grid">
+            {filteredFiles.map((item) => {
+              const fileType = getFileType(item.doc_type)
+              const config = FILE_TYPE_CONFIG[fileType]
+              return (
+                <div
+                  key={item.file_hash || item.id}
+                  className="asset-grid-card"
+                  onClick={() => handlePreview(item.file_hash)}
+                >
+                  {/* 卡片头部：图标 + 类型 */}
+                  <div className="asset-grid-card-header">
+                    <div className="asset-grid-card-icon" data-type={fileType}>
+                      {config.icon}
                     </div>
-                  ))
-                )}
-              </div>
-            )}
-          </PrdCard>
-        </Col>
+                    <Tag color={config.color} size="small">
+                      {item.doc_type || config.label}
+                    </Tag>
+                  </div>
 
-        <Col span={16}>
-          <PrdCard
-            title={selectedDataset?.label || '数据集详情'}
-            sub={selectedDataset?.description || '选择左侧数据集查看详情、Schema、样本与版本管理能力'}
-            extra={
-              selectedDataset ? (
-                <Space>
-                  {selectedDataset.versioned ? <PrdTag kind="ok">{`当前版本 v${selectedDataset.currentVersion ?? 0}`}</PrdTag> : null}
-                  <PrdTag kind={selectedDataset?.datasetType === 'external' ? 'warn' : 'info'}>
-                    {selectedDataset?.engine || 'Catalog View'}
-                  </PrdTag>
-                </Space>
-              ) : null
-            }
-          >
-            <Spin loading={detailLoading}>
-              {!assetDetail || !selectedDataset ? (
-                <Empty description="选择左侧数据集查看详情" />
-              ) : (
-                <Tabs defaultActiveTab="overview" type="rounded">
-                  <TabPane key="overview" title="概览">
-                    <div className="dataset-metric-grid">
-                      <div className="dataset-metric">
-                        <div className="k">样本规模</div>
-                        <div className="v">{formatNumber(selectedDataset.rowCount)}</div>
-                      </div>
-                      <div className="dataset-metric">
-                        <div className="k">字段数量</div>
-                        <div className="v">{formatNumber(assetDetail.columns?.length || 0)}</div>
-                      </div>
-                      <div className="dataset-metric">
-                        <div className="k">版本状态</div>
-                        <div className="v">{selectedDataset.versioned ? `v${selectedDataset.currentVersion ?? 0}` : '未托管'}</div>
-                      </div>
-                      <div className="dataset-metric">
-                        <div className="k">数据类型</div>
-                        <div className="v">{selectedDataset.versioned ? 'Lance Dataset' : selectedDataset.engine}</div>
-                      </div>
-                    </div>
+                  {/* 文件名 */}
+                  <div className="asset-grid-card-title">
+                    {item.file_name || item.doc_name || '未命名文件'}
+                  </div>
 
-                    <Descriptions
-                      column={2}
-                      size="small"
-                      className="dataset-descriptions"
-                      data={buildDatasetSummary(assetDetail, selectedDataset).map((item) => ({
-                        label: item.label,
-                        value: <Text>{item.value}</Text>,
-                      }))}
-                    />
+                  {/* 文件大小 */}
+                  <div className="asset-grid-card-meta">
+                    <span>{formatFileSize(item.file_size)}</span>
+                    <span>{item.created_at ? formatDateTime(item.created_at) : '--'}</span>
+                  </div>
 
-                    <div className="dataset-section-grid">
-                      <PrdCard title="Schema 摘要" sub="当前数据集字段结构，用于判断多模态字段和治理范围">
-                        <MiniSchemaTable rows={assetDetail.columns || []} />
-                      </PrdCard>
-                      <PrdCard title="样本快照" sub="直接查看当前数据集的前几条样本，用于汇报和数据核验">
-                        <MiniSampleTable rows={assetDetail.sample_rows || []} />
-                      </PrdCard>
-                    </div>
-                  </TabPane>
+                  {/* 悬停操作 */}
+                  <div className="asset-grid-card-actions" onClick={(e) => e.stopPropagation()}>
+                    <Button type="text" size="small" icon={<IconEye />}>
+                      预览
+                    </Button>
+                    <Button type="text" size="small" icon={<IconDownload />}>
+                      下载
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          // 列表视图
+          <Table
+            columns={columns}
+            data={filteredFiles}
+            rowKey={(record) => record.file_hash || record.id}
+            pagination={{
+              current: currentPage,
+              total,
+              pageSize: 20,
+              onChange: (page) => loadFiles(page, activeCategory),
+            }}
+          />
+        )}
+      </Spin>
 
-                  <TabPane key="schema" title="Schema">
-                    <PrdCard
-                      title="字段结构浏览"
-                      sub="面向数据治理、检索建模与训练准备的结构化查看入口"
-                    >
-                      <MiniSchemaTable rows={assetDetail.columns || []} />
-                    </PrdCard>
-                  </TabPane>
-
-                  <TabPane key="versions" title="版本管理">
-                    {selectedDataset.versioned ? (
-                      <div className="dataset-version-layout">
-                        <div className="dataset-version-note">
-                          <div className="dataset-version-note-title">Lance 版本中心</div>
-                          <div className="dataset-version-note-copy">
-                            当前版本管理直接对齐 Lance Dataset 快照语义。这里优先解决汇报里最重要的三件事：当前生产版本、可回滚历史、以及两个版本之间的摘要差异。
-                          </div>
-                        </div>
-                        <PrdCard
-                          title="版本中心"
-                          sub="当前接入的是 Lance 版本能力，适合做快照、回滚与存储整理"
-                          extra={
-                            <Space>
-                              <Button
-                                size="small"
-                                icon={<IconSync />}
-                                loading={compacting}
-                                onClick={() => handleCompact(selectedDataset.versionKey)}
-                              >
-                                数据整理
-                              </Button>
-                              <Button size="small" icon={<IconRefresh />} onClick={() => loadVersionList(selectedDataset.versionKey)}>
-                                刷新版本
-                              </Button>
-                            </Space>
-                          }
-                        >
-                          <Table
-                            size="small"
-                            rowKey="version"
-                            loading={versionLoading}
-                            columns={versionColumns}
-                            data={versionList}
-                            pagination={false}
-                            noDataElement={<Empty description="暂无版本历史" />}
-                          />
-                        </PrdCard>
-
-                        <PrdCard
-                          title="版本对比摘要"
-                          sub="先基于版本元数据做快照对比，后续可继续补字段差异与样本差异"
-                        >
-                          {versionList.length === 0 ? (
-                            <Empty description="暂无可对比版本" />
-                          ) : (
-                            <>
-                              <div className="dataset-compare-selects">
-                                <div className="field">
-                                  <Text type="secondary">选择两个版本</Text>
-                                  <Select
-                                    mode="multiple"
-                                    maxTagCount={2}
-                                    value={versionSelection}
-                                    onChange={(values) => setVersionSelection(values.slice(-2))}
-                                    style={{ width: '100%', marginTop: 6 }}
-                                  >
-                                    {versionList.map((item) => (
-                                      <Option key={item.version} value={item.version}>{`v${item.version}`}</Option>
-                                    ))}
-                                  </Select>
-                                </div>
-                              </div>
-
-                              {compareData ? (
-                                <div className="dataset-compare-panel">
-                                  <div className="dataset-compare-item">
-                                    <div className="k">基线版本</div>
-                                    <div className="v">{`v${compareData.base.version}`}</div>
-                                    <div className="m">{compareData.base.timestamp ? formatDateTime(compareData.base.timestamp) : '系统快照'}</div>
-                                  </div>
-                                  <div className="dataset-compare-item">
-                                    <div className="k">目标版本</div>
-                                    <div className="v">{`v${compareData.target.version}`}</div>
-                                    <div className="m">{compareData.target.timestamp ? formatDateTime(compareData.target.timestamp) : '系统快照'}</div>
-                                  </div>
-                                  <div className="dataset-compare-item">
-                                    <div className="k">行数变化</div>
-                                    <div className="v">
-                                      {compareData.delta == null
-                                        ? '--'
-                                        : compareData.delta === 0
-                                          ? '0'
-                                          : `${compareData.delta > 0 ? '+' : ''}${formatNumber(compareData.delta)}`}
-                                    </div>
-                                    <div className="m">{`当前生产版本 v${compareData.currentVersion ?? 0}`}</div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <Empty description="请选择两个版本进行摘要对比" />
-                              )}
-                            </>
-                          )}
-                        </PrdCard>
-                      </div>
-                    ) : (
-                      <Empty description="当前数据集不是 Lance 托管数据集，暂不支持版本回滚" />
-                    )}
-                  </TabPane>
-
-                  <TabPane key="samples" title="样本与预览">
-                    <div className="dataset-section-grid">
-                      <PrdCard title="样本预览" sub="数据集样本直接查看">
-                        <MiniSampleTable rows={assetDetail.sample_rows || []} />
-                      </PrdCard>
-                      <PrdCard title="多模态预览入口" sub="如果当前数据集含文件样本，可直接打开预览">
-                        {assetDetail.media_samples?.length > 0 ? (
-                          <div className="dataset-preview-grid">
-                            {assetDetail.media_samples.map((item) => (
-                              <button
-                                key={item.file_hash}
-                                type="button"
-                                className="dataset-preview-card"
-                                onClick={() => handlePreview(item.file_hash)}
-                              >
-                                <div className="dataset-preview-title">{item.doc_name || '未命名样本'}</div>
-                                <div className="dataset-preview-meta">
-                                  <PrdTag kind="info">{item.doc_type || 'unknown'}</PrdTag>
-                                  <span><IconEye /> 打开预览</span>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <Empty description="当前数据集暂无可直接预览的多模态样本" />
-                        )}
-                      </PrdCard>
-                    </div>
-                  </TabPane>
-                </Tabs>
-              )}
-            </Spin>
-          </PrdCard>
-        </Col>
-      </Row>
-
+      {/* 预览弹窗 */}
       <PreviewModal
         open={previewState.open}
         loading={previewState.loading}
