@@ -304,3 +304,7 @@
   对策：优先修复用户可见文案；提交前检查源码编码和构建输出。
 - 风险：演示诉求和真实使用诉求冲突。
   对策：先保证真实链路，演示页只复用链路数据和组件，不另起一套视觉。
+
+## 14. Implementation Plans
+
+- Phase 1 UI foundation: `docs/superpowers/plans/2026-06-08-core-workflow-ui-foundation.md`

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>核心业务流 UI 结构原型</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, "Microsoft YaHei", Arial, sans-serif; color: #111827; background: #f5f7fb; }
+    .shell { min-height: 100vh; display: grid; grid-template-columns: 260px 1fr; }
+    .side { background: #fff; border-right: 1px solid #e5e7eb; padding: 16px 12px; }
+    .brand { height: 54px; display: flex; align-items: center; gap: 10px; font-weight: 800; }
+    .logo { width: 34px; height: 34px; border-radius: 8px; background: #165dff; }
+    .group { margin-top: 14px; }
+    .group-title { font-size: 12px; font-weight: 800; color: #475569; margin: 0 8px 8px; }
+    .item { height: 32px; display: flex; align-items: center; padding: 0 10px; border-radius: 7px; color: #334155; font-size: 13px; }
+    .item.active { background: #eff6ff; color: #165dff; font-weight: 700; }
+    .main { min-width: 0; display: grid; grid-template-rows: 56px 1fr; }
+    .top { background: #fff; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; }
+    .content { padding: 22px; display: grid; gap: 16px; }
+    .title h1 { margin: 0; font-size: 22px; }
+    .title p { margin: 6px 0 0; color: #64748b; font-size: 13px; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .metric, .panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
+    .metric .k { color: #64748b; font-size: 12px; }
+    .metric .v { margin-top: 8px; font-size: 24px; font-weight: 800; }
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .step { min-height: 112px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
+    .step strong { display: block; margin-bottom: 8px; }
+    .step span { color: #64748b; font-size: 12px; line-height: 1.7; }
+    .workspace { display: grid; grid-template-columns: 1.15fr .85fr; gap: 16px; }
+    .rows { display: grid; gap: 8px; margin-top: 12px; }
+    .row { height: 34px; border-radius: 6px; background: #f8fafc; border: 1px solid #edf2f7; }
+    @media (max-width: 900px) { .shell { grid-template-columns: 1fr; } .side { display: none; } .metrics, .flow, .workspace { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="side">
+      <div class="brand"><div class="logo"></div><div>湖仓控制台</div></div>
+      <div class="group"><div class="group-title">湖总览</div><div class="item active">湖仓总览</div><div class="item">资产目录</div></div>
+      <div class="group"><div class="group-title">湖查询</div><div class="item">SQL 查询</div><div class="item">统一检索</div><div class="item">AI 数据副驾驶</div></div>
+      <div class="group"><div class="group-title">湖计算</div><div class="item">工作流编排</div><div class="item">算子中心</div><div class="item">任务中心</div></div>
+      <div class="group"><div class="group-title">湖存储</div><div class="item">总览</div><div class="item">来源接入</div><div class="item">本地上传</div></div>
+      <div class="group"><div class="group-title">湖治理</div><div class="item">数据治理</div></div>
+      <div class="group"><div class="group-title">湖运维</div><div class="item">集群管理</div><div class="item">告警监控</div></div>
+    </aside>
+    <main class="main">
+      <header class="top"><span>湖总览 / 湖仓总览</span><span>平台用户</span></header>
+      <section class="content">
+        <div class="title">
+          <h1>核心业务流工作台</h1>
+          <p>保留一级导航名称，重构页面内部结构和跨页面流转。</p>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="k">接入任务</div><div class="v">18</div></div>
+          <div class="metric"><div class="k">今日查询</div><div class="v">1,284</div></div>
+          <div class="metric"><div class="k">运行作业</div><div class="v">9</div></div>
+          <div class="metric"><div class="k">数据资产</div><div class="v">326</div></div>
+        </div>
+        <div class="flow">
+          <div class="step"><strong>湖存储</strong><span>来源接入、本地上传、入湖结果。</span></div>
+          <div class="step"><strong>湖查询</strong><span>SQL、统一检索、向量和多模态检索。</span></div>
+          <div class="step"><strong>湖计算</strong><span>工作流编排、算子、作业实例。</span></div>
+          <div class="step"><strong>任务中心</strong><span>统一任务状态、日志、重试和取消。</span></div>
+          <div class="step"><strong>湖治理</strong><span>资产目录、版本、Schema 和血缘。</span></div>
+        </div>
+        <div class="workspace">
+          <div class="panel"><strong>列表/表格区域</strong><div class="rows"><div class="row"></div><div class="row"></div><div class="row"></div><div class="row"></div></div></div>
+          <div class="panel"><strong>详情/状态区域</strong><div class="rows"><div class="row"></div><div class="row"></div><div class="row"></div></div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
