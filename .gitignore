@@ -23,6 +23,7 @@ temp_uploads/
 temp_extracted/
 .tmp/
 .aidiff/
+.worktrees/
 *.log
 
 # Agent 运行态
