@@ -15,9 +15,9 @@ import {
 import {
   IconCaretDown,
   IconExport,
+  IconLock,
   IconSearch,
   IconUser,
-  IconLock,
 } from '@arco-design/web-react/icon'
 import { clearAuthSession, loadAuthSession, saveAuthSession, subscribeAuthSession } from '@/auth/session'
 import { findCurrentNav, getVisibleNavGroups } from '@/navigation/navConfig.jsx'
@@ -27,7 +27,7 @@ import NotificationCenter from './components/NotificationCenter.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 
-// 懒加载：只在用户访问对应路由时才加载
+// Lazy-load pages only when users visit the matching route.
 const ComputeJobsOverviewPage = lazy(() => import('./pages/ComputeJobsOverviewPage.jsx'))
 const ConfigCenterPage = lazy(() => import('./pages/ConfigCenterPage.jsx'))
 const DataGovernancePage = lazy(() => import('./pages/DataGovernancePage.jsx'))
@@ -131,6 +131,7 @@ function AppShell({ authSession, onLogout }) {
     navigate('/login', { replace: true })
   }
 
+  const roleLabel = currentUser?.is_admin ? '系统管理员' : '平台用户'
   const userMenu = (
     <Menu
       onClickMenuItem={(key) => {
@@ -146,7 +147,7 @@ function AppShell({ authSession, onLogout }) {
       <Menu.Item key="role" disabled>
         <Space>
           <IconLock />
-          <Text type="secondary">{currentUser?.is_admin ? '系统管理员' : '平台用户'}</Text>
+          <Text type="secondary">{roleLabel}</Text>
         </Space>
       </Menu.Item>
       <Menu.Item key="logout">
@@ -288,7 +289,7 @@ function AppShell({ authSession, onLogout }) {
                 <div style={{ lineHeight: 1.2 }}>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{getDisplayName(currentUser)}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-text-3)' }}>
-                    {currentUser?.is_admin ? '系统管理员' : '平台用户'}
+                    {roleLabel}
                   </div>
                 </div>
                 <IconCaretDown style={{ color: 'var(--color-text-3)' }} />
@@ -299,51 +300,51 @@ function AppShell({ authSession, onLogout }) {
 
         <Content style={{ overflow: 'auto', background: 'var(--color-fill-1)' }}>
           <Suspense fallback={<PageLoading />}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/ingestion" element={<IngestionCenterPage />} />
-            <Route path="/ingestion/workflow" element={<Navigate to="/workflow" replace />} />
-            <Route path="/ingestion/tasks" element={<Navigate to="/task-center" replace />} />
-            <Route path="/ingestion/:tab" element={<IngestionCenterPage />} />
-            <Route path="/workbench" element={<Navigate to="/ingestion/source" replace />} />
-            <Route path="/workflow" element={<WorkflowCenterPage />} />
-            <Route path="/task-center" element={<TaskCenterPage />} />
-            <Route path="/compute/operators" element={<OperatorCenterPage />} />
-            <Route path="/compute/jobs" element={<ComputeJobsOverviewPage />} />
-            <Route path="/compute/templates" element={<TemplateLibraryPage />} />
-            <Route path="/governance" element={<DataGovernancePage />} />
-            <Route path="/settings" element={<Navigate to="/settings/access" replace />} />
-            <Route path="/settings/access" element={<ConfigCenterPage />} />
-            <Route
-              path="/settings/users"
-              element={(
-                <RequireAdmin user={currentUser}>
-                  <UserManagementPage />
-                </RequireAdmin>
-              )}
-            />
-            <Route
-              path="/settings/permissions"
-              element={(
-                <RequireAdmin user={currentUser}>
-                  <PermissionManagementPage />
-                </RequireAdmin>
-              )}
-            />
-            <Route path="/upload" element={<Navigate to="/ingestion/upload" replace />} />
-            <Route path="/lake-query" element={<Navigate to="/lake-query/sql" replace />} />
-            <Route path="/lake-query/:tab" element={<LakeQueryPage />} />
-            <Route path="/search" element={<Navigate to="/lake-query/retrieval" replace />} />
-            <Route path="/files" element={<FilesPage />} />
-            <Route path="/logs" element={<LogsPage />} />
-            <Route path="/mpp/cluster" element={<ClusterPage />} />
-            <Route path="/mpp/sql" element={<SqlEditorPage />} />
-            <Route path="/mpp/alert" element={<AlertPage />} />
-            <Route path="/mpp/inspection" element={<InspectionPage />} />
-            <Route path="/ray/jobs" element={<RayJobsPage />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/ingestion" element={<IngestionCenterPage />} />
+              <Route path="/ingestion/workflow" element={<Navigate to="/workflow" replace />} />
+              <Route path="/ingestion/tasks" element={<Navigate to="/task-center" replace />} />
+              <Route path="/ingestion/:tab" element={<IngestionCenterPage />} />
+              <Route path="/workbench" element={<Navigate to="/ingestion/source" replace />} />
+              <Route path="/workflow" element={<WorkflowCenterPage />} />
+              <Route path="/task-center" element={<TaskCenterPage />} />
+              <Route path="/compute/operators" element={<OperatorCenterPage />} />
+              <Route path="/compute/jobs" element={<ComputeJobsOverviewPage />} />
+              <Route path="/compute/templates" element={<TemplateLibraryPage />} />
+              <Route path="/governance" element={<DataGovernancePage />} />
+              <Route path="/settings" element={<Navigate to="/settings/access" replace />} />
+              <Route path="/settings/access" element={<ConfigCenterPage />} />
+              <Route
+                path="/settings/users"
+                element={(
+                  <RequireAdmin user={currentUser}>
+                    <UserManagementPage />
+                  </RequireAdmin>
+                )}
+              />
+              <Route
+                path="/settings/permissions"
+                element={(
+                  <RequireAdmin user={currentUser}>
+                    <PermissionManagementPage />
+                  </RequireAdmin>
+                )}
+              />
+              <Route path="/upload" element={<Navigate to="/ingestion/upload" replace />} />
+              <Route path="/lake-query" element={<Navigate to="/lake-query/sql" replace />} />
+              <Route path="/lake-query/:tab" element={<LakeQueryPage />} />
+              <Route path="/search" element={<Navigate to="/lake-query/retrieval" replace />} />
+              <Route path="/files" element={<FilesPage />} />
+              <Route path="/logs" element={<LogsPage />} />
+              <Route path="/mpp/cluster" element={<ClusterPage />} />
+              <Route path="/mpp/sql" element={<SqlEditorPage />} />
+              <Route path="/mpp/alert" element={<AlertPage />} />
+              <Route path="/mpp/inspection" element={<InspectionPage />} />
+              <Route path="/ray/jobs" element={<RayJobsPage />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
           </Suspense>
         </Content>
       </Layout>
