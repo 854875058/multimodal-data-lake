@@ -13,30 +13,14 @@ import {
   Typography,
 } from '@arco-design/web-react'
 import {
-  IconApps,
-  IconBug,
-  IconCalendarClock,
   IconCaretDown,
-  IconCloudDownload,
-  IconCommand,
-  IconCommon,
-  IconDashboard,
   IconExport,
-  IconFile,
-  IconLanguage,
-  IconLayout,
-  IconLock,
-  IconNotification,
-  IconRobot,
-  IconSafe,
   IconSearch,
-  IconSettings,
-  IconStorage,
-  IconUpload,
   IconUser,
-  IconUserGroup,
+  IconLock,
 } from '@arco-design/web-react/icon'
 import { clearAuthSession, loadAuthSession, saveAuthSession, subscribeAuthSession } from '@/auth/session'
+import { findCurrentNav, getVisibleNavGroups } from '@/navigation/navConfig.jsx'
 import boncLogo from '@/assets/bonc.jpg'
 import CommandPalette from './components/CommandPalette.jsx'
 import NotificationCenter from './components/NotificationCenter.jsx'
@@ -74,96 +58,6 @@ function PageLoading() {
 const { Sider, Header, Content } = Layout
 const { SubMenu, Item: MenuItem } = Menu
 const { Title, Text } = Typography
-
-const navGroups = [
-  {
-    key: 'lake-overview',
-    title: '湖总览',
-    icon: <IconDashboard />,
-    items: [
-      { path: '/dashboard', label: '湖总览', icon: <IconDashboard /> },
-      { path: '/files', label: '资产目录', icon: <IconFile /> },
-    ],
-  },
-  {
-    key: 'lake-query',
-    title: '湖查询',
-    icon: <IconSearch />,
-    items: [
-      { path: '/lake-query/sql', label: 'SQL 查询', icon: <IconCommand /> },
-      { path: '/lake-query/retrieval', label: '统一检索', icon: <IconSearch /> },
-      { path: '/lake-query/vector', label: '向量检索', icon: <IconSearch /> },
-      { path: '/lake-query/multimodal', label: '多模态检索', icon: <IconLayout /> },
-      { path: '/lake-query/hybrid', label: '混合检索', icon: <IconCommon /> },
-      { path: '/lake-query/copilot', label: 'AI 数据副驾驶', icon: <IconRobot /> },
-      { path: '/lake-query/annotation', label: '自动化标注', icon: <IconExport /> },
-    ],
-  },
-  {
-    key: 'lake-compute',
-    title: '湖计算',
-    icon: <IconApps />,
-    items: [
-      { path: '/workflow', label: '工作流编排', icon: <IconLayout /> },
-      { path: '/compute/operators', label: '算子中心', icon: <IconCommon /> },
-      { path: '/task-center', label: '任务中心', icon: <IconCalendarClock /> },
-      { path: '/compute/jobs', label: '作业实例', icon: <IconRobot /> },
-      { path: '/compute/templates', label: '模板库', icon: <IconFile /> },
-    ],
-  },
-  {
-    key: 'lake-storage',
-    title: '湖存储',
-    icon: <IconStorage />,
-    items: [
-      { path: '/ingestion', label: '总览', icon: <IconStorage /> },
-      { path: '/ingestion/source', label: '来源接入', icon: <IconCloudDownload /> },
-      { path: '/ingestion/upload', label: '本地上传', icon: <IconUpload /> },
-    ],
-  },
-  {
-    key: 'lake-governance',
-    title: '湖治理',
-    icon: <IconSafe />,
-    items: [
-      { path: '/governance', label: '数据治理', icon: <IconSafe /> },
-    ],
-  },
-  {
-    key: 'mpp-database',
-    title: '湖运维',
-    icon: <IconDashboard />,
-    items: [
-      { path: '/mpp/cluster', label: '集群管理', icon: <IconCommon /> },
-      { path: '/mpp/sql', label: 'SQL 编辑器', icon: <IconCommand /> },
-      { path: '/mpp/alert', label: '告警监控', icon: <IconNotification /> },
-      { path: '/mpp/inspection', label: '自动巡检', icon: <IconBug /> },
-    ],
-  },
-  {
-    key: 'system-config',
-    title: '系统配置',
-    icon: <IconSettings />,
-    items: [
-      { path: '/settings/access', label: '来源配置', icon: <IconSettings /> },
-      { path: '/logs', label: '系统日志', icon: <IconLanguage /> },
-    ],
-  },
-  {
-    key: 'admin-tools',
-    title: '管理入口',
-    icon: <IconLock />,
-    requiresAdmin: true,
-    items: [
-      { path: '/settings/users', label: '用户管理', icon: <IconUser />, requiresAdmin: true },
-      { path: '/settings/permissions', label: '权限管理', icon: <IconUserGroup />, requiresAdmin: true },
-    ],
-  },
-]
-
-const allNavItems = navGroups.flatMap((group) =>
-  group.items.map((item) => ({ ...item, groupKey: group.key, groupTitle: group.title }))
-)
 
 function buildIntentPath(location) {
   return `${location.pathname}${location.search || ''}`
@@ -213,19 +107,11 @@ function RequireAdmin({ user, children }) {
 function AppShell({ authSession, onLogout }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const currentNav = allNavItems
-    .filter((item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`))
-    .sort((left, right) => right.path.length - left.path.length)[0] || allNavItems[0]
+  const currentNav = findCurrentNav(location.pathname)
 
   const currentUser = authSession.user
   const showAdminLinks = Boolean(currentUser?.is_admin)
-  const visibleGroups = navGroups
-    .filter((group) => !group.requiresAdmin || showAdminLinks)
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => !item.hidden && (!item.requiresAdmin || showAdminLinks)),
-    }))
-    .filter((group) => group.items.length > 0)
+  const visibleGroups = getVisibleNavGroups({ isAdmin: showAdminLinks })
   const [collapsed, setCollapsed] = useState(false)
   const [paletteVisible, setPaletteVisible] = useState(false)
 
@@ -381,7 +267,7 @@ function AppShell({ authSession, onLogout }) {
               onClick={() => setPaletteVisible(true)}
               style={{ color: 'var(--color-text-2)', fontSize: 16 }}
             >
-              <span style={{ fontSize: 12, marginLeft: 4, color: 'var(--color-text-3)' }}>⌘K</span>
+              <span style={{ fontSize: 12, marginLeft: 4, color: 'var(--color-text-3)' }}>Ctrl K</span>
             </Button>
             <NotificationCenter onNavigate={(path) => navigate(path)} />
             <div style={{ width: 1, height: 20, background: 'var(--color-border-2)', margin: '0 6px' }} />
