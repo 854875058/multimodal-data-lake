@@ -37,12 +37,9 @@ export const navGroups = [
     title: '湖查询',
     icon: <IconSearch />,
     items: [
+      { path: '/lake-query/copilot', label: 'AI 数据副驾驶', icon: <IconRobot /> },
       { path: '/lake-query/sql', label: 'SQL 查询', icon: <IconCommand /> },
       { path: '/lake-query/retrieval', label: '统一检索', icon: <IconSearch /> },
-      { path: '/lake-query/vector', label: '向量检索', icon: <IconSearch /> },
-      { path: '/lake-query/multimodal', label: '多模态检索', icon: <IconLayout /> },
-      { path: '/lake-query/hybrid', label: '混合检索', icon: <IconCommon /> },
-      { path: '/lake-query/copilot', label: 'AI 数据副驾驶', icon: <IconRobot /> },
       { path: '/lake-query/annotation', label: '自动化标注', icon: <IconExport /> },
     ],
   },

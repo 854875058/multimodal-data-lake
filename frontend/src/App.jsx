@@ -333,7 +333,7 @@ function AppShell({ authSession, onLogout }) {
                 )}
               />
               <Route path="/upload" element={<Navigate to="/ingestion/upload" replace />} />
-              <Route path="/lake-query" element={<Navigate to="/lake-query/sql" replace />} />
+              <Route path="/lake-query" element={<Navigate to="/lake-query/copilot" replace />} />
               <Route path="/lake-query/:tab" element={<LakeQueryPage />} />
               <Route path="/search" element={<Navigate to="/lake-query/retrieval" replace />} />
               <Route path="/files" element={<FilesPage />} />

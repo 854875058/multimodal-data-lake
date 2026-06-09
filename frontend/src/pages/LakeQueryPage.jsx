@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Button,
   Card,
@@ -34,6 +34,7 @@ import api, { getErrorMessage } from '@/api'
 import { dorisGet, dorisPost, dorisDelete } from '@/api/doris'
 import { truncateText } from '@/utils/format'
 import SqlEditor from '@/components/SqlEditor'
+import { getLakeQueryRouteState, normalizeRetrievalStrategy } from './lake-query/queryRouting'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
@@ -53,10 +54,24 @@ const PAGE_MAP = {
 }
 
 const RETRIEVAL_PRESET_MAP = {
-  retrieval: 'semantic',
-  vector: 'semantic',
-  multimodal: 'visual',
+  retrieval: 'auto',
+  vector: 'vector',
+  multimodal: 'multimodal',
   hybrid: 'hybrid',
+}
+
+const RETRIEVAL_STRATEGY_LABELS = {
+  auto: '智能选择',
+  semantic: '语义检索',
+  vector: '向量检索',
+  multimodal: '多模态检索',
+  hybrid: '混合检索',
+}
+
+function getRetrievalInitialQuery(strategy) {
+  if (strategy === 'multimodal') return '查找设备异常外观相关的图片样本'
+  if (strategy === 'hybrid') return '夜间巡检异常样本，按设备和告警等级汇总'
+  return '夜间巡检异常样本'
 }
 
 const COPILOT_EXAMPLES = [
@@ -519,8 +534,9 @@ function SqlWorkspaceTab() {
 }
 
 function RetrievalWorkspaceTab({ initialStrategy = 'semantic' }) {
-  const [strategy, setStrategy] = useState(initialStrategy)
-  const [query, setQuery] = useState(initialStrategy === 'visual' ? '查找设备异常外观相关的图片样本' : '夜间巡检异常样本')
+  const normalizedInitialStrategy = normalizeRetrievalStrategy(initialStrategy)
+  const [strategy, setStrategy] = useState(normalizedInitialStrategy)
+  const [query, setQuery] = useState(getRetrievalInitialQuery(normalizedInitialStrategy))
   const [limit, setLimit] = useState(12)
   const [rrfK, setRrfK] = useState(60)
   const [results, setResults] = useState([])
@@ -531,7 +547,7 @@ function RetrievalWorkspaceTab({ initialStrategy = 'semantic' }) {
   const [messageText, setMessageText] = useState('')
 
   useEffect(() => {
-    setStrategy(initialStrategy)
+    setStrategy(normalizeRetrievalStrategy(initialStrategy))
   }, [initialStrategy])
 
   const run = async () => {
@@ -543,22 +559,22 @@ function RetrievalWorkspaceTab({ initialStrategy = 'semantic' }) {
     setResults([])
     setMessageText('')
     try {
-      if (strategy === 'hybrid') {
+      if (strategy === 'auto' || strategy === 'hybrid') {
         const response = await api.search(query.trim(), 'hybrid', { limit, rrf_k: rrfK })
         if (!response.success) throw new Error(response.message || '检索失败')
         setResults(Array.isArray(response.results) ? response.results : [])
         setMessageText(response.message || '')
-        setRouteText('关键词检索 + 向量召回 + RRF 融合')
-        setRouteMeta(`RRF k=${rrfK}，适合复杂组合查询。`)
+        setRouteText(strategy === 'auto' ? '智能选择 · 混合召回' : '关键词检索 + 向量召回 + RRF 融合')
+        setRouteMeta(strategy === 'auto' ? '系统优先使用混合召回，适合用户不确定检索策略时使用。' : `RRF k=${rrfK}，适合复杂组合查询。`)
       } else {
         const guideResponse = await api.convertNlToVector({ prompt: query.trim(), top_k: limit })
         const guide = guideResponse?.data || {}
-        const mode = strategy === 'visual' ? 'image' : (guide.mode || 'text')
+        const mode = strategy === 'multimodal' ? 'image' : (guide.mode || 'text')
         const response = await api.search(query.trim(), mode, limit)
         if (!response.success) throw new Error(response.message || '检索失败')
         setResults(Array.isArray(response.results) ? response.results : [])
         setMessageText(guide.command_text || '')
-        setRouteText(mode === 'image' ? '文搜图向量检索' : '文本语义检索')
+        setRouteText(mode === 'image' ? '文搜图多模态检索' : `${RETRIEVAL_STRATEGY_LABELS[strategy]}召回`)
         setRouteMeta(guide.command_text || '已根据当前问题生成检索指令。')
       }
       setSearched(true)
@@ -572,7 +588,7 @@ function RetrievalWorkspaceTab({ initialStrategy = 'semantic' }) {
   }
 
   const summaryItems = [
-    { key: 'strategy', label: '当前策略', value: strategy === 'semantic' ? '语义检索' : strategy === 'visual' ? '文搜图' : '混合检索', meta: '统一在一个工作台内切换，不再拆成多个页面。' },
+    { key: 'strategy', label: '当前策略', value: RETRIEVAL_STRATEGY_LABELS[strategy] || '智能选择', meta: '统一在一个工作台内切换，不再拆成多个页面。' },
     { key: 'limit', label: '结果规模', value: `${limit} 条`, meta: '适合演示召回效果和快速抽样。' },
     { key: 'route', label: '检索路径', value: routeText, meta: routeMeta },
     { key: 'count', label: '当前命中', value: searched ? `${results.length} 条` : '--', meta: messageText || '执行后会展示召回资产与检索说明。' },
@@ -589,8 +605,10 @@ function RetrievalWorkspaceTab({ initialStrategy = 'semantic' }) {
           <Card title={<Space><IconSearch />检索输入</Space>} bodyStyle={{ padding: 16 }}>
             <Text type="secondary">检索策略</Text>
             <Select value={strategy} onChange={setStrategy} style={{ width: '100%', marginTop: 6 }}>
+              <Option value="auto">智能选择</Option>
               <Option value="semantic">语义检索</Option>
-              <Option value="visual">文搜图</Option>
+              <Option value="vector">向量检索</Option>
+              <Option value="multimodal">多模态检索</Option>
               <Option value="hybrid">混合检索</Option>
             </Select>
             <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>检索内容</Text>
@@ -602,18 +620,20 @@ function RetrievalWorkspaceTab({ initialStrategy = 'semantic' }) {
               </Col>
               <Col span={12}>
                 <Text type="secondary">RRF K</Text>
-                <InputNumber value={rrfK} onChange={setRrfK} min={10} max={200} disabled={strategy !== 'hybrid'} style={{ width: '100%', marginTop: 6 }} />
+                <InputNumber value={rrfK} onChange={setRrfK} min={10} max={200} disabled={!['auto', 'hybrid'].includes(strategy)} style={{ width: '100%', marginTop: 6 }} />
               </Col>
             </Row>
-            <Button type="primary" icon={strategy === 'visual' ? <IconImage /> : <IconSearch />} onClick={run} loading={searching} style={{ marginTop: 16, width: '100%' }}>
+            <Button type="primary" icon={strategy === 'multimodal' ? <IconImage /> : <IconSearch />} onClick={run} loading={searching} style={{ marginTop: 16, width: '100%' }}>
               开始检索
             </Button>
           </Card>
 
           <Card title="策略说明" bodyStyle={{ padding: 16 }}>
             <div style={{ display: 'grid', gap: 12 }}>
+              <JourneyStep title="智能选择" status={strategy === 'auto' ? 'running' : 'pending'} detail="默认策略，系统根据问题选择合适的检索路径。" />
               <JourneyStep title="语义检索" status={strategy === 'semantic' ? 'running' : 'pending'} detail="适合文本语义、摘要内容和相似描述。" />
-              <JourneyStep title="文搜图" status={strategy === 'visual' ? 'running' : 'pending'} detail="适合查相似图片、异常外观和跨模态样本。" />
+              <JourneyStep title="向量检索" status={strategy === 'vector' ? 'running' : 'pending'} detail="适合按向量相似度召回相近资产。" />
+              <JourneyStep title="多模态检索" status={strategy === 'multimodal' ? 'running' : 'pending'} detail="适合查相似图片、异常外观和跨模态样本。" />
               <JourneyStep title="混合检索" status={strategy === 'hybrid' ? 'running' : 'pending'} detail="适合同时需要关键词过滤和语义理解的复杂问题。" />
             </div>
           </Card>
@@ -1177,19 +1197,18 @@ function CopilotTab() {
 export default function LakeQueryPage() {
   const { tab } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const routeState = getLakeQueryRouteState(tab)
 
   useEffect(() => {
-    if (!tab || !PAGE_MAP[tab]) {
-      navigate('/lake-query/sql', { replace: true })
-      return
+    if (routeState.redirectTo) {
+      navigate(routeState.redirectTo, { replace: true })
     }
-    if (tab === 'nl2sql') {
-      navigate('/lake-query/sql', { replace: true })
-    }
-  }, [navigate, tab])
+  }, [navigate, routeState.redirectTo])
 
-  const activeTab = PAGE_MAP[tab] ? (tab === 'vector' || tab === 'multimodal' || tab === 'hybrid' ? 'retrieval' : tab) : 'sql'
-  const retrievalPreset = RETRIEVAL_PRESET_MAP[tab] || 'semantic'
+  const strategyParam = new URLSearchParams(location.search).get('strategy')
+  const activeTab = routeState.activeTab
+  const retrievalPreset = normalizeRetrievalStrategy(strategyParam || RETRIEVAL_PRESET_MAP[tab] || routeState.retrievalStrategy)
 
   return (
     <div style={{ padding: 24, background: 'var(--prd-bg)', minHeight: '100%' }}>
